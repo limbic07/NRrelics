@@ -1,6 +1,6 @@
 # NRrelic_Bot
 
-An automated relic screening assistant based on OCR and simulated input. Designed to save your time and fingers.
+An automated relic screening assistant based on OCR and simulated input. Designed to save your time and fingers. Based on OCR, so it only support NR in Simplified Chinese version.
 
 ## ⚠️ Disclaimer (Must Read)
 
