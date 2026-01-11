@@ -43,7 +43,9 @@ IGNORE_TEXTS = [
     "装备时",
     "至游戏版本"
 ]
-
+# --- UI 界面锚点 (用于确认当前是否在遗物详情页) ---
+# 只有检测到这些词，才认为脚本处于受控状态
+UI_ANCHORS = ["立刻卖出", "移除喜爱", "登记"]
 
 # ================= 工具函数 =================
 
@@ -369,7 +371,7 @@ class BotLogic:
                 "top": monitor["top"] + int(h * 0.2),
                 "left": monitor["left"] + int(w * 0.3),
                 "width": int(w * 0.4),
-                "height": int(h * 0.6)
+                "height": int(h * 0.75)
             }
             img = np.array(sct.grab(roi))
             return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
@@ -408,7 +410,7 @@ class BotLogic:
         res, _ = self.ocr(img)
         text = "".join([line[1] for line in res]) if res else ""
         has_stone = "原石" in text
-        has_deep = "黯淡" in text or "暗淡" in text
+        has_deep = "暗淡" in text
         if mode == "deepnight":
             if has_stone and has_deep: return True
         else:
@@ -417,27 +419,42 @@ class BotLogic:
         return False
 
     def wait_for_result_screen(self, timeout=2.5):
+        """
+        智能等待：循环截图直到出现物品详情页
+        [优化] 加入 UI 锚点检测，防止误判
+        """
         start_time = time.time()
         while time.time() - start_time < timeout:
             if self.should_stop: return False, None
+
             img = self.get_screen_image()
             res, _ = self.ocr(img)
             text = "".join([line[1] for line in res]) if res else ""
-            if "情景" in text or "卖出" in text or "关闭" in text:
+
+            # [核心优化] 严格检查是否包含底部功能键文字
+            # 只要识别到 "立刻卖出" 或 "移除喜爱"，就说明界面肯定是详情页，而不是加载画面或商店列表
+            is_valid_ui = any(anchor in text for anchor in UI_ANCHORS)
+
+            if is_valid_ui:
                 return True, img
+
+            # 备选：如果 OCR 没识别到底部小字，但识别到了核心内容，也可以放行（视情况而定）
+            # 但为了安全，建议强制要求识别到 UI
+
             time.sleep(0.05)
         return False, None
 
     def purchase_loop(self, config):
+        # 1.连按3下交互键进入遗物详情页
         self.press(KEYS['interact'], duration=0.03, wait=0.05)
         self.press(KEYS['interact'], duration=0.03, wait=0.05)
-        time.sleep(0.15)
         self.press(KEYS['interact'], duration=0.03, wait=0.05)
-
+        # 2.等待界面页加载
         success, img = self.wait_for_result_screen(timeout=2.5)
 
         if not success:
-            self.press(KEYS['interact'])
+            self.log("❌ 异常：未识别到遗物详情界面 UI，脚本已安全停止。")
+            self.should_stop = True
             return
 
         keep, reason, debug_info = self.check_logic(img, config)
