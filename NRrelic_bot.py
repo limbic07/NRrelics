@@ -5,7 +5,6 @@ import json
 import os
 import threading
 import time
-import datetime
 import pydirectinput
 from rapidocr_onnxruntime import RapidOCR
 import mss
@@ -579,7 +578,7 @@ class BotLogic:
 class App(tb.Window):
     def __init__(self):
         super().__init__(themename="superhero")
-        self.title("NRrelic_bot V1.0")
+        self.title("NRrelic_bot V1.2")
         self.geometry("1100x850")
 
         self.norm_pos, self.deep_pos, self.deep_neg = DataLoader.get_data()
@@ -603,7 +602,7 @@ class App(tb.Window):
         rb1 = tb.Radiobutton(top, text="普通遗物", variable=self.mode_var, value="normal", command=self.on_mode_change);
         rb1.pack(side=LEFT, padx=10)
         rb2 = tb.Radiobutton(top, text="深夜遗物", variable=self.mode_var, value="deepnight",
-                             command=self.on_mode_change);
+                             command=self.on_mode_change)
         rb2.pack(side=LEFT, padx=10)
 
         # [修改] 右侧：全局配置按钮
@@ -612,26 +611,26 @@ class App(tb.Window):
         tb.Button(top, text="导入配置", width=8, command=self.import_full_config, bootstyle="warning-outline").pack(
             side=RIGHT, padx=5)
 
-        self.nb = tb.Notebook(self);
+        self.nb = tb.Notebook(self)
         self.nb.pack(fill=BOTH, expand=True, padx=10)
 
-        self.tab1 = tb.Frame(self.nb);
+        self.tab1 = tb.Frame(self.nb)
         self.nb.add(self.tab1, text="1. 策略预设")
         self.ui_presets = PresetEditor(self.tab1, [])
         self.ui_presets.pack(fill=BOTH, expand=True)
 
-        self.tab2 = tb.Frame(self.nb);
+        self.tab2 = tb.Frame(self.nb)
         self.nb.add(self.tab2, text="2. 全局致命负面")
         self.ui_neg = AttributeSelector(self.tab2, self.deep_neg, "负面词条", "黑名单(出现即卖)", "danger")
         self.ui_neg.pack(fill=BOTH, expand=True)
 
-        ctrl = tb.Frame(self);
+        ctrl = tb.Frame(self)
         ctrl.pack(fill=X, padx=20, pady=20)
         self.btn_start = tb.Button(ctrl, text="开始挂机", command=self.start, bootstyle="success");
         self.btn_start.pack(side=LEFT, fill=X, expand=True, padx=5)
         self.btn_stop = tb.Button(ctrl, text="停止 (F11)", command=self.stop, bootstyle="danger", state="disabled");
         self.btn_stop.pack(side=LEFT, fill=X, expand=True, padx=5)
-        self.log_text = tb.Text(self, height=8);
+        self.log_text = tb.Text(self, height=8)
         self.log_text.pack(fill=X, padx=20, pady=10)
 
     def on_mode_change(self):
