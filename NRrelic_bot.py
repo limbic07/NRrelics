@@ -60,7 +60,7 @@ def normalize_text(text):
     text = text.replace('碱', '减')
     text = text.replace('土', '+')
 
-    # 3. [关键修复] 解决竖线被识别为数字1的问题
+    # 3.解决竖线被识别为数字1的问题
     # 场景： "攻击力+3|" -> OCR "攻击力+31"
     # 游戏里通常加值是个位数或双位数，+31/+21 这种如果不合理，就在这里修
     text = text.replace('+41', '+4')
