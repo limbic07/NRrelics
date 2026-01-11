@@ -17,8 +17,8 @@ import difflib
 from tkinter import simpledialog, filedialog, messagebox
 
 
-
 # ================= 配置区域 =================
+pydirectinput.PAUSE = 0.0
 
 KEYS = {
     'interact': 'f',
@@ -37,7 +37,7 @@ IGNORE_TEXTS = [
 UI_ANCHORS = ["立刻卖出", "移除喜爱", "登记"]
 
 
-# ================= 调试用：性能分析工具 =================
+# ================= 调试工具 =================
 class Profiler:
     def __init__(self):
         self.records = {}
@@ -64,7 +64,7 @@ class Profiler:
 
 # ================= 工具函数 =================
 def get_resource_path(relative_path):
-    """ 获取资源绝对路径，兼容开发环境和打包后的 EXE 环境 """
+    """ 获取资源绝对路径 """
     if hasattr(sys, '_MEIPASS'):
         base_path = sys._MEIPASS
     else:
@@ -158,6 +158,7 @@ class AttributeSelector(tb.Frame):
         self.all_items = all_items if all_items else []
         self.current_selection_ref = []
         self.callback = callback
+
         container = tb.Frame(self)
         container.pack(fill=BOTH, expand=True, padx=5, pady=5)
 
@@ -208,9 +209,11 @@ class AttributeSelector(tb.Frame):
     def refresh(self, search=""):
         for t in [self.tree_left, self.tree_right]:
             for x in t.get_children(): t.delete(x)
+
         for item in self.all_items:
             if item not in self.current_selection_ref and search in item.lower():
                 self.tree_left.insert("", END, text=item)
+
         for item in self.current_selection_ref:
             self.tree_right.insert("", END, text=item)
 
@@ -233,7 +236,6 @@ class AttributeSelector(tb.Frame):
     def get_list(self):
         return self.current_selection_ref
 
-    # [重要] 恢复 set_list 方法，用于加载负面配置
     def set_list(self, lst):
         valid_items = [normalize_text(i) for i in lst]
         self.current_selection_ref = [i for i in valid_items if i in self.all_items]
@@ -241,7 +243,8 @@ class AttributeSelector(tb.Frame):
 
 
 class PresetEditor(tb.Frame):
-    def __init__(self, master, all_possible_items, export_cb=None, import_cb=None, **kwargs):
+    # [修改] 移除了 export_cb 和 import_cb，因为按钮移走了
+    def __init__(self, master, all_possible_items, **kwargs):
         super().__init__(master, **kwargs)
         self.presets = []
         self.current_preset_index = -1
@@ -259,13 +262,7 @@ class PresetEditor(tb.Frame):
         tb.Button(toolbar1, text="改名", width=5, command=self.rename_preset, bootstyle="info-outline").pack(side=LEFT,
                                                                                                              padx=1)
 
-        # [修改] 导入导出按钮改为调用回调函数
-        toolbar2 = tb.Frame(left_panel)
-        toolbar2.pack(fill=X, pady=2)
-        tb.Button(toolbar2, text="导出配置", width=8, command=export_cb, bootstyle="secondary-outline").pack(side=LEFT,
-                                                                                                             padx=1)
-        tb.Button(toolbar2, text="导入配置", width=8, command=import_cb, bootstyle="warning-outline").pack(side=LEFT,
-                                                                                                           padx=1)
+        # [修改] 移除了底部的导入导出按钮栏
 
         self.lb_presets = tb.Treeview(left_panel, show="tree", selectmode="browse")
         self.lb_presets.pack(fill=BOTH, expand=True)
@@ -447,9 +444,9 @@ class BotLogic:
 
     def purchase_loop(self, config):
         self.profiler.start("按键操作(买)")
-        # [极速三连]
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
+        time.sleep(0.3)
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.profiler.end("按键操作(买)")
 
@@ -461,8 +458,13 @@ class BotLogic:
             return
 
         self.profiler.start("逻辑判定")
-        keep, reason, debug_info = self.check_logic(img, config)
+        keep, reason, debug_info, pos_str, neg_str = self.check_logic(img, config)
         self.profiler.end("逻辑判定")
+
+        # [新增] 在界面打印清洗后的识别结果
+        self.log(f"📝 正面: {pos_str}")
+        if neg_str:
+            self.log(f"⚠️ 负面: {neg_str}")
 
         self.profiler.start("按键操作(卖/留)")
         if keep:
@@ -470,57 +472,71 @@ class BotLogic:
             self.press(KEYS['interact'], duration=0.02, wait=0.1)
         else:
             self.log(f"× 卖出 | {reason}")
-            # [极速卖出]
             self.press(KEYS['sell'], duration=0.02, wait=0.03)
-            self.press(KEYS['interact'], duration=0.02, wait=0.03)
+            self.press(KEYS['interact'], duration=0.02, wait=0.1)
         self.profiler.end("按键操作(卖/留)")
 
         self.profiler.print_report()
 
     def check_logic(self, img, config):
+        """
+        V33.0 逻辑：先清洗纠错，再进行判定，最后返回清洗后的字符串用于显示
+        """
         mode = config['mode']
         active_presets = config['presets']
         bad_neg_list = config['bad_neg']
 
         pos_lines, neg_lines = self.extract_text_by_color(img)
 
-        # 1. 查负面
+        # --- 1. 数据清洗与纠错 (生成标准化的列表) ---
+
+        clean_neg_lines = []
         if mode == "deepnight":
             for ocr_line in neg_lines:
                 corrected, score = find_best_match_in_library(ocr_line, self.master_library)
                 target = corrected if score > CORRECTION_THRESHOLD else ocr_line
-                for bad in bad_neg_list:
-                    if bad in target:
-                        return False, f"致命负面 [{bad}]", ""
+                clean_neg_lines.append(target)
 
-        # 2. 查正面
-        normalized_pos_lines = []
+        clean_pos_lines = []
         for ocr_line in pos_lines:
             if len(ocr_line) < 2: continue
             if "情景" in ocr_line: continue
 
             corrected, score = find_best_match_in_library(ocr_line, self.master_library)
             if score > CORRECTION_THRESHOLD:
-                normalized_pos_lines.append(corrected)
+                clean_pos_lines.append(corrected)
 
+        # 生成用于显示的字符串
+        pos_str_display = " | ".join(clean_pos_lines)
+        neg_str_display = " | ".join(clean_neg_lines)
+
+        # --- 2. 逻辑判定 (使用清洗后的数据) ---
+
+        # 负面检查
+        if mode == "deepnight":
+            for target in clean_neg_lines:
+                for bad in bad_neg_list:
+                    if bad in target:
+                        return False, f"致命负面 [{bad}]", "", pos_str_display, neg_str_display
+
+        # 正面检查 (遍历预设)
         for preset in active_presets:
             preset_name = preset['name']
             wanted_items = preset['items']
             match_count = 0
             hits = []
 
-            for line in normalized_pos_lines:
+            for line in clean_pos_lines:
                 for wanted in wanted_items:
-                    # 全等匹配
                     if wanted == line:
                         match_count += 1
                         hits.append(wanted)
                         break
 
             if match_count >= 2:
-                return True, f"命中方案[{preset_name}]: {hits}", ""
+                return True, f"命中方案[{preset_name}]: {hits}", "", pos_str_display, neg_str_display
 
-        return False, "不符合任何启用预设", ""
+        return False, "不符合任何启用预设", "", pos_str_display, neg_str_display
 
     def run(self, config):
         self.log(">>> 3秒后开始校验...")
@@ -529,10 +545,10 @@ class BotLogic:
         self.log(">>> 校验通过，开始循环...")
         while not self.should_stop:
             self.purchase_loop(config)
-            # 极速循环
-            time.sleep(0.1)
+            time.sleep(0.2)
 
-# ================= 主程序入口 =================
+        # ================= 主程序入口 =================
+
 
 class App(tb.Window):
     def __init__(self):
@@ -543,37 +559,39 @@ class App(tb.Window):
         self.norm_pos, self.deep_pos, self.deep_neg = DataLoader.get_data()
         self.logic = None
 
-        # 内存数据初始化
         self.presets_norm = []
         self.presets_deep = []
 
         self.setup_ui()
         self.load_config()
 
-        # 绑定退出事件
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def setup_ui(self):
         top = tb.Frame(self);
         top.pack(fill=X, padx=10, pady=10)
-        tb.Label(top, text="选择模式", font=("bold", 12)).pack(side=LEFT)
+
+        # 左侧：模式选择
+        tb.Label(top, text="模式", font=("bold", 12)).pack(side=LEFT)
         self.mode_var = tb.StringVar(value="deepnight")
         rb1 = tb.Radiobutton(top, text="普通遗物", variable=self.mode_var, value="normal", command=self.on_mode_change);
-        rb1.pack(side=LEFT, padx=15)
+        rb1.pack(side=LEFT, padx=10)
         rb2 = tb.Radiobutton(top, text="深夜遗物", variable=self.mode_var, value="deepnight",
                              command=self.on_mode_change);
-        rb2.pack(side=LEFT, padx=15)
+        rb2.pack(side=LEFT, padx=10)
+
+        # [修改] 右侧：全局配置按钮
+        tb.Button(top, text="导出配置", width=8, command=self.export_full_config, bootstyle="secondary-outline").pack(
+            side=RIGHT, padx=5)
+        tb.Button(top, text="导入配置", width=8, command=self.import_full_config, bootstyle="warning-outline").pack(
+            side=RIGHT, padx=5)
 
         self.nb = tb.Notebook(self);
         self.nb.pack(fill=BOTH, expand=True, padx=10)
 
         self.tab1 = tb.Frame(self.nb);
-        self.nb.add(self.tab1, text="1. 策略预设 (定义多套保留方案)")
-        self.ui_presets = PresetEditor(
-            self.tab1, [],
-            export_cb=self.export_full_config,
-            import_cb=self.import_full_config  # 这里调用 self.import_full_config，下面必须定义
-        )
+        self.nb.add(self.tab1, text="1. 策略预设")
+        self.ui_presets = PresetEditor(self.tab1, [])
         self.ui_presets.pack(fill=BOTH, expand=True)
 
         self.tab2 = tb.Frame(self.nb);
@@ -657,17 +675,13 @@ class App(tb.Window):
             print(f"保存配置失败: {e}")
 
     def export_full_config(self):
-        """导出当前配置"""
-        # 先保存一下当前状态到内存变量
-        self.save_to_json()
-
+        self.save_to_json()  # 先存到内存和本地
         data = {
             'last_mode': self.mode_var.get(),
             'presets_norm': self.presets_norm,
             'presets_deep': self.presets_deep,
             'bad_neg': self.ui_neg.get_list()
         }
-
         filename = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON Config", "*.json")],
@@ -682,49 +696,73 @@ class App(tb.Window):
                 messagebox.showerror("错误", f"导出失败: {e}")
 
     def import_full_config(self):
-        """导入配置 (兼容旧版列表格式)"""
+        """导入配置 (智能识别旧版/新版，支持取消)"""
         filename = filedialog.askopenfilename(
             filetypes=[("JSON Config", "*.json"), ("All Files", "*.*")],
             title="导入配置"
         )
-        if filename:
-            try:
-                with open(filename, "r", encoding="utf-8") as f:
-                    c = json.load(f)
+        if not filename: return
 
-                # --- 情况 A: 导入的是旧版预设文件 (列表格式) ---
-                if isinstance(c, list):
-                    current_mode = self.mode_var.get()
-                    if current_mode == "normal":
-                        self.presets_norm = c
-                    else:
-                        self.presets_deep = c
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                c = json.load(f)
 
-                    self.on_mode_change()  # 刷新界面
-                    messagebox.showinfo("成功", f"检测到旧版预设文件。\n已成功导入到当前【{current_mode}】模式！")
-                    return
+            # --- 情况 A: 导入的是旧版预设文件 (列表格式) ---
+            if isinstance(c, list):
+                # 获取当前界面选中的模式名称
+                curr_mode_val = self.mode_var.get()
+                curr_mode_name = "普通遗物" if curr_mode_val == "normal" else "深夜遗物"
 
-                # --- 情况 B: 导入的是新版完整配置 (字典格式) ---
-                default_preset = [{"name": "默认预设", "items": []}]
+                # [修改点] 使用 askyesnocancel，增加取消选项
+                choice = messagebox.askyesnocancel(
+                    "导入旧版预设",
+                    f"检测到旧版预设文件（不含模式信息）。\n\n"
+                    f"当前界面选择的是【{curr_mode_name}】。\n"
+                    f"点击【是】导入到【{curr_mode_name}】模式。\n"
+                    f"点击【否】反转导入到另一模式。\n"
+                    f"点击【取消】或【关闭窗口】中止操作。",
+                    icon='warning'
+                )
 
-                self.presets_norm = c.get('presets_norm', default_preset)
-                self.presets_deep = c.get('presets_deep', default_preset)
+                # [逻辑判断]
+                if choice is None:
+                    return  # 用户点击了取消或X，直接中止
 
-                loaded_neg = c.get('bad_neg', [])
-                self.ui_neg.set_list(loaded_neg)
+                # choice为True(是) -> 当前模式；choice为False(否) -> 反转模式
+                target_mode = curr_mode_val if choice else ("deepnight" if curr_mode_val == "normal" else "normal")
 
-                mode = c.get('last_mode', 'deepnight')
-                self.mode_var.set(mode)
+                if target_mode == "normal":
+                    self.presets_norm = c
+                    if self.mode_var.get() != "normal": self.mode_var.set("normal")
+                else:
+                    self.presets_deep = c
+                    if self.mode_var.get() != "deepnight": self.mode_var.set("deepnight")
 
-                self.on_mode_change()
+                self.on_mode_change()  # 刷新界面
 
-                messagebox.showinfo("成功", "完整配置导入成功！")
+                target_name = "普通遗物" if target_mode == "normal" else "深夜遗物"
+                messagebox.showinfo("成功", f"旧版预设已成功导入到【{target_name}】模式！")
+                return
 
-            except Exception as e:
-                messagebox.showerror("错误", f"导入失败: {e}")
+            # --- 情况 B: 导入的是新版完整配置 (字典格式) ---
+            default_preset = [{"name": "默认预设", "items": []}]
 
+            self.presets_norm = c.get('presets_norm', default_preset)
+            self.presets_deep = c.get('presets_deep', default_preset)
+
+            loaded_neg = c.get('bad_neg', [])
+            self.ui_neg.set_list(loaded_neg)
+
+            mode = c.get('last_mode', 'deepnight')
+            self.mode_var.set(mode)
+
+            self.on_mode_change()
+
+            messagebox.showinfo("成功", "完整配置导入成功！")
+
+        except Exception as e:
+            messagebox.showerror("错误", f"导入失败: {e}")
     def load_config(self):
-        """启动时加载配置"""
         default_preset = [{"name": "默认配置", "items": []}]
         self.presets_norm = default_preset
         self.presets_deep = default_preset
@@ -734,11 +772,9 @@ class App(tb.Window):
             try:
                 with open("bot_config.json", "r", encoding='utf-8') as f:
                     c = json.load(f)
-
                     self.presets_norm = c.get('presets_norm', default_preset)
                     self.presets_deep = c.get('presets_deep', default_preset)
                     saved_neg_list = c.get('bad_neg', [])
-
                     mode = c.get('last_mode', 'deepnight')
                     self.mode_var.set(mode)
             except Exception as e:
