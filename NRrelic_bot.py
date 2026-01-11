@@ -14,6 +14,7 @@ import cv2
 import keyboard
 import unicodedata
 import difflib
+import ctypes
 from tkinter import simpledialog, filedialog, messagebox
 
 
@@ -61,6 +62,23 @@ class Profiler:
         print(f"⏱️ 总耗时        : {total:6.1f} ms")
         print("-" * 40)
 
+# ================= 窗口管理工具  =================
+class WindowMgr:
+    """使用 Windows API 检测当前前台窗口"""
+    @staticmethod
+    def is_game_active():
+        try:
+            # 获取当前用户正在操作的窗口句柄
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            # 获取窗口标题
+            length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+            buff = ctypes.create_unicode_buffer(length + 1)
+            ctypes.windll.user32.GetWindowTextW(hwnd, buff, length + 1)
+            title = buff.value
+            # 判断标题是否包含游戏名
+            return "ELDEN RING NIGHTREIGN" in title
+        except:
+            return False
 
 # ================= 工具函数 =================
 def get_resource_path(relative_path):
@@ -382,7 +400,8 @@ class BotLogic:
             return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
     def extract_text_by_color(self, img):
-        self.profiler.start("OpenCV处理")
+        # 1. 图像处理 (OpenCV)
+        self.profiler.start("OpenCV预处理")
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         lower_blue = np.array([90, 50, 50])
         upper_blue = np.array([130, 255, 255])
@@ -395,12 +414,13 @@ class BotLogic:
         _, img_neg_bin = cv2.threshold(cv2.cvtColor(img_neg, cv2.COLOR_BGR2GRAY), 10, 255, cv2.THRESH_BINARY)
         img_pos = cv2.bitwise_and(img, img, mask=mask_white)
         _, img_pos_bin = cv2.threshold(cv2.cvtColor(img_pos, cv2.COLOR_BGR2GRAY), 50, 255, cv2.THRESH_BINARY)
-        self.profiler.end("OpenCV处理")
+        self.profiler.end("OpenCV预处理")
 
-        self.profiler.start("OCR识别")
+        # 2. OCR 推理 (这是大头)
+        self.profiler.start("RapidOCR推理")
         res_neg, _ = self.ocr(img_neg_bin)
         res_pos, _ = self.ocr(img_pos_bin)
-        self.profiler.end("OCR识别")
+        self.profiler.end("RapidOCR推理")
 
         list_neg = [normalize_text(line[1]) for line in res_neg] if res_neg else []
         list_pos = [normalize_text(line[1]) for line in res_pos] if res_pos else []
@@ -443,6 +463,11 @@ class BotLogic:
         return False, None
 
     def purchase_loop(self, config):
+        # 焦点检测：如果当前前台窗口不是游戏，立即停止
+        if not WindowMgr.is_game_active():
+            self.log("🛑 警告：游戏失去焦点 (检测到切屏)，脚本自动停止。")
+            self.should_stop = True
+            return
         self.profiler.start("按键操作(买)")
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
@@ -457,9 +482,7 @@ class BotLogic:
             self.should_stop = True
             return
 
-        self.profiler.start("逻辑判定")
         keep, reason, debug_info, pos_str, neg_str = self.check_logic(img, config)
-        self.profiler.end("逻辑判定")
 
         # [新增] 在界面打印清洗后的识别结果
         self.log(f"📝 正面: {pos_str}")
@@ -479,24 +502,32 @@ class BotLogic:
         self.profiler.print_report()
 
     def check_logic(self, img, config):
-        """
-        V33.0 逻辑：先清洗纠错，再进行判定，最后返回清洗后的字符串用于显示
-        """
+        self.profiler.start("提取文本(含OCR)")
+        pos_lines, neg_lines = self.extract_text_by_color(img)
+        self.profiler.end("提取文本(含OCR)")
+
         mode = config['mode']
         active_presets = config['presets']
         bad_neg_list = config['bad_neg']
 
-        pos_lines, neg_lines = self.extract_text_by_color(img)
-
-        # --- 1. 数据清洗与纠错 (生成标准化的列表) ---
-
+        # 1. 负面检查耗时
+        self.profiler.start("负面判定")
         clean_neg_lines = []
         if mode == "deepnight":
             for ocr_line in neg_lines:
                 corrected, score = find_best_match_in_library(ocr_line, self.master_library)
                 target = corrected if score > CORRECTION_THRESHOLD else ocr_line
-                clean_neg_lines.append(target)
+                clean_neg_lines.append(target)  # 保存下来后面显示用
 
+                for bad in bad_neg_list:
+                    if bad in target:
+                        msg = f"致命负面 [{bad}]"
+                        self.profiler.end("负面判定")
+                        return False, msg, f"❌ {msg}", "", ""
+        self.profiler.end("负面判定")
+
+        # 2. 正面标准化耗时 (这通常是最耗时的，因为要遍历全库纠错)
+        self.profiler.start("正面纠错标准化")
         clean_pos_lines = []
         for ocr_line in pos_lines:
             if len(ocr_line) < 2: continue
@@ -505,21 +536,14 @@ class BotLogic:
             corrected, score = find_best_match_in_library(ocr_line, self.master_library)
             if score > CORRECTION_THRESHOLD:
                 clean_pos_lines.append(corrected)
+        self.profiler.end("正面纠错标准化")
 
-        # 生成用于显示的字符串
+        # 生成显示字符串
         pos_str_display = " | ".join(clean_pos_lines)
         neg_str_display = " | ".join(clean_neg_lines)
 
-        # --- 2. 逻辑判定 (使用清洗后的数据) ---
-
-        # 负面检查
-        if mode == "deepnight":
-            for target in clean_neg_lines:
-                for bad in bad_neg_list:
-                    if bad in target:
-                        return False, f"致命负面 [{bad}]", "", pos_str_display, neg_str_display
-
-        # 正面检查 (遍历预设)
+        # 3. 预设匹配耗时
+        self.profiler.start("预设匹配计算")
         for preset in active_presets:
             preset_name = preset['name']
             wanted_items = preset['items']
@@ -534,7 +558,9 @@ class BotLogic:
                         break
 
             if match_count >= 2:
+                self.profiler.end("预设匹配计算")
                 return True, f"命中方案[{preset_name}]: {hits}", "", pos_str_display, neg_str_display
+        self.profiler.end("预设匹配计算")
 
         return False, "不符合任何启用预设", "", pos_str_display, neg_str_display
 
@@ -651,6 +677,7 @@ class App(tb.Window):
 
     def stop(self):
         if self.logic: self.logic.should_stop = True
+        self.log("🛑 已接收停止指令 (F11/按钮)，正在结束当前循环...")
         self.btn_start.config(state="normal");
         self.btn_stop.config(state="disabled")
 
