@@ -17,14 +17,6 @@ import difflib
 from tkinter import simpledialog, filedialog, messagebox
 
 
-def get_resource_path(relative_path):
-    """ 获取资源绝对路径，兼容开发环境和打包后的 EXE 环境 """
-    if hasattr(sys, '_MEIPASS'):
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
-
 
 # ================= 配置区域 =================
 
@@ -42,7 +34,6 @@ IGNORE_TEXTS = [
     "装备时",
     "至游戏版本"
 ]
-# UI 界面锚点
 UI_ANCHORS = ["立刻卖出", "移除喜爱", "登记"]
 
 
@@ -72,6 +63,13 @@ class Profiler:
 
 
 # ================= 工具函数 =================
+def get_resource_path(relative_path):
+    """ 获取资源绝对路径，兼容开发环境和打包后的 EXE 环境 """
+    if hasattr(sys, '_MEIPASS'):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
 
 def normalize_text(text):
     if not text: return ""
@@ -93,42 +91,28 @@ def is_fuzzy_match(ocr_line, target_line, threshold=FUZZY_THRESHOLD):
 
 
 def find_best_match_in_library(ocr_line, library):
-    """
-    [核心优化] 智能剪枝 + 全量优选
-    既保证速度，又保证 '火属性' 和 '雷属性' 这种高度相似词条不被搞混
-    """
     if not ocr_line or len(ocr_line) < 2: return None, 0.0
-
-    # 1. 精确匹配 (最快)
     if ocr_line in library: return ocr_line, 1.0
 
     best_ratio = 0.0
     best_text = None
-
-    # 预计算特征集合
     ocr_set = set(ocr_line)
     ocr_len = len(ocr_line)
 
     for item in library:
-        # 2. [剪枝] 长度差异过大，直接跳过 (比如 '+1' 和 '攻击力+1')
-        if abs(len(item) - ocr_len) > 3:
+        item_len = len(item)
+        if abs(item_len - ocr_len) > 2:
             continue
 
-        # 3. [剪枝] 字符重合度检查 (Jaccard变体)
-        # 如果公共字符连一半都不到，肯定不是同一个词，跳过 difflib 计算
-        # 这步能过滤掉 95% 无关词条，极大提升速度
         common_chars = 0
         for char in item:
             if char in ocr_set:
                 common_chars += 1
-        if common_chars < max(len(item), ocr_len) * 0.5:
+
+        if common_chars < max(item_len, ocr_len) * 0.6:
             continue
 
-        # 4. 只有很像的才进行精细比对
         ratio = difflib.SequenceMatcher(None, ocr_line, item).ratio()
-
-        # 5. [关键] 记录最高分，但不提前退出！
-        # 必须看完所有候选者，防止把 '火属性' 误认为 '雷属性'
         if ratio > best_ratio:
             best_ratio = ratio
             best_text = item
@@ -166,7 +150,7 @@ class DataLoader:
         return sorted(list(set(n + dp + dn)))
 
 
-# ================= UI 组件 (保持原样) =================
+# ================= UI 组件 =================
 
 class AttributeSelector(tb.Frame):
     def __init__(self, master, all_items, title_left, title_right, bootstyle="primary", callback=None, **kwargs):
@@ -176,6 +160,7 @@ class AttributeSelector(tb.Frame):
         self.callback = callback
         container = tb.Frame(self)
         container.pack(fill=BOTH, expand=True, padx=5, pady=5)
+
         frame_left = tb.Labelframe(container, text=title_left, bootstyle="secondary")
         frame_left.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
         self.search_var = tb.StringVar()
@@ -186,10 +171,12 @@ class AttributeSelector(tb.Frame):
         sb_left = tb.Scrollbar(frame_left, orient="vertical", command=self.tree_left.yview)
         sb_left.pack(side=RIGHT, fill=Y)
         self.tree_left.configure(yscrollcommand=sb_left.set)
+
         frame_mid = tb.Frame(container)
         frame_mid.pack(side=LEFT, fill=Y, padx=5, pady=50)
         tb.Button(frame_mid, text="添加 >>", command=self.add_item, bootstyle=bootstyle).pack(pady=10)
         tb.Button(frame_mid, text="<< 移除", command=self.remove_item, bootstyle="secondary").pack(pady=10)
+
         frame_right = tb.Labelframe(container, text=title_right, bootstyle=bootstyle)
         frame_right.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
         self.tree_right = tb.Treeview(frame_right, show="tree", selectmode="extended")
@@ -197,18 +184,23 @@ class AttributeSelector(tb.Frame):
         sb_right = tb.Scrollbar(frame_right, orient="vertical", command=self.tree_right.yview)
         sb_right.pack(side=RIGHT, fill=Y)
         self.tree_right.configure(yscrollcommand=sb_right.set)
+
         self.tree_left.bind("<Control-a>", lambda e: self.select_all(self.tree_left))
         self.tree_right.bind("<Control-a>", lambda e: self.select_all(self.tree_right))
+
         self.refresh()
 
     def select_all(self, tree):
-        tree.selection_set(tree.get_children()); return "break"
+        tree.selection_set(tree.get_children())
+        return "break"
 
     def load_selection(self, selection_list_ref):
-        self.current_selection_ref = selection_list_ref; self.refresh()
+        self.current_selection_ref = selection_list_ref
+        self.refresh()
 
     def update_source(self, new_items):
-        self.all_items = new_items; self.refresh()
+        self.all_items = new_items
+        self.refresh()
 
     def filter_left(self, *args):
         self.refresh(self.search_var.get().lower())
@@ -219,35 +211,46 @@ class AttributeSelector(tb.Frame):
         for item in self.all_items:
             if item not in self.current_selection_ref and search in item.lower():
                 self.tree_left.insert("", END, text=item)
-        for item in self.current_selection_ref: self.tree_right.insert("", END, text=item)
+        for item in self.current_selection_ref:
+            self.tree_right.insert("", END, text=item)
 
     def add_item(self):
         for item in self.tree_left.selection():
             txt = self.tree_left.item(item, "text")
-            if txt not in self.current_selection_ref: self.current_selection_ref.append(txt)
-        self.refresh(self.search_var.get());
+            if txt not in self.current_selection_ref:
+                self.current_selection_ref.append(txt)
+        self.refresh(self.search_var.get())
         if self.callback: self.callback()
 
     def remove_item(self):
         for item in self.tree_right.selection():
             txt = self.tree_right.item(item, "text")
-            if txt in self.current_selection_ref: self.current_selection_ref.remove(txt)
-        self.refresh(self.search_var.get());
+            if txt in self.current_selection_ref:
+                self.current_selection_ref.remove(txt)
+        self.refresh(self.search_var.get())
         if self.callback: self.callback()
 
     def get_list(self):
         return self.current_selection_ref
 
+    # [重要] 恢复 set_list 方法，用于加载负面配置
+    def set_list(self, lst):
+        valid_items = [normalize_text(i) for i in lst]
+        self.current_selection_ref = [i for i in valid_items if i in self.all_items]
+        self.refresh()
+
 
 class PresetEditor(tb.Frame):
-    def __init__(self, master, all_possible_items, **kwargs):
+    def __init__(self, master, all_possible_items, export_cb=None, import_cb=None, **kwargs):
         super().__init__(master, **kwargs)
-        self.presets = [];
-        self.current_preset_index = -1;
+        self.presets = []
+        self.current_preset_index = -1
         self.all_possible_items = all_possible_items
-        left_panel = tb.Frame(self, width=220);
+
+        left_panel = tb.Frame(self, width=220)
         left_panel.pack(side=LEFT, fill=Y, padx=5, pady=5)
-        toolbar1 = tb.Frame(left_panel);
+
+        toolbar1 = tb.Frame(left_panel)
         toolbar1.pack(fill=X, pady=2)
         tb.Button(toolbar1, text="+", width=3, command=self.add_preset, bootstyle="success-outline").pack(side=LEFT,
                                                                                                           padx=1)
@@ -255,81 +258,91 @@ class PresetEditor(tb.Frame):
                                                                                                          padx=1)
         tb.Button(toolbar1, text="改名", width=5, command=self.rename_preset, bootstyle="info-outline").pack(side=LEFT,
                                                                                                              padx=1)
-        toolbar2 = tb.Frame(left_panel);
+
+        # [修改] 导入导出按钮改为调用回调函数
+        toolbar2 = tb.Frame(left_panel)
         toolbar2.pack(fill=X, pady=2)
-        tb.Button(toolbar2, text="导出预设", width=8, command=self.export_presets, bootstyle="secondary-outline").pack(
-            side=LEFT, padx=1)
-        tb.Button(toolbar2, text="导入预设", width=8, command=self.import_presets, bootstyle="warning-outline").pack(
-            side=LEFT, padx=1)
-        self.lb_presets = tb.Treeview(left_panel, show="tree", selectmode="browse");
+        tb.Button(toolbar2, text="导出配置", width=8, command=export_cb, bootstyle="secondary-outline").pack(side=LEFT,
+                                                                                                             padx=1)
+        tb.Button(toolbar2, text="导入配置", width=8, command=import_cb, bootstyle="warning-outline").pack(side=LEFT,
+                                                                                                           padx=1)
+
+        self.lb_presets = tb.Treeview(left_panel, show="tree", selectmode="browse")
         self.lb_presets.pack(fill=BOTH, expand=True)
         self.lb_presets.bind("<<TreeviewSelect>>", self.on_preset_select)
-        self.selector = AttributeSelector(self, self.all_possible_items, "词条库", "当前预设包含的词条 (>=2生效)",
-                                          "success")
+
+        self.selector = AttributeSelector(
+            self,
+            self.all_possible_items,
+            "词条库",
+            "当前预设包含的词条 (>=2生效)",
+            "success"
+        )
         self.selector.pack(side=RIGHT, fill=BOTH, expand=True)
 
     def load_presets(self, presets_data):
-        self.presets = presets_data;
-        if not self.presets: self.presets.append({"name": "默认预设", "items": []})
+        self.presets = presets_data
+        if not self.presets:
+            self.presets.append({"name": "默认预设", "items": []})
         self.refresh_list()
-        if self.presets: self.lb_presets.selection_set(self.lb_presets.get_children()[0])
+        if self.presets:
+            try:
+                first_id = self.lb_presets.get_children()[0]
+                self.lb_presets.selection_set(first_id)
+            except IndexError:
+                pass
 
     def refresh_list(self):
-        selected = self.lb_presets.selection();
+        selected = self.lb_presets.selection()
         selected_idx = self.lb_presets.index(selected[0]) if selected else 0
-        for item in self.lb_presets.get_children(): self.lb_presets.delete(item)
-        for p in self.presets: self.lb_presets.insert("", END, text=f"{p['name']} ({len(p['items'])})")
+
+        for item in self.lb_presets.get_children():
+            self.lb_presets.delete(item)
+
+        for p in self.presets:
+            count = len(p["items"])
+            self.lb_presets.insert("", END, text=f"{p['name']} ({count})")
+
         children = self.lb_presets.get_children()
-        if 0 <= selected_idx < len(children):
-            self.lb_presets.selection_set(children[selected_idx])
-        elif children:
-            self.lb_presets.selection_set(children[0])
+        if children:
+            if 0 <= selected_idx < len(children):
+                self.lb_presets.selection_set(children[selected_idx])
+            else:
+                self.lb_presets.selection_set(children[0])
 
     def on_preset_select(self, event):
-        selected = self.lb_presets.selection();
+        selected = self.lb_presets.selection()
         if not selected: return
-        idx = self.lb_presets.index(selected[0]);
-        self.current_preset_index = idx;
+        idx = self.lb_presets.index(selected[0])
+        self.current_preset_index = idx
         self.selector.load_selection(self.presets[idx]["items"])
 
     def add_preset(self):
         if len(self.presets) >= 10: return
-        self.presets.append({"name": f"预设 {len(self.presets) + 1}", "items": []});
-        self.refresh_list();
-        self.lb_presets.selection_set(self.lb_presets.get_children()[-1])
+        new_name = f"预设 {len(self.presets) + 1}"
+        self.presets.append({"name": new_name, "items": []})
+        self.refresh_list()
+        children = self.lb_presets.get_children()
+        if children:
+            self.lb_presets.selection_set(children[-1])
 
     def del_preset(self):
         if len(self.presets) <= 1: return
-        if self.current_preset_index >= 0: del self.presets[self.current_preset_index]; self.refresh_list()
+        if self.current_preset_index >= 0:
+            del self.presets[self.current_preset_index]
+            self.refresh_list()
 
     def rename_preset(self):
         if self.current_preset_index < 0: return
-        new_name = simpledialog.askstring("重命名", "请输入预设名称:",
-                                          initialvalue=self.presets[self.current_preset_index]["name"])
-        if new_name: self.presets[self.current_preset_index]["name"] = new_name; self.refresh_list()
-
-    def export_presets(self):
-        f = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
-        if f:
-            try:
-                with open(f, "w", encoding="utf-8") as file:
-                    json.dump(self.presets, file, ensure_ascii=False, indent=4)
-                messagebox.showinfo("成功", f"导出成功")
-            except Exception as e:
-                messagebox.showerror("错误", str(e))
-
-    def import_presets(self):
-        f = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
-        if f:
-            try:
-                with open(f, "r", encoding="utf-8") as file:
-                    data = json.load(file); self.presets = data; self.refresh_list(); messagebox.showinfo("成功",
-                                                                                                          "导入成功")
-            except Exception as e:
-                messagebox.showerror("错误", str(e))
+        old_name = self.presets[self.current_preset_index]["name"]
+        new_name = simpledialog.askstring("重命名", "请输入预设名称:", initialvalue=old_name)
+        if new_name:
+            self.presets[self.current_preset_index]["name"] = new_name
+            self.refresh_list()
 
     def update_source_library(self, new_library):
-        self.all_possible_items = new_library; self.selector.update_source(new_library)
+        self.all_possible_items = new_library
+        self.selector.update_source(new_library)
 
     def get_presets(self):
         return self.presets
@@ -373,11 +386,6 @@ class BotLogic:
 
     def extract_text_by_color(self, img):
         self.profiler.start("OpenCV处理")
-
-        # [保留图片留证功能] (可按需注释)
-        ts = datetime.datetime.now().strftime("%H_%M_%S_%f")
-        # cv2.imwrite(f"logs/{ts}_1_raw.jpg", img)
-
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         lower_blue = np.array([90, 50, 50])
         upper_blue = np.array([130, 255, 255])
@@ -432,7 +440,6 @@ class BotLogic:
             if is_valid_ui:
                 self.profiler.end("等待界面")
                 return True, img
-
             time.sleep(0.05)
 
         self.profiler.end("等待界面")
@@ -440,13 +447,14 @@ class BotLogic:
 
     def purchase_loop(self, config):
         self.profiler.start("按键操作(买)")
-        # [优化] 极速三连：缩短 duration 和 wait
+        # [极速三连]
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.profiler.end("按键操作(买)")
 
         success, img = self.wait_for_result_screen(timeout=1.5)
+
         if not success:
             self.log("❌ 异常：未识别到遗物详情界面 UI，脚本已安全停止。")
             self.should_stop = True
@@ -462,6 +470,7 @@ class BotLogic:
             self.press(KEYS['interact'], duration=0.02, wait=0.1)
         else:
             self.log(f"× 卖出 | {reason}")
+            # [极速卖出]
             self.press(KEYS['sell'], duration=0.02, wait=0.03)
             self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.profiler.end("按键操作(卖/留)")
@@ -475,25 +484,16 @@ class BotLogic:
 
         pos_lines, neg_lines = self.extract_text_by_color(img)
 
-        # print("\n" + "=" * 40)
-        # print(f"📸 [OCR 原始识别结果]")
-        # print(f"🔵 负面池 (蓝字): {neg_lines}")
-        # print(f"⚪ 正面池 (白字): {pos_lines}")
-        # print("-" * 40)
-
+        # 1. 查负面
         if mode == "deepnight":
-            # print(f"💀 [负面检查] 开始比对黑名单...")
             for ocr_line in neg_lines:
                 corrected, score = find_best_match_in_library(ocr_line, self.master_library)
                 target = corrected if score > CORRECTION_THRESHOLD else ocr_line
-
                 for bad in bad_neg_list:
                     if bad in target:
-                        msg = f"致命负面 [{bad}] (来源: {ocr_line} -> {target})"
-                        return False, msg, f"❌ {msg}"
-            # print(f"✅ 负面检查通过")
+                        return False, f"致命负面 [{bad}]", ""
 
-        # print(f"✨ [正面标准化] 开始全库纠错...")
+        # 2. 查正面
         normalized_pos_lines = []
         for ocr_line in pos_lines:
             if len(ocr_line) < 2: continue
@@ -502,12 +502,6 @@ class BotLogic:
             corrected, score = find_best_match_in_library(ocr_line, self.master_library)
             if score > CORRECTION_THRESHOLD:
                 normalized_pos_lines.append(corrected)
-                # print(f"   🔹 '{ocr_line}' -> 修正为: '{corrected}' ({score:.2f})")
-            else:
-                pass
-                # print(f"   🔸 '{ocr_line}' -> 无法识别/噪点")
-
-        # print(f"🎯 [预设匹配] 开始匹配 {len(active_presets)} 套方案...")
 
         for preset in active_presets:
             preset_name = preset['name']
@@ -517,21 +511,16 @@ class BotLogic:
 
             for line in normalized_pos_lines:
                 for wanted in wanted_items:
-                    # 必须完全相等才算命中
+                    # 全等匹配
                     if wanted == line:
                         match_count += 1
                         hits.append(wanted)
                         break
 
             if match_count >= 2:
-                success_msg = f"命中方案[{preset_name}]: {hits}"
-                # print(f"🎉 判定保留! {success_msg}")
-                return True, success_msg, ""
-            else:
-                pass
-                # print(f"   💨 预设[{preset_name}] 不满足: {match_count}/2 {hits}")
+                return True, f"命中方案[{preset_name}]: {hits}", ""
 
-        return False, "不符合任何启用预设", "不满足条件"
+        return False, "不符合任何启用预设", ""
 
     def run(self, config):
         self.log(">>> 3秒后开始校验...")
@@ -540,8 +529,8 @@ class BotLogic:
         self.log(">>> 校验通过，开始循环...")
         while not self.should_stop:
             self.purchase_loop(config)
+            # 极速循环
             time.sleep(0.1)
-
 
 # ================= 主程序入口 =================
 
@@ -550,12 +539,19 @@ class App(tb.Window):
         super().__init__(themename="superhero")
         self.title("NRrelic_bot V1.0")
         self.geometry("1100x850")
+
         self.norm_pos, self.deep_pos, self.deep_neg = DataLoader.get_data()
         self.logic = None
+
+        # 内存数据初始化
         self.presets_norm = []
         self.presets_deep = []
+
         self.setup_ui()
         self.load_config()
+
+        # 绑定退出事件
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def setup_ui(self):
         top = tb.Frame(self);
@@ -567,16 +563,24 @@ class App(tb.Window):
         rb2 = tb.Radiobutton(top, text="深夜遗物", variable=self.mode_var, value="deepnight",
                              command=self.on_mode_change);
         rb2.pack(side=LEFT, padx=15)
+
         self.nb = tb.Notebook(self);
         self.nb.pack(fill=BOTH, expand=True, padx=10)
+
         self.tab1 = tb.Frame(self.nb);
         self.nb.add(self.tab1, text="1. 策略预设 (定义多套保留方案)")
-        self.ui_presets = PresetEditor(self.tab1, []);
+        self.ui_presets = PresetEditor(
+            self.tab1, [],
+            export_cb=self.export_full_config,
+            import_cb=self.import_full_config  # 这里调用 self.import_full_config，下面必须定义
+        )
         self.ui_presets.pack(fill=BOTH, expand=True)
+
         self.tab2 = tb.Frame(self.nb);
         self.nb.add(self.tab2, text="2. 全局致命负面")
-        self.ui_neg = AttributeSelector(self.tab2, self.deep_neg, "负面词条", "黑名单(出现即卖)", "danger");
+        self.ui_neg = AttributeSelector(self.tab2, self.deep_neg, "负面词条", "黑名单(出现即卖)", "danger")
         self.ui_neg.pack(fill=BOTH, expand=True)
+
         ctrl = tb.Frame(self);
         ctrl.pack(fill=X, padx=20, pady=20)
         self.btn_start = tb.Button(ctrl, text="开始挂机", command=self.start, bootstyle="success");
@@ -589,26 +593,35 @@ class App(tb.Window):
     def on_mode_change(self):
         mode = self.mode_var.get()
         if mode == "normal":
-            self.ui_presets.update_source_library(self.norm_pos);
-            self.ui_presets.load_presets(self.presets_norm);
+            self.ui_presets.update_source_library(self.norm_pos)
+            self.ui_presets.load_presets(self.presets_norm)
             self.nb.tab(1, state="disabled")
         else:
-            self.ui_presets.update_source_library(self.deep_pos);
-            self.ui_presets.load_presets(self.presets_deep);
+            self.ui_presets.update_source_library(self.deep_pos)
+            self.ui_presets.load_presets(self.presets_deep)
             self.nb.tab(1, state="normal")
 
     def log(self, msg):
-        self.log_text.insert(END, msg + "\n"); self.log_text.see(END)
+        self.log_text.insert(END, msg + "\n")
+        self.log_text.see(END)
 
     def start(self):
         current_presets = self.ui_presets.get_presets()
         if not current_presets: self.log("错误：请至少添加一套预设策略！"); return
-        config = {'mode': self.mode_var.get(), 'presets': current_presets, 'bad_neg': self.ui_neg.get_list()}
+
         self.save_to_json()
+
+        config = {
+            'mode': self.mode_var.get(),
+            'presets': current_presets,
+            'bad_neg': self.ui_neg.get_list()
+        }
+
         self.logic = BotLogic(self.log)
         t = threading.Thread(target=self.logic.run, args=(config,))
         t.daemon = True;
         t.start()
+
         threading.Thread(target=self.monitor_keys, daemon=True).start()
         self.btn_start.config(state="disabled");
         self.btn_stop.config(state="normal")
@@ -625,31 +638,119 @@ class App(tb.Window):
 
     def save_to_json(self):
         mode = self.mode_var.get()
-        current_data = self.ui_presets.get_presets()
+        current_presets = self.ui_presets.get_presets()
         if mode == "normal":
-            self.presets_norm = current_data
+            self.presets_norm = current_presets
         else:
-            self.presets_deep = current_data
-        data = {'last_mode': mode, 'presets_norm': self.presets_norm, 'presets_deep': self.presets_deep,
-                'bad_neg': self.ui_neg.get_list()}
-        with open("bot_config.json", "w", encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False)
+            self.presets_deep = current_presets
+
+        data = {
+            'last_mode': mode,
+            'presets_norm': self.presets_norm,
+            'presets_deep': self.presets_deep,
+            'bad_neg': self.ui_neg.get_list()
+        }
+        try:
+            with open("bot_config.json", "w", encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"保存配置失败: {e}")
+
+    def export_full_config(self):
+        """导出当前配置"""
+        # 先保存一下当前状态到内存变量
+        self.save_to_json()
+
+        data = {
+            'last_mode': self.mode_var.get(),
+            'presets_norm': self.presets_norm,
+            'presets_deep': self.presets_deep,
+            'bad_neg': self.ui_neg.get_list()
+        }
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON Config", "*.json")],
+            title="导出完整配置"
+        )
+        if filename:
+            try:
+                with open(filename, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+                messagebox.showinfo("成功", f"配置已导出到:\n{filename}")
+            except Exception as e:
+                messagebox.showerror("错误", f"导出失败: {e}")
+
+    def import_full_config(self):
+        """导入配置 (兼容旧版列表格式)"""
+        filename = filedialog.askopenfilename(
+            filetypes=[("JSON Config", "*.json"), ("All Files", "*.*")],
+            title="导入配置"
+        )
+        if filename:
+            try:
+                with open(filename, "r", encoding="utf-8") as f:
+                    c = json.load(f)
+
+                # --- 情况 A: 导入的是旧版预设文件 (列表格式) ---
+                if isinstance(c, list):
+                    current_mode = self.mode_var.get()
+                    if current_mode == "normal":
+                        self.presets_norm = c
+                    else:
+                        self.presets_deep = c
+
+                    self.on_mode_change()  # 刷新界面
+                    messagebox.showinfo("成功", f"检测到旧版预设文件。\n已成功导入到当前【{current_mode}】模式！")
+                    return
+
+                # --- 情况 B: 导入的是新版完整配置 (字典格式) ---
+                default_preset = [{"name": "默认预设", "items": []}]
+
+                self.presets_norm = c.get('presets_norm', default_preset)
+                self.presets_deep = c.get('presets_deep', default_preset)
+
+                loaded_neg = c.get('bad_neg', [])
+                self.ui_neg.set_list(loaded_neg)
+
+                mode = c.get('last_mode', 'deepnight')
+                self.mode_var.set(mode)
+
+                self.on_mode_change()
+
+                messagebox.showinfo("成功", "完整配置导入成功！")
+
+            except Exception as e:
+                messagebox.showerror("错误", f"导入失败: {e}")
 
     def load_config(self):
-        self.presets_norm = [{"name": "默认配置", "items": []}]
-        self.presets_deep = [{"name": "默认配置", "items": []}]
+        """启动时加载配置"""
+        default_preset = [{"name": "默认配置", "items": []}]
+        self.presets_norm = default_preset
+        self.presets_deep = default_preset
+        saved_neg_list = []
+
         if os.path.exists("bot_config.json"):
             try:
                 with open("bot_config.json", "r", encoding='utf-8') as f:
                     c = json.load(f)
-                    self.presets_norm = c.get('presets_norm', self.presets_norm)
-                    self.presets_deep = c.get('presets_deep', self.presets_deep)
-                    self.ui_neg.set_list(c.get('bad_neg', []))
+
+                    self.presets_norm = c.get('presets_norm', default_preset)
+                    self.presets_deep = c.get('presets_deep', default_preset)
+                    saved_neg_list = c.get('bad_neg', [])
+
                     mode = c.get('last_mode', 'deepnight')
                     self.mode_var.set(mode)
-            except:
-                pass
+            except Exception as e:
+                print(f"配置文件加载警告: {e}")
+
+        self.ui_neg.set_list(saved_neg_list)
         self.on_mode_change()
+
+    def on_close(self):
+        self.stop()
+        self.save_to_json()
+        self.destroy()
 
 
 if __name__ == "__main__":
