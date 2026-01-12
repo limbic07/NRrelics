@@ -630,7 +630,7 @@ class BotLogic:
 class App(tb.Window):
     def __init__(self):
         super().__init__(themename="superhero")
-        self.title("NRrelic_bot V1.2")
+        self.title("NRrelic_bot V1.2.1")
         self.geometry("1100x850")
         #  设置运行时的窗口图标
         try:
