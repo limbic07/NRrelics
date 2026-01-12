@@ -4,16 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c63fab2c-5e9e-43a9-a525-c17f5c68b18d" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/NRrelics.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/NRrelic_bot.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/deepnight_neg.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/deepnight_pos.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/normal.txt" afterDir="false" />
+    <list default="true" id="c63fab2c-5e9e-43a9-a525-c17f5c68b18d" name="更改" comment="optimize wait for result in purchase flow v3">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NRrelic_bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/NRrelic_bot.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,12 +20,25 @@
       </list>
     </option>
   </component>
+  <component name="Git.Merge.Settings">
+    <option name="BRANCH" value="refactor/improve-item-purchase-flow" />
+    <option name="OPTIONS">
+      <set>
+        <option value="SQUASH" />
+      </set>
+    </option>
+  </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="master" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 8
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
   <component name="ProjectId" id="381QFyFFnHCXFrdUI4dh8xWkDb5" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -46,7 +52,7 @@
     "Python.game_bot.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "feature/inventory-sell__10pulls",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "C:/Users/Admin/PycharmProjects/NRrelics",
     "node.js.detected.package.eslint": "true",
@@ -82,25 +88,54 @@
       <updated>1767964497448</updated>
       <workItem from="1767964498496" duration="20618000" />
     </task>
+    <task id="LOCAL-00001" summary="initial">
+      <option name="closed" value="true" />
+      <created>1768114283128</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1768114283128</updated>
+    </task>
+    <task id="LOCAL-00002" summary="optimize wait for result in purchase flow">
+      <option name="closed" value="true" />
+      <created>1768115364435</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1768115364435</updated>
+    </task>
+    <task id="LOCAL-00003" summary="optimize wait for result in purchase flow v2">
+      <option name="closed" value="true" />
+      <created>1768118029196</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1768118029196</updated>
+    </task>
+    <task id="LOCAL-00004" summary="optimize wait for result in purchase flow v3">
+      <option name="closed" value="true" />
+      <created>1768120840214</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1768120840214</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/NRrelic_bot.py</url>
-          <line>432</line>
-          <option name="timeStamp" value="1" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="initial" />
+    <MESSAGE value="optimize wait for result in purchase flow" />
+    <MESSAGE value="optimize wait for result in purchase flow v2" />
+    <MESSAGE value="optimize wait for result in purchase flow v3" />
+    <option name="LAST_COMMIT_MESSAGE" value="optimize wait for result in purchase flow v3" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NRrelics$game_bot.coverage" NAME="game_bot 覆盖结果" MODIFIED="1768026974001" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NRrelics$background_test.coverage" NAME="background_test 覆盖结果" MODIFIED="1768022327670" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/NRrelics$NRrelic_bot.coverage" NAME="NRrelic_bot 覆盖结果" MODIFIED="1768027592718" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NRrelics$NRrelic_bot.coverage" NAME="NRrelic_bot 覆盖结果" MODIFIED="1768196595263" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
