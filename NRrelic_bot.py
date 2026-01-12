@@ -35,12 +35,6 @@ KEYS = {
 FUZZY_THRESHOLD = 0.7
 CORRECTION_THRESHOLD = 0.55
 
-IGNORE_TEXTS = [
-    "仅限能使用的",
-    "装备时",
-]
-UI_ANCHORS = ["立刻卖出", "移除喜爱", "登记"]
-
 
 # ================= 调试工具 =================
 class Profiler:
@@ -429,7 +423,6 @@ class BotLogic:
         self.should_stop = False
         self.profiler = Profiler()
         self.master_library = DataLoader.get_master_library()
-
         if not os.path.exists("logs"): os.makedirs("logs")
         try:
             self.ocr = RapidOCR()
@@ -518,30 +511,6 @@ class BotLogic:
         self.log(f"校验失败。模式:{mode}。")
         return False
 
-    def wait_for_result_screen(self, timeout=2.5):
-        self.profiler.start("等待界面")
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if self.should_stop:
-                self.profiler.end("等待界面")
-                return False, None
-            img = self.get_screen_image()
-            if img is None:
-                time.sleep(0.05)
-                continue
-            res, _ = self.ocr(img)
-            text = "".join([line[1] for line in res]) if res else ""
-
-            is_valid_ui = any(anchor in text for anchor in UI_ANCHORS)
-
-            if is_valid_ui:
-                self.profiler.end("等待界面")
-                return True, img
-            time.sleep(0.05)
-
-        self.profiler.end("等待界面")
-        return False, None
-
     def purchase_loop(self, config):
         # 焦点检测：如果当前前台窗口不是游戏，立即停止
         if not WindowMgr.is_game_active():
@@ -549,22 +518,25 @@ class BotLogic:
             self.should_stop = True
             return
         self.profiler.start("按键操作(买)")
-        self.press(KEYS['interact'], duration=0.02, wait=0.03)
-        self.press(KEYS['interact'], duration=0.02, wait=0.03)
-        time.sleep(0.2)
-        self.press(KEYS['interact'], duration=0.02, wait=0.03)
+        self.press(KEYS['interact'], duration=0.02, wait=0.15)
+        self.press(KEYS['interact'], duration=0.02, wait=0.3)
+        self.press(KEYS['interact'], duration=0.02, wait=0.2)
         self.profiler.end("按键操作(买)")
 
-        success, img = self.wait_for_result_screen(timeout=1.5)
+        self.profiler.start("截取图片")
+        img = self.get_screen_image()
+        self.profiler.end("截取图片")
 
-        if not success:
-            self.log("❌ 异常：未识别到遗物详情界面 UI，脚本已安全停止。")
+        self.profiler.start("逻辑判定")
+        keep, reason, debug_info, pos_str, neg_str, is_fatal = self.check_logic(img, config)
+        self.profiler.end("逻辑判定")
+        # 致命错误熔断
+        if is_fatal:
+            self.log(f"🛑 {reason}")
             self.should_stop = True
             return
 
-        keep, reason, debug_info, pos_str, neg_str = self.check_logic(img, config)
-
-        # [新增] 在界面打印清洗后的识别结果
+        #  在界面打印清洗后的识别结果
         self.log(f"📝 正面: {pos_str}")
         if neg_str:
             self.log(f"⚠️ 负面: {neg_str}")
@@ -575,39 +547,32 @@ class BotLogic:
             self.press(KEYS['interact'], duration=0.02, wait=0.1)
         else:
             self.log(f"× 卖出 | {reason}")
-            self.press(KEYS['sell'], duration=0.02, wait=0.03)
+            self.press(KEYS['sell'], duration=0.02, wait=0.1)
             self.press(KEYS['interact'], duration=0.02, wait=0.1)
         self.profiler.end("按键操作(卖/留)")
 
         self.profiler.print_report()
 
     def check_logic(self, img, config):
-        self.profiler.start("提取文本(含OCR)")
-        pos_lines, neg_lines = self.extract_text_by_color(img)
-        self.profiler.end("提取文本(含OCR)")
-
         mode = config['mode']
         active_presets = config['presets']
         bad_neg_list = config['bad_neg']
 
-        # 1. 负面检查耗时
-        self.profiler.start("负面判定")
+        # 1. 提取文本
+        pos_lines, neg_lines = self.extract_text_by_color(img)
+
+        # 如果纠错前就全是空的，说明画面异常
+        if not pos_lines and not neg_lines:
+            return False, "异常：OCR为空(画面异常/遮挡)", "", "", "", True
+
+        # 2. 清洗纠错
         clean_neg_lines = []
         if mode == "deepnight":
             for ocr_line in neg_lines:
                 corrected, score = find_best_match_in_library(ocr_line, self.master_library)
                 target = corrected if score > CORRECTION_THRESHOLD else ocr_line
-                clean_neg_lines.append(target)  # 保存下来后面显示用
+                clean_neg_lines.append(target)
 
-                for bad in bad_neg_list:
-                    if bad in target:
-                        msg = f"致命负面 [{bad}]"
-                        self.profiler.end("负面判定")
-                        return False, msg, f"❌ {msg}", "", ""
-        self.profiler.end("负面判定")
-
-        # 2. 正面标准化耗时 (这通常是最耗时的，因为要遍历全库纠错)
-        self.profiler.start("正面纠错标准化")
         clean_pos_lines = []
         for ocr_line in pos_lines:
             if len(ocr_line) < 2: continue
@@ -616,14 +581,22 @@ class BotLogic:
             corrected, score = find_best_match_in_library(ocr_line, self.master_library)
             if score > CORRECTION_THRESHOLD:
                 clean_pos_lines.append(corrected)
-        self.profiler.end("正面纠错标准化")
 
-        # 生成显示字符串
+        # 再次熔断：如果清洗后正面词条为空，也视为异常
+        if not clean_pos_lines:
+            return False, "异常：无词条识别", "", "", "", True
+
         pos_str_display = " | ".join(clean_pos_lines)
         neg_str_display = " | ".join(clean_neg_lines)
 
-        # 3. 预设匹配耗时
-        self.profiler.start("预设匹配计算")
+        # 3. 负面检查
+        if mode == "deepnight":
+            for target in clean_neg_lines:
+                for bad in bad_neg_list:
+                    if bad in target:
+                        return False, f"致命负面 [{bad}]", "", pos_str_display, neg_str_display, False
+
+        # 4. 正面检查
         for preset in active_presets:
             preset_name = preset['name']
             wanted_items = preset['items']
@@ -638,11 +611,9 @@ class BotLogic:
                         break
 
             if match_count >= 2:
-                self.profiler.end("预设匹配计算")
-                return True, f"命中方案[{preset_name}]: {hits}", "", pos_str_display, neg_str_display
-        self.profiler.end("预设匹配计算")
+                return True, f"命中方案[{preset_name}]: {hits}", "", pos_str_display, neg_str_display, False
 
-        return False, "不符合任何启用预设", "", pos_str_display, neg_str_display
+        return False, "不符合任何启用预设", "", pos_str_display, neg_str_display, False
 
     def run(self, config):
         self.log(">>> 3秒后开始校验...")
