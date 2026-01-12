@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c63fab2c-5e9e-43a9-a525-c17f5c68b18d" name="更改" comment="optimize wait for result in purchase flow v3">
+    <list default="true" id="c63fab2c-5e9e-43a9-a525-c17f5c68b18d" name="更改" comment="initial">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NRrelic_bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/NRrelic_bot.py" afterDir="false" />
     </list>
@@ -120,22 +120,30 @@
       <option name="project" value="LOCAL" />
       <updated>1768120840214</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="initial">
+      <option name="closed" value="true" />
+      <created>1768197007352</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1768197007352</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="initial" />
     <MESSAGE value="optimize wait for result in purchase flow" />
     <MESSAGE value="optimize wait for result in purchase flow v2" />
     <MESSAGE value="optimize wait for result in purchase flow v3" />
-    <option name="LAST_COMMIT_MESSAGE" value="optimize wait for result in purchase flow v3" />
+    <MESSAGE value="initial" />
+    <option name="LAST_COMMIT_MESSAGE" value="initial" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NRrelics$game_bot.coverage" NAME="game_bot 覆盖结果" MODIFIED="1768026974001" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NRrelics$background_test.coverage" NAME="background_test 覆盖结果" MODIFIED="1768022327670" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/NRrelics$NRrelic_bot.coverage" NAME="NRrelic_bot 覆盖结果" MODIFIED="1768196595263" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NRrelics$NRrelic_bot.coverage" NAME="NRrelic_bot 覆盖结果" MODIFIED="1768199756436" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

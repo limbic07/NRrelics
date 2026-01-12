@@ -15,6 +15,9 @@ import unicodedata
 import difflib
 import ctypes
 from tkinter import simpledialog, filedialog, messagebox
+import ctypes
+from ctypes import windll, byref, Structure, c_long
+
 
 
 # ================= 配置区域 =================
@@ -84,6 +87,30 @@ class WindowMgr:
         except:
             return False
 
+    # 获取当前前台窗口的精准坐标
+    @staticmethod
+    def get_foreground_window_rect():
+        try:
+            hwnd = windll.user32.GetForegroundWindow()
+            rect = RECT()
+            windll.user32.GetWindowRect(hwnd, byref(rect))
+
+            # 计算 mss 需要的格式
+            width = rect.right - rect.left
+            height = rect.bottom - rect.top
+
+            # 过滤无效窗口 (最小化时坐标通常是负数或极小)
+            if width <= 0 or height <= 0:
+                return None
+
+            return {
+                "left": rect.left,
+                "top": rect.top,
+                "width": width,
+                "height": height
+            }
+        except:
+            return None
 # ================= 工具函数 =================
 def get_resource_path(relative_path):
     """ 获取资源绝对路径 """
@@ -159,6 +186,15 @@ def find_best_match_in_library(ocr_line, library):
 
     return best_text, best_ratio
 
+# =========== 定义 RECT 结构体，用于获取窗口坐标 ==========
+class RECT(Structure):
+    _fields_ = [("left", c_long), ("top", c_long), ("right", c_long), ("bottom", c_long)]
+
+# 开启 DPI 感知 (解决高分屏/缩放导致的截图偏移问题)
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+except Exception:
+    ctypes.windll.user32.SetProcessDPIAware()
 
 # ================= 数据加载 =================
 
@@ -409,19 +445,38 @@ class BotLogic:
         time.sleep(wait)
 
     def get_screen_image(self):
+        """
+        动态截取当前游戏窗口
+        无论在哪个显示器，无论全屏还是窗口化，都能精准截图
+        """
         with mss.mss() as sct:
-            monitor = sct.monitors[1]
-            w, h = monitor["width"], monitor["height"]
-            roi = {
-                "top": monitor["top"] + int(h * 0.2),
-                "left": monitor["left"] + int(w * 0.3),
-                "width": int(w * 0.4),
-                "height": int(h * 0.75)
-            }
-            img = np.array(sct.grab(roi))
+            # 1. 尝试获取游戏窗口坐标
+            game_rect = None
+
+            # 只有当游戏在前台时，才去获取它的坐标
+            if WindowMgr.is_game_active():
+                game_rect = WindowMgr.get_foreground_window_rect()
+
+            # 2. 决定截图区域
+            if game_rect:
+                # 找到游戏窗口！
+                monitor = game_rect
+            else:
+                return None
+
+            # 3. 执行截图
+            try:
+                img = np.array(sct.grab(monitor))
+            except Exception as e:
+                # 极少数情况(如窗口最小化/坐标溢出)会导致 grab 报错
+                # print(f"截图失败: {e}")
+                return None
+
+                # 4. 格式转换
             return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
     def extract_text_by_color(self, img):
+        if img is None: return
         # 1. 图像处理 (OpenCV)
         self.profiler.start("OpenCV预处理")
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -451,6 +506,7 @@ class BotLogic:
     def validate_item_in_shop(self, mode):
         self.log("正在校验商店选中商品...")
         img = self.get_screen_image()
+        if img is None: return False
         res, _ = self.ocr(img)
         text = "".join([line[1] for line in res]) if res else ""
         has_stone = "原石" in text
@@ -469,8 +525,10 @@ class BotLogic:
             if self.should_stop:
                 self.profiler.end("等待界面")
                 return False, None
-
             img = self.get_screen_image()
+            if img is None:
+                time.sleep(0.05)
+                continue
             res, _ = self.ocr(img)
             text = "".join([line[1] for line in res]) if res else ""
 
@@ -493,7 +551,7 @@ class BotLogic:
         self.profiler.start("按键操作(买)")
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
-        time.sleep(0.3)
+        time.sleep(0.2)
         self.press(KEYS['interact'], duration=0.02, wait=0.03)
         self.profiler.end("按键操作(买)")
 
@@ -771,7 +829,7 @@ class App(tb.Window):
                 curr_mode_val = self.mode_var.get()
                 curr_mode_name = "普通遗物" if curr_mode_val == "normal" else "深夜遗物"
 
-                # [修改点] 使用 askyesnocancel，增加取消选项
+                # 使用 askyesnocancel，增加取消选项
                 choice = messagebox.askyesnocancel(
                     "导入旧版预设",
                     f"检测到旧版预设文件（不含模式信息）。\n\n"
@@ -803,10 +861,9 @@ class App(tb.Window):
                 return
 
             # --- 情况 B: 导入的是新版完整配置 (字典格式) ---
-            default_preset = [{"name": "默认预设", "items": []}]
 
-            self.presets_norm = c.get('presets_norm', default_preset)
-            self.presets_deep = c.get('presets_deep', default_preset)
+            self.presets_norm = c.get('presets_norm', [{"name": "默认配置", "items": []}])
+            self.presets_deep = c.get('presets_deep', [{"name": "默认配置", "items": []}])
 
             loaded_neg = c.get('bad_neg', [])
             self.ui_neg.set_list(loaded_neg)
@@ -820,25 +877,36 @@ class App(tb.Window):
 
         except Exception as e:
             messagebox.showerror("错误", f"导入失败: {e}")
+
     def load_config(self):
-        default_preset = [{"name": "默认配置", "items": []}]
-        self.presets_norm = default_preset
-        self.presets_deep = default_preset
+
+        # 默认初始化为空列表，稍后填充
+        self.presets_norm = []
+        self.presets_deep = []
         saved_neg_list = []
-        # 获取全局路径
-        config_path = get_app_config_path()
+
+        config_path = get_app_config_path()  #
+
         if os.path.exists(config_path):
             try:
-                # 读取全局路径文件
                 with open(config_path, "r", encoding='utf-8') as f:
                     c = json.load(f)
-                    self.presets_norm = c.get('presets_norm', default_preset)
-                    self.presets_deep = c.get('presets_deep', default_preset)
+
+                    # 读取配置，如果不存在则使用新的默认列表
+                    self.presets_norm = c.get('presets_norm', [{"name": "默认配置", "items": []}])
+                    self.presets_deep = c.get('presets_deep', [{"name": "默认配置", "items": []}])
+
                     saved_neg_list = c.get('bad_neg', [])
-                    mode = c.get('last_mode', 'deepnight')
-                    self.mode_var.set(mode)
+                    self.mode_var.set(c.get('last_mode', 'deepnight'))
             except Exception as e:
-                messagebox.showerror("读取失败", f"无法保读取配置文件：\n{e}")
+                print(f"配置文件加载警告: {e}")
+
+        # 双重保险：如果读取失败导致仍为空，初始化默认值
+        if not self.presets_norm:
+            self.presets_norm = [{"name": "默认配置", "items": []}]
+        if not self.presets_deep:
+            self.presets_deep = [{"name": "默认配置", "items": []}]
+
         self.ui_neg.set_list(saved_neg_list)
         self.on_mode_change()
 
