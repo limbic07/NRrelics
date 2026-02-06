@@ -4,15 +4,22 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c63fab2c-5e9e-43a9-a525-c17f5c68b18d" name="更改" comment="initial">
-      <change afterPath="$PROJECT_DIR$/bot_inventory.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/bot_merchant.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/grab_tools.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/NRrelics.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/NRrelics.iml" afterDir="false" />
+    <list default="true" id="c63fab2c-5e9e-43a9-a525-c17f5c68b18d" name="更改" comment="0130 inventory sell">
+      <change afterPath="$PROJECT_DIR$/core/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/main_window.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/navigation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/base_page.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/inventory.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/merchant.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/settings.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ui/pages/strategy.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NRrelic_bot.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/bot_inventory.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/bot_inventory.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bot_merchant.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/bot_merchant.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,7 +44,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="master" />
+        <entry key="$PROJECT_DIR$" value="feature/inventory-sell" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -75,9 +82,9 @@
     "Python.main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "git-widget-placeholder": "feature/inventory-sell",
+    "git-widget-placeholder": "NRrelic__bot__v2",
     "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "C:/Users/Admin/PycharmProjects/NRrelics",
+    "last_opened_file_path": "C:/Users/Lim/PycharmProjects/NRrelics/ui/pages",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -88,9 +95,12 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\Lim\PycharmProjects\NRrelics\ui\pages" />
       <recent name="C:\Users\Admin\PycharmProjects\NRrelics" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Lim\PycharmProjects\NRrelics\ui\pages" />
+      <recent name="C:\Users\Lim\PycharmProjects\NRrelics\core" />
       <recent name="C:\Users\Admin\PycharmProjects\NRrelics\data" />
     </key>
   </component>
@@ -112,6 +122,8 @@
       <updated>1767964497448</updated>
       <workItem from="1767964498496" duration="20618000" />
       <workItem from="1769744288483" duration="3403000" />
+      <workItem from="1769771232907" duration="1293000" />
+      <workItem from="1770389355160" duration="2557000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <option name="closed" value="true" />
@@ -153,7 +165,15 @@
       <option name="project" value="LOCAL" />
       <updated>1768197007352</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="0130 inventory sell">
+      <option name="closed" value="true" />
+      <created>1769771311138</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1769771311138</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -164,13 +184,14 @@
     <MESSAGE value="optimize wait for result in purchase flow v2" />
     <MESSAGE value="optimize wait for result in purchase flow v3" />
     <MESSAGE value="initial" />
-    <option name="LAST_COMMIT_MESSAGE" value="initial" />
+    <MESSAGE value="0130 inventory sell" />
+    <option name="LAST_COMMIT_MESSAGE" value="0130 inventory sell" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NRrelics$NRrelic_bot.coverage" NAME="NRrelic_bot 覆盖结果" MODIFIED="1768199756436" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NRrelics$background_test.coverage" NAME="background_test 覆盖结果" MODIFIED="1768022327670" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NRrelics$grab_tools.coverage" NAME="grab_tools 覆盖结果" MODIFIED="1769744833487" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/NRrelics$main.coverage" NAME="main 覆盖结果" MODIFIED="1769746161406" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NRrelics$main.coverage" NAME="main 覆盖结果" MODIFIED="1770392994870" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NRrelics$game_bot.coverage" NAME="game_bot 覆盖结果" MODIFIED="1768026974001" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

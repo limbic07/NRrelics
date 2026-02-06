@@ -18,7 +18,7 @@ class InventoryBot:
         self.anchor1_sig = None
         self.anchor2_sig = None
 
-        self.debug_dir = "logs/debug_screenshots"
+        self.debug_dir = "../logs/debug_screenshots"
         if not os.path.exists(self.debug_dir):
             os.makedirs(self.debug_dir)
 

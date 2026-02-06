@@ -1,7 +1,6 @@
 # --- START OF FILE bot_merchant.py ---
 import time
 import pydirectinput
-import cv2
 import utils
 
 

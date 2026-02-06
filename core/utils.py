@@ -111,15 +111,15 @@ class DataLoader:
 
     @staticmethod
     def get_data():
-        return (DataLoader.load_txt("data/normal.txt"),
-                DataLoader.load_txt("data/deepnight_pos.txt"),
-                DataLoader.load_txt("data/deepnight_neg.txt"))
+        return (DataLoader.load_txt("../data/normal.txt"),
+                DataLoader.load_txt("../data/deepnight_pos.txt"),
+                DataLoader.load_txt("../data/deepnight_neg.txt"))
 
     @staticmethod
     def get_master_library():
-        n = DataLoader.load_txt("data/normal.txt")
-        dp = DataLoader.load_txt("data/deepnight_pos.txt")
-        dn = DataLoader.load_txt("data/deepnight_neg.txt")
+        n = DataLoader.load_txt("../data/normal.txt")
+        dp = DataLoader.load_txt("../data/deepnight_pos.txt")
+        dn = DataLoader.load_txt("../data/deepnight_neg.txt")
         return sorted(list(set(n + dp + dn)))
 
 
