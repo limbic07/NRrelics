@@ -1,0 +1,43 @@
+# --- Python 核心 ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- 虚拟环境 (Virtual Environments) ---
+# 常用的虚拟环境文件夹名称
+venv/
+env/
+.env/
+.venv/
+venv.bak/
+
+# --- 发布的构建文件 (Distribution / Build) ---
+build/
+dist/
+wheels/
+*.egg-info/
+.eggs/
+
+# --- 单元测试与覆盖率 (Unit Test / Coverage) ---
+.tox/
+.nox/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# --- IDE 配置 (编辑器生成的文件夹) ---
+# VS Code
+.vscode/
+# PyCharm
+.idea/
+
+# --- Jupyter Notebook (如果你使用的话) ---
+.ipynb_checkpoints
+
+# --- 环境变量文件 (安全起见，不要提交) ---
+.env
+.env.local
+
+# --- 操作系统生成的文件 ---
+.DS_Store
+Thumbs.db

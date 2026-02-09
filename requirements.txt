@@ -1,0 +1,16 @@
+# OCR 和图像处理
+cnocr>=2.3.0
+opencv-python>=4.5.0
+numpy>=1.21.0
+
+# GUI 框架
+PySide6>=6.0.0
+PySide6-Fluent-Widgets>=0.10.0
+
+# 自动化和输入
+pyautogui>=0.9.53
+pydirectinput>=1.0.2
+keyboard>=0.13.5
+
+# 文本处理
+rapidfuzz>=2.0.0
