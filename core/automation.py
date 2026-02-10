@@ -145,31 +145,20 @@ class RepositoryFilter:
             True: 在遗物仪式界面
             False: 不在遗物仪式界面
         """
-        print("\n[步骤 1] 验证遗物仪式界面...")
-
         if self.ocr_engine is None:
-            print("[警告] OCR引擎未初始化，跳过验证")
             return True
 
         # 截取左上角区域
         image = self._capture_region(self.RITUAL_REGION)
-        self._save_debug_image(image, "ritual_region")
 
         # OCR识别（不进行纠错）
         result = self.ocr_engine.recognize_raw(image)
         if not result['success']:
-            print("[失败] OCR识别失败")
             return False
 
         # 检查是否包含"遗物仪式"
         text = ''.join(result['entries'])
-        print(f"  [识别文本] {text}")
-        if '遗物仪式' in text or '遗物' in text:
-            print("[成功] 确认在遗物仪式界面")
-            return True
-        else:
-            print(f"[失败] 未检测到遗物仪式界面")
-            return False
+        return '遗物仪式' in text or '遗物' in text
 
     def verify_sell_interface(self) -> bool:
         """
@@ -179,31 +168,20 @@ class RepositoryFilter:
             True: 在卖出界面
             False: 不在卖出界面
         """
-        print("\n[步骤 2] 验证卖出界面...")
-
         if self.ocr_engine is None:
-            print("[警告] OCR引擎未初始化，跳过验证")
             return True
 
         # 截取卖出区域
         image = self._capture_region(self.SELL_REGION)
-        self._save_debug_image(image, "sell_region")
 
         # OCR识别（不进行纠错）
         result = self.ocr_engine.recognize_raw(image)
         if not result['success']:
-            print("[失败] OCR识别失败")
             return False
 
         # 检查是否包含"卖出"
         text = ''.join(result['entries'])
-        print(f"  [识别文本] {text}")
-        if '卖出' in text:
-            print("[成功] 确认在卖出界面")
-            return True
-        else:
-            print(f"[失败] 未检测到卖出界面")
-            return False
+        return '卖出' in text
 
     def navigate_to_sell_interface(self, max_attempts: int = 5) -> bool:
         """
@@ -216,17 +194,13 @@ class RepositoryFilter:
             True: 成功导航到卖出界面
             False: 导航失败
         """
-        print("\n[导航] 尝试切换到卖出界面...")
-
         for attempt in range(max_attempts):
             if self.verify_sell_interface():
                 return True
 
-            print(f"  [尝试 {attempt + 1}/{max_attempts}] 按F2切换...")
             AutomationController.press_key('f2', duration=0.5)
             time.sleep(0.3)
 
-        print("[失败] 无法导航到卖出界面")
         return False
 
     def enter_filter_interface(self) -> bool:
@@ -237,10 +211,8 @@ class RepositoryFilter:
             True: 成功进入筛选界面
             False: 进入失败
         """
-        print("\n[步骤 3] 进入筛选界面...")
         AutomationController.press_key('4', duration=0.3)
-        time.sleep(0.5)  # 等待界面加载
-        print("[成功] 已按下4键进入筛选界面")
+        time.sleep(0.5)
         return True
 
     def reset_filter(self) -> bool:
@@ -251,10 +223,7 @@ class RepositoryFilter:
             True: 成功重置筛选
             False: 重置失败
         """
-        print("\n[步骤 4] 重置筛选...")
         AutomationController.press_key('1', duration=0.3)
-        time.sleep(0.3)  # 等待重置完成
-        print("[成功] 已按下1键重置筛选")
         return True
 
     def detect_checkbox_state(self) -> Tuple[bool, bool]:
@@ -266,24 +235,15 @@ class RepositoryFilter:
             - normal_checked: "遗物"是否打勾
             - deepnight_checked: "深层的遗物"是否打勾
         """
-        print("\n[步骤 5] 检测勾选状态（精确区域匹配）...")
-
         # 检测"遗物"勾选框
         normal_region = self._scale_region(self.NORMAL_CHECKBOX)
         normal_image = self._capture_single_region(normal_region)
-        self._save_debug_image(normal_image, "checkbox_normal")
         normal_checked = self._is_checkbox_checked(normal_image)
-        print(f"  [遗物坐标] {normal_region}, [灰度判断] {'✓' if normal_checked else '✗'}")
 
         # 检测"深层的遗物"勾选框
         deepnight_region = self._scale_region(self.DEEPNIGHT_CHECKBOX)
         deepnight_image = self._capture_single_region(deepnight_region)
-        self._save_debug_image(deepnight_image, "checkbox_deepnight")
         deepnight_checked = self._is_checkbox_checked(deepnight_image)
-        print(f"  [深层坐标] {deepnight_region}, [灰度判断] {'✓' if deepnight_checked else '✗'}")
-
-        print(f"  [遗物] {'✓' if normal_checked else '✗'}")
-        print(f"  [深层的遗物] {'✓' if deepnight_checked else '✗'}")
 
         return normal_checked, deepnight_checked
 
@@ -306,7 +266,7 @@ class RepositoryFilter:
         """
         h, w = checkbox_region.shape[:2]
 
-        # 排除边框，只检测框内部中心区域 (约10x10)
+        # 排除边框，只检测框内部中心区域
         margin = 6
         inner_region = checkbox_region[margin:h-margin, margin:w-margin]
 
@@ -316,11 +276,8 @@ class RepositoryFilter:
         # 计算中心区域平均灰度值
         mean_val = cv2.mean(gray)[0]
 
-        # 打印调试信息
-        print(f"    [调试] 中心区域平均灰度: {mean_val:.2f}")
-
-        # 框内是空的：平均灰度值较高（接近255，背景透过来）
-        # 框内有√：平均灰度值较低（√是深色的）
+        # 框内有√：平均灰度值较高（约109）
+        # 框内是空的：平均灰度值较低（约58）
         return mean_val > 90
 
     def click_checkbox(self, is_normal: bool):
@@ -333,20 +290,16 @@ class RepositoryFilter:
         # 获取精确的勾选框坐标并缩放
         if is_normal:
             region = self._scale_region(self.NORMAL_CHECKBOX)
-            checkbox_name = "遗物"
         else:
             region = self._scale_region(self.DEEPNIGHT_CHECKBOX)
-            checkbox_name = "深层的遗物"
 
         # 计算中心点
         x1, y1, x2, y2 = region
         click_x = (x1 + x2) // 2
         click_y = (y1 + y2) // 2
 
-        print(f"  [点击] {checkbox_name}勾选框 坐标范围{region} -> 中心({click_x}, {click_y})")
-
         AutomationController.click(click_x, click_y)
-        time.sleep(0.2)  # 等待点击生效
+        time.sleep(0.5)
 
     def adjust_filter_mode(self, mode: str) -> bool:
         """
@@ -359,10 +312,7 @@ class RepositoryFilter:
             True: 调整成功
             False: 调整失败
         """
-        print(f"\n[步骤 6] 调整筛选模式为: {mode}")
-
-        # 检测当前勾选状态
-        normal_checked, deepnight_checked = self.detect_checkbox_state()
+        print(f"\n[筛选模式] {mode}")
 
         if mode == "normal":
             # 普通模式：遗物打勾，深层的遗物不打勾
@@ -373,38 +323,33 @@ class RepositoryFilter:
             target_normal = False
             target_deepnight = True
         else:
-            print(f"[错误] 未知的筛选模式: {mode}")
             return False
 
         # 调整遗物勾选状态
+        normal_checked, deepnight_checked = self.detect_checkbox_state()
+
         if normal_checked != target_normal:
-            print(f"  [调整] 遗物: {normal_checked} -> {target_normal}")
             self.click_checkbox(is_normal=True)
-            time.sleep(0.2)
 
         # 调整深层的遗物勾选状态
         if deepnight_checked != target_deepnight:
-            print(f"  [调整] 深层的遗物: {deepnight_checked} -> {target_deepnight}")
             self.click_checkbox(is_normal=False)
-            time.sleep(0.2)
 
         # 验证调整结果
         normal_checked, deepnight_checked = self.detect_checkbox_state()
         success = (normal_checked == target_normal and deepnight_checked == target_deepnight)
 
         if success:
-            print("[成功] 筛选模式调整完成")
+            print("[结果] 筛选成功")
         else:
-            print("[失败] 筛选模式调整失败")
+            print("[结果] 筛选失败")
 
         return success
 
     def exit_filter_interface(self):
         """退出筛选界面（按q）"""
-        print("\n[步骤 7] 退出筛选界面...")
         AutomationController.press_key('q', duration=0.3)
         time.sleep(0.3)
-        print("[成功] 已按下q键退出筛选界面")
 
     def apply_filter(self, mode: str) -> bool:
         """
@@ -417,19 +362,13 @@ class RepositoryFilter:
             True: 筛选成功
             False: 筛选失败
         """
-        print(f"\n{'='*50}")
-        print(f"开始筛选流程 - 模式: {mode}")
-        print(f"{'='*50}")
-
         # 1. 验证遗物仪式界面
         if not self.verify_ritual_interface():
-            print("[错误] 请先进入遗物仪式界面")
             return False
 
         # 2. 验证或导航到卖出界面
         if not self.verify_sell_interface():
             if not self.navigate_to_sell_interface():
-                print("[错误] 无法进入卖出界面")
                 return False
 
         # 3. 进入筛选界面
@@ -447,10 +386,6 @@ class RepositoryFilter:
 
         # 6. 退出筛选界面
         self.exit_filter_interface()
-
-        print(f"\n{'='*50}")
-        print(f"筛选流程完成 - 模式: {mode}")
-        print(f"{'='*50}")
 
         return True
 
