@@ -298,12 +298,13 @@ class OCREngine:
             print(f"[错误] 词条库加载失败: {e}")
             return False
 
-    def recognize(self, image: np.ndarray) -> dict:
+    def recognize(self, image: np.ndarray, enable_correction: bool = True) -> dict:
         """
         执行OCR识别
 
         Args:
             image: numpy 图像数组
+            enable_correction: 是否进行纠错（默认True）
 
         Returns:
             {
@@ -336,7 +337,7 @@ class OCREngine:
             # 纠错
             correction_time = 0.0
             corrected_entries = raw_entries
-            if self.corrector and CORRECTION_CONFIG["enabled"]:
+            if enable_correction and self.corrector and CORRECTION_CONFIG["enabled"]:
                 correction_start = time.time()
                 corrected_entries = correct_entries(raw_entries, self.corrector)
                 correction_time = time.time() - correction_start
@@ -354,6 +355,50 @@ class OCREngine:
                 "entries": [],
                 "raw_entries": [],
                 "correction_time": 0.0,
+                "success": False
+            }
+
+    def recognize_raw(self, image: np.ndarray) -> dict:
+        """
+        执行OCR识别（不进行纠错，不进行词条处理）
+        用于简单的文字识别场景，如界面验证
+        使用单行识别方法以提高准确率
+
+        Args:
+            image: numpy 图像数组
+
+        Returns:
+            {
+                "entries": [识别到的文本列表],
+                "success": 是否成功
+            }
+        """
+        try:
+            # 使用单行识别方法
+            result = self.engine.ocr_for_single_line(image)
+            if result is None or not result:
+                return {
+                    "entries": [],
+                    "success": False
+                }
+
+            # 提取文本
+            text = result.get('text', '') if isinstance(result, dict) else result
+            if text and text.strip():
+                return {
+                    "entries": [text.strip()],
+                    "success": True
+                }
+            else:
+                return {
+                    "entries": [],
+                    "success": False
+                }
+
+        except Exception as e:
+            print(f"[错误] OCR识别失败: {e}")
+            return {
+                "entries": [],
                 "success": False
             }
 
