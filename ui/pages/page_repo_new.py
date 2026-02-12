@@ -12,6 +12,7 @@ from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
                            ComboBox, SpinBox, MessageBox, InfoBar, InfoBarPosition)
 
 from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
+from core.ocr_engine import OCREngine
 from core.relic_detector import RelicDetector
 from core.repo_cleaner import RepoCleaner
 from ui.dialogs.preset_edit_dialog import PresetEditDialog
@@ -52,7 +53,7 @@ class CleaningThread(QThread):
 
 
 class PresetCard(CardWidget):
-    """预设卡片（带词条展开功能）"""
+    """预设卡片"""
     edit_clicked = Signal(str)  # preset_id
     delete_clicked = Signal(str)  # preset_id
     toggle_clicked = Signal(str)  # preset_id
@@ -61,56 +62,34 @@ class PresetCard(CardWidget):
         super().__init__(parent)
         self.preset_data = preset_data
         self.is_general = is_general
-        self.is_expanded = False
 
         self._init_ui()
 
     def _init_ui(self):
         """初始化UI"""
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(12, 10, 12, 10)
-        main_layout.setSpacing(8)
-
-        # 顶部：预设信息和按钮
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(8)
-
-        # 展开/折叠按钮
-        self.expand_btn = QPushButton("▶" if not self.is_expanded else "▼")
-        self.expand_btn.setFixedSize(20, 20)
-        self.expand_btn.setStyleSheet("""
-            QPushButton {
-                border: none;
-                background: transparent;
-                font-size: 10px;
-            }
-            QPushButton:hover {
-                background: #f0f0f0;
-                border-radius: 3px;
-            }
-        """)
-        self.expand_btn.clicked.connect(self._toggle_expand)
-        top_layout.addWidget(self.expand_btn)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(12)
 
         # 预设信息
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
+        info_layout.setSpacing(4)
 
         # 名称
         name_label = QLabel(self.preset_data["name"])
         name_font = QFont()
-        name_font.setPointSize(10)
+        name_font.setPointSize(11)
         name_font.setBold(True)
         name_label.setFont(name_font)
         info_layout.addWidget(name_label)
 
         # 词条数量
         count_label = QLabel(f"{len(self.preset_data['affixes'])} 条词条")
-        count_label.setStyleSheet("color: #888; font-size: 10px;")
+        count_label.setStyleSheet("color: #666; font-size: 11px;")
         info_layout.addWidget(count_label)
 
-        top_layout.addLayout(info_layout)
-        top_layout.addStretch()
+        layout.addLayout(info_layout)
+        layout.addStretch()
 
         # 按钮
         if not self.is_general:
@@ -120,49 +99,20 @@ class PresetCard(CardWidget):
             self.active_checkbox.stateChanged.connect(
                 lambda: self.toggle_clicked.emit(self.preset_data["id"])
             )
-            top_layout.addWidget(self.active_checkbox)
+            layout.addWidget(self.active_checkbox)
 
         # 编辑按钮
         edit_btn = PushButton("编辑")
         edit_btn.setFixedWidth(60)
         edit_btn.clicked.connect(lambda: self.edit_clicked.emit(self.preset_data["id"]))
-        top_layout.addWidget(edit_btn)
+        layout.addWidget(edit_btn)
 
         # 删除按钮（仅专用预设）
         if not self.is_general:
             delete_btn = PushButton("删除")
             delete_btn.setFixedWidth(60)
             delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.preset_data["id"]))
-            top_layout.addWidget(delete_btn)
-
-        main_layout.addLayout(top_layout)
-
-        # 词条列表（可展开）
-        self.affixes_widget = QWidget()
-        affixes_layout = QVBoxLayout(self.affixes_widget)
-        affixes_layout.setContentsMargins(24, 4, 4, 4)
-        affixes_layout.setSpacing(2)
-
-        # 添加词条标签
-        for affix in self.preset_data["affixes"][:20]:  # 最多显示20条
-            affix_label = QLabel(f"• {affix}")
-            affix_label.setStyleSheet("color: #555; font-size: 9px;")
-            affix_label.setWordWrap(True)
-            affixes_layout.addWidget(affix_label)
-
-        if len(self.preset_data["affixes"]) > 20:
-            more_label = QLabel(f"... 还有 {len(self.preset_data['affixes']) - 20} 条")
-            more_label.setStyleSheet("color: #999; font-size: 9px; font-style: italic;")
-            affixes_layout.addWidget(more_label)
-
-        self.affixes_widget.setVisible(False)
-        main_layout.addWidget(self.affixes_widget)
-
-    def _toggle_expand(self):
-        """切换展开/折叠"""
-        self.is_expanded = not self.is_expanded
-        self.expand_btn.setText("▼" if self.is_expanded else "▶")
-        self.affixes_widget.setVisible(self.is_expanded)
+            layout.addWidget(delete_btn)
 
 
 class RepoPage(QWidget):
@@ -174,9 +124,9 @@ class RepoPage(QWidget):
 
         # 初始化组件
         self.preset_manager = PresetManager()
-        self.ocr_engine = None  # 延迟加载，初始为 None
+        self.ocr_engine = OCREngine()
         self.relic_detector = RelicDetector()
-        self.repo_cleaner = RepoCleaner(self.preset_manager, None, self.relic_detector)
+        self.repo_cleaner = RepoCleaner(self.preset_manager, self.ocr_engine, self.relic_detector)
 
         # 清理线程
         self.cleaning_thread = None
@@ -192,15 +142,15 @@ class RepoPage(QWidget):
     def _init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 8, 16, 16)
-        layout.setSpacing(6)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(16)
 
         # 标题
         title = QLabel("仓库清理")
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         layout.addWidget(title)
 
-        # 顶部工具栏（紧凑版）
+        # 顶部工具栏
         toolbar = self._create_toolbar()
         layout.addWidget(toolbar)
 
@@ -215,19 +165,17 @@ class RepoPage(QWidget):
         right_panel = self._create_right_panel()
         splitter.addWidget(right_panel)
 
-        # 调整比例：预设面板更大
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 3)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
 
-        layout.addWidget(splitter, 1)
+        layout.addWidget(splitter)
 
     def _create_toolbar(self) -> CardWidget:
-        """创建顶部工具栏（紧凑版）"""
+        """创建顶部工具栏"""
         card = CardWidget()
-        card.setFixedHeight(60)
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(12, 6, 12, 6)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(16)
 
         # 模式选择
         mode_label = QLabel("模式:")
@@ -235,36 +183,29 @@ class RepoPage(QWidget):
 
         self.mode_combo = ComboBox()
         self.mode_combo.addItems(["普通", "深夜"])
-        self.mode_combo.setFixedWidth(100)
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         layout.addWidget(self.mode_combo)
 
-        layout.addSpacing(10)
+        layout.addSpacing(20)
 
         # 清理模式
-        clean_mode_label = QLabel("清理:")
+        clean_mode_label = QLabel("清理模式:")
         layout.addWidget(clean_mode_label)
 
         self.clean_mode_combo = ComboBox()
         self.clean_mode_combo.addItems(["售出", "收藏"])
-        self.clean_mode_combo.setFixedWidth(100)
         layout.addWidget(self.clean_mode_combo)
 
-        layout.addSpacing(10)
+        layout.addSpacing(20)
 
-        # 清理数量
-        max_label = QLabel("数量:")
+        # 最大检测数量
+        max_label = QLabel("最大数量:")
         layout.addWidget(max_label)
 
         self.max_spin = SpinBox()
-        self.max_spin.setRange(1, 2000)
-        self.max_spin.setValue(100)
-        self.max_spin.setFixedWidth(100)
-        # 隐藏上下按钮
-        self.max_spin.setStyleSheet("""
-            QSpinBox::up-button { width: 0px; }
-            QSpinBox::down-button { width: 0px; }
-        """)
+        self.max_spin.setRange(0, 9999)
+        self.max_spin.setValue(0)
+        self.max_spin.setSpecialValueText("无限制")
         layout.addWidget(self.max_spin)
 
         layout.addStretch()
@@ -276,11 +217,11 @@ class RepoPage(QWidget):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(12)
 
-        # 标题（紧凑版）
+        # 标题
         title = QLabel("预设管理")
-        title.setStyleSheet("font-size: 13px; font-weight: bold; padding: 4px 0;")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
         layout.addWidget(title)
 
         # 滚动区域
@@ -290,7 +231,7 @@ class RepoPage(QWidget):
 
         scroll_content = QWidget()
         self.preset_layout = QVBoxLayout(scroll_content)
-        self.preset_layout.setSpacing(8)
+        self.preset_layout.setSpacing(12)
 
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll)
@@ -320,18 +261,17 @@ class RepoPage(QWidget):
 
         layout.addWidget(tab_widget)
 
-        # 控制按钮（紧凑版）
+        # 控制按钮
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.start_btn = PrimaryPushButton("正在初始化 OCR...")
-        self.start_btn.setFixedSize(100, 32)
-        self.start_btn.setEnabled(False)
+        self.start_btn = PrimaryPushButton("开始清理")
+        self.start_btn.setFixedWidth(120)
         self.start_btn.clicked.connect(self._start_cleaning)
         button_layout.addWidget(self.start_btn)
 
         self.stop_btn = PushButton("停止")
-        self.stop_btn.setFixedSize(100, 32)
+        self.stop_btn.setFixedWidth(120)
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop_cleaning)
         button_layout.addWidget(self.stop_btn)
@@ -341,11 +281,11 @@ class RepoPage(QWidget):
         return panel
 
     def _create_dashboard(self) -> QWidget:
-        """创建仪表盘（紧凑版）"""
+        """创建仪表盘"""
         dashboard = QWidget()
         layout = QVBoxLayout(dashboard)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
         # 统计卡片
         stats_layout = QHBoxLayout()
@@ -376,18 +316,18 @@ class RepoPage(QWidget):
         return dashboard
 
     def _create_stat_card(self, title: str, value: str, color: str) -> tuple:
-        """创建统计卡片（紧凑版），返回(card, value_label)"""
+        """创建统计卡片，返回(card, value_label)"""
         card = CardWidget()
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(12, 10, 12, 10)
-        card_layout.setSpacing(4)
+        card_layout.setContentsMargins(20, 16, 20, 16)
+        card_layout.setSpacing(8)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {color}; font-size: 11px;")
+        title_label.setStyleSheet(f"color: {color}; font-size: 12px;")
         card_layout.addWidget(title_label)
 
         value_label = QLabel(value)
-        value_label.setStyleSheet(f"color: {color}; font-size: 20px; font-weight: bold;")
+        value_label.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: bold;")
         card_layout.addWidget(value_label)
 
         return card, value_label
@@ -418,9 +358,8 @@ class RepoPage(QWidget):
             card.toggle_clicked.connect(self._toggle_preset)
             self.preset_layout.addWidget(card)
 
-        # 添加按钮（紧凑版）
+        # 添加按钮
         add_btn = PrimaryPushButton("+ 创建专用预设")
-        add_btn.setFixedHeight(32)
         add_btn.clicked.connect(self._create_dedicated_preset)
         self.preset_layout.addWidget(add_btn)
 
@@ -509,11 +448,6 @@ class RepoPage(QWidget):
 
     def _delete_preset(self, preset_id: str):
         """删除预设"""
-        # 显示确认对话框
-        msg_box = MessageBox("确认删除", "确定要删除这个预设吗？删除后无法恢复。", self)
-        if msg_box.exec() != MessageBox.Accepted:
-            return
-
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         self.preset_manager.delete_dedicated_preset(mode, preset_id)
         self._refresh_presets()
@@ -605,14 +539,3 @@ class RepoPage(QWidget):
                 "allow_operate_favorited": False,
                 "require_double_valid": True
             }
-
-    def set_ocr_engine(self, engine):
-        """设置 OCR 引擎（异步加载完成后调用）"""
-        self.ocr_engine = engine
-        # 关键：更新 repo_cleaner 的引擎
-        self.repo_cleaner.ocr_engine = engine
-        # 启用开始按钮
-        self.start_btn.setEnabled(True)
-        self.start_btn.setText("开始清理")
-        # 输出成功日志
-        self.logger.log("OCR 引擎异步加载完成", "SUCCESS")

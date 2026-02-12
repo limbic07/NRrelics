@@ -70,3 +70,8 @@ class MainWindow(FluentWindow):
             "设置",
             NavigationItemPosition.BOTTOM
         )
+
+    def init_ocr_dependencies(self, engine):
+        """初始化 OCR 依赖（异步加载完成后调用）"""
+        if self.repo_page:
+            self.repo_page.set_ocr_engine(engine)

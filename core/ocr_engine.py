@@ -71,8 +71,19 @@ class VocabularyLoader:
                     else:
                         entry = line
 
+                    # 清洗词条（与OCR后处理保持一致）
+                    entry = self._clean_entry(entry)
                     if entry:
                         self.vocabulary.append(entry)
+
+    def _clean_entry(self, entry: str) -> str:
+        """清洗词条中的特殊符号"""
+        entry = entry.replace('【', '').replace('】', '')
+        entry = entry.replace('"', '').replace('"', '')
+        entry = entry.replace('(', '').replace(')', '')
+        entry = entry.replace('[', '').replace(']', '')
+        entry = entry.replace('{', '').replace('}', '')
+        return entry.strip()
 
 
 # ==================== 词条纠错器 ====================
@@ -117,26 +128,25 @@ def postprocess_text(text: str) -> str:
     # 1. 加号标准化：十、＋(全角)、⁺(上标) → +(半角)
     text = text.replace('十', '+').replace('＋', '+')
 
-    # 2. 括号标准化：[](){}  → 【】
-    text = text.replace('[', '【').replace(']', '】')
-    text = text.replace('(', '【').replace(')', '】')
-    text = text.replace('{', '【').replace('}', '】')
-
-    # 3. 删除引号：""
+    # 2. 删除特殊符号：【】、""、()、[]、{}
+    text = text.replace('【', '').replace('】', '')
     text = text.replace('"', '').replace('"', '')
+    text = text.replace('(', '').replace(')', '')
+    text = text.replace('[', '').replace(']', '')
+    text = text.replace('{', '').replace('}', '')
 
-    # 4. 删除所有空格
+    # 3. 删除所有空格
     text = text.replace(' ', '').replace('　', '')
 
-    # 5. 标点标准化：英文标点 → 中文标点
+    # 4. 标点标准化：英文标点 → 中文标点
     text = text.replace(',', '，')
     text = text.replace(':', '：')
     text = text.replace(';', '；')
 
-    # 6. 修正分隔符：数字1中文 → 数字|中文
+    # 5. 修正分隔符：数字1中文 → 数字|中文
     text = re.sub(r'(\+\d+)\s*1\s*([\u4e00-\u9fa5])', r'\1|\2', text)
 
-    # 7. 删除包含※符号或"仅限能使用的武器类别"的行
+    # 6. 删除包含※符号或"仅限能使用的武器类别"的行
     lines = text.split('\n')
     filtered_lines = []
     for line in lines:
@@ -357,6 +367,144 @@ class OCREngine:
                 "correction_time": 0.0,
                 "success": False
             }
+
+    def recognize_with_classification(self, image: np.ndarray, mode: str = "normal") -> dict:
+        """
+        执行OCR识别并分类词条（正面/负面）
+
+        Args:
+            image: numpy 图像数组
+            mode: 模式 ("normal" 或 "deepnight")
+
+        Returns:
+            {
+                "affixes": [
+                    {
+                        "text": str,           # 原始文本
+                        "cleaned_text": str,   # 清洗后文本
+                        "is_positive": bool,   # 是否正面词条
+                        "is_unknown": bool,    # 是否未知词条
+                        "similarity": float,   # 相似度
+                    },
+                    ...
+                ],
+                "positive_count": int,         # 正面词条数量
+                "negative_count": int,         # 负面词条数量
+                "recognition_time": float,     # 识别耗时(ms)
+                "success": bool
+            }
+        """
+        start_time = time.time()
+
+        try:
+            result = self.engine.ocr(image)
+            if result is None:
+                return self._empty_classification_result()
+
+            # 收集所有文本
+            all_text = []
+            for item in result:
+                text = item.get('text', '') if isinstance(item, dict) else item['text']
+                if text.strip():
+                    all_text.append(text)
+
+            combined_text = '\n'.join(all_text)
+            raw_entries = split_entries(combined_text)
+
+            # 纠错和分类
+            affixes = []
+            positive_count = 0
+            negative_count = 0
+
+            for entry in raw_entries:
+                affix_info = self._correct_and_classify(entry, mode)
+                affixes.append(affix_info)
+
+                if affix_info["is_positive"]:
+                    positive_count += 1
+                else:
+                    negative_count += 1
+
+            recognition_time = (time.time() - start_time) * 1000  # 转换为毫秒
+
+            return {
+                "affixes": affixes,
+                "positive_count": positive_count,
+                "negative_count": negative_count,
+                "recognition_time": recognition_time,
+                "success": True
+            }
+
+        except Exception as e:
+            print(f"[错误] OCR识别失败: {e}")
+            return self._empty_classification_result()
+
+    def _empty_classification_result(self) -> dict:
+        """返回空的分类结果"""
+        return {
+            "affixes": [],
+            "positive_count": 0,
+            "negative_count": 0,
+            "recognition_time": 0.0,
+            "success": False
+        }
+
+    def _correct_and_classify(self, entry: str, mode: str) -> dict:
+        """
+        纠错并分类词条（正面/负面）
+
+        Returns:
+            {
+                "text": str,           # 原始文本
+                "cleaned_text": str,   # 清洗后文本（纠错后）
+                "is_positive": bool,   # 是否正面词条
+                "is_unknown": bool,    # 是否未知词条
+                "similarity": float,   # 相似度
+            }
+        """
+        # 纠错
+        if self.corrector:
+            corrected_text, similarity, is_corrected = self.corrector.correct_entry(entry)
+        else:
+            corrected_text = entry
+            similarity = 0.0
+            is_corrected = False
+
+        is_unknown = not is_corrected
+
+        # 判断正面/负面
+        is_positive = self._is_positive_affix(corrected_text, mode)
+
+        return {
+            "text": entry,
+            "cleaned_text": corrected_text,
+            "is_positive": is_positive,
+            "is_unknown": is_unknown,
+            "similarity": similarity
+        }
+
+    def _is_positive_affix(self, text: str, mode: str) -> bool:
+        """
+        判断词条是否为正面词条
+
+        规则：
+        - 普通模式：全部为正面
+        - 深夜模式：以"降低"、"减少"、"受到损伤"等开头的为负面
+        """
+        if mode == "normal":
+            return True
+
+        # 深夜模式：检查负面关键词
+        negative_keywords = [
+            "降低", "减少", "受到损伤", "持续减少", "累积",
+            "闪避后", "连续闪避", "使用圣杯瓶", "血量没有全满", "濒死"
+        ]
+
+        for keyword in negative_keywords:
+            if text.startswith(keyword):
+                return False
+
+        return True
 
     def recognize_raw(self, image: np.ndarray) -> dict:
         """

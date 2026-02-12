@@ -75,11 +75,10 @@ class Application:
         self.ocr_worker.error.connect(self.ocr_thread.quit)
         self.ocr_thread.finished.connect(self.ocr_thread.deleteLater)
 
-        # 设置低优先级 (UI 线程优先)
-        self.ocr_thread.setPriority(QThread.Priority.LowPriority)
-
         # 启动线程
         self.ocr_thread.start()
+
+
 
     def _on_ocr_initialized(self):
         """OCR 初始化完成"""
@@ -88,6 +87,8 @@ class Application:
         if self.ocr_engine:
             self.ocr_engine.load_vocabulary(relic_type)
             print("✓ OCR 引擎初始化完成")
+            # 将引擎传递到 UI 层
+            self.window.init_ocr_dependencies(self.ocr_engine)
 
     def _on_ocr_error(self, error_msg: str):
         """OCR 初始化失败"""

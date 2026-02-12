@@ -1,9 +1,9 @@
 """遗物卡片组件 - Fluent Design"""
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
-from qfluentwidgets import CardWidget, RoundedPushButton
+from qfluentwidgets import CardWidget
 
 
 class RelicCard(CardWidget):
@@ -43,10 +43,10 @@ class RelicCard(CardWidget):
         button_layout = QHBoxLayout()
         button_layout.setSpacing(8)
 
-        delete_btn = RoundedPushButton("删除")
+        delete_btn = QPushButton("删除")
         delete_btn.setFixedHeight(32)
         delete_btn.setStyleSheet("""
-            RoundedPushButton {
+            QPushButton {
                 background-color: #f3f3f3;
                 color: #333333;
                 border: none;
@@ -54,7 +54,7 @@ class RelicCard(CardWidget):
                 font-size: 11px;
                 font-weight: 600;
             }
-            RoundedPushButton:hover {
+            QPushButton:hover {
                 background-color: #e8e8e8;
             }
         """)

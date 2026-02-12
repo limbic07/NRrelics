@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "normal_general": {
+    "id": "normal_general",
+    "name": "普通通用预设",
+    "type": "normal_whitelist",
+    "affixes": [
+      "生命力+1",
+      "生命力+2",
+      "生命力+3",
+      "集中力+1",
+      "集中力+2"
+    ],
+    "is_general": true,
+    "is_active": true
+  },
+  "deepnight_general": {
+    "id": "deepnight_general",
+    "name": "深夜通用预设",
+    "type": "deepnight_whitelist",
+    "affixes": [
+      "提升魔力属性攻击力+3",
+      "提升魔力属性攻击力+4"
+    ],
+    "is_general": true,
+    "is_active": true
+  },
+  "normal_dedicated": {
+    "b35c1362-708e-47ed-b253-8e0c237034c8": {
+      "id": "b35c1362-708e-47ed-b253-8e0c237034c8",
+      "name": "2",
+      "type": "normal_whitelist",
+      "affixes": [
+        "生命力+3",
+        "集中力+1",
+        "集中力+2"
+      ],
+      "is_general": false,
+      "is_active": true
+    }
+  },
+  "deepnight_whitelist_dedicated": {
+    "e0ce6a5c-3e1b-4d29-9485-e1f2373c7335": {
+      "id": "e0ce6a5c-3e1b-4d29-9485-e1f2373c7335",
+      "name": "test1",
+      "type": "deepnight_whitelist",
+      "affixes": [
+        "提升物理攻击力+3",
+        "提升物理攻击力+4",
+        "提升魔力属性攻击力+3",
+        "提升魔力属性攻击力+4"
+      ],
+      "is_general": false,
+      "is_active": true
+    }
+  },
+  "deepnight_blacklist": {
+    "id": "deepnight_blacklist",
+    "name": "深夜黑名单",
+    "type": "deepnight_blacklist",
+    "affixes": [],
+    "is_general": false,
+    "is_active": true
+  }
+}
