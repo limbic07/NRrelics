@@ -12,8 +12,6 @@ from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
                            ComboBox, SpinBox, MessageBox, InfoBar, InfoBarPosition)
 
 from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
-from core.relic_detector import RelicDetector
-from core.repo_cleaner import RepoCleaner
 from ui.dialogs.preset_edit_dialog import PresetEditDialog
 from ui.components.logger_widget import LoggerWidget
 import json
@@ -175,8 +173,8 @@ class RepoPage(QWidget):
         # 初始化组件
         self.preset_manager = PresetManager()
         self.ocr_engine = None  # 延迟加载，初始为 None
-        self.relic_detector = RelicDetector()
-        self.repo_cleaner = RepoCleaner(self.preset_manager, None, self.relic_detector)
+        self.relic_detector = None  # 延迟加载
+        self.repo_cleaner = None  # 延迟加载
 
         # 清理线程
         self.cleaning_thread = None
@@ -608,9 +606,22 @@ class RepoPage(QWidget):
 
     def set_ocr_engine(self, engine):
         """设置 OCR 引擎（异步加载完成后调用）"""
+        # 在这里才真正导入重型模块，此时界面已经显示出来了
+        from core.relic_detector import RelicDetector
+        from core.repo_cleaner import RepoCleaner
+
         self.ocr_engine = engine
-        # 关键：更新 repo_cleaner 的引擎
-        self.repo_cleaner.ocr_engine = engine
+
+        # 初始化 relic_detector 和 repo_cleaner
+        if self.relic_detector is None:
+            self.relic_detector = RelicDetector()
+
+        if self.repo_cleaner is None:
+            self.repo_cleaner = RepoCleaner(self.preset_manager, engine, self.relic_detector)
+        else:
+            # 如果已经初始化，只更新引擎
+            self.repo_cleaner.ocr_engine = engine
+
         # 启用开始按钮
         self.start_btn.setEnabled(True)
         self.start_btn.setText("开始清理")

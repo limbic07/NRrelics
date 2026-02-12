@@ -77,63 +77,67 @@ class PresetEditDialog(QDialog):
         layout.addWidget(list_label)
 
         self.vocab_list = QListWidget()
-        # 修正后的样式表
+        # === 重新设计的现代化样式表 (使用 Fluent 图标) ===
         self.vocab_list.setStyleSheet("""
             QListWidget {
                 border: 1px solid #e0e0e0;
-                border-radius: 4px;
+                border-radius: 6px;
                 background-color: white;
-                outline: none; /* 去除焦点虚线框 */
+                outline: none;
+                padding: 4px;
             }
             QListWidget::item {
-                height: 36px;
+                height: 38px; /* 稍微增加高度让布局更宽松 */
                 padding-left: 8px;
                 color: #333;
-                border-bottom: 1px solid #f5f5f5;
+                border-radius: 4px; /* 让选中项有圆角 */
+                margin-bottom: 2px;
             }
             QListWidget::item:hover {
-                background-color: #f0f0f0;
+                background-color: #f5f5f5;
             }
             QListWidget::item:selected {
                 background-color: #e3f2fd; /* 选中时的浅蓝背景 */
                 color: #000;
             }
 
-            /* === 复选框基础样式 === */
+            /* === 复选框指示器样式 === */
             QListWidget::indicator {
-                width: 18px;
-                height: 18px;
+                width: 20px;
+                height: 20px;
                 border-radius: 4px;
-                border: 1px solid #999;
+                border: 1px solid #c0c0c0; /* 默认浅灰边框 */
                 background-color: white;
-                margin-right: 10px;
+                margin-right: 12px;
             }
 
-            /* 鼠标悬停在复选框上 */
+            /* 鼠标悬停 */
             QListWidget::indicator:hover {
                 border-color: #009faa;
+                background-color: #f0f8ff;
             }
 
-            /* === 已勾选 (Checked) 状态 === */
-            /* 使用实心蓝色背景填充，确保无论在哪里都能看清 */
+            /* === 关键修改：勾选状态 (Checked) === */
+            /* 使用蓝色背景 + 内置的白色对钩图标 */
             QListWidget::indicator:checked {
-                background-color: #009faa;
+                background-color: #009faa; /* Fluent 主题蓝 */
                 border: 1px solid #009faa;
-                /* 如果没有对钩图片，实心蓝块也足以表示选中 */
-                image: none;
+                /* 引用 QFluentWidgets 库内置的白色对钩资源 */
+                image: url(":/qfluentwidgets/images/check_box_checked_white.png");
             }
 
-            /* === 已勾选且行被选中 (Checked + Selected) === */
-            /* 保持蓝色，稍微加深一点以示区别 */
+            /* === 关键修改：选中行时的勾选状态 (Checked + Selected) === */
+            /* 保持样式不变，蓝色背景+白勾在浅蓝底色上非常清晰 */
             QListWidget::indicator:checked:selected {
-                background-color: #007acc;
-                border: 1px solid #007acc;
+                 background-color: #009faa;
+                 border: 1px solid #009faa;
+                 image: url(":/qfluentwidgets/images/check_box_checked_white.png");
             }
 
-            /* === 未勾选但行被选中 (Unchecked + Selected) === */
+            /* 未勾选时的选中状态 */
             QListWidget::indicator:unchecked:selected {
-                background-color: white;
                 border: 1px solid #009faa;
+                background-color: white;
             }
         """)
 
@@ -152,6 +156,7 @@ class PresetEditDialog(QDialog):
         layout.addWidget(self.count_label)
 
         self.vocab_list.itemChanged.connect(self._update_count)
+        self.vocab_list.itemChanged.connect(self._sort_items)  # 勾选变化时重新排序
 
         # 按钮
         button_layout = QHBoxLayout()
@@ -184,6 +189,7 @@ class PresetEditDialog(QDialog):
                 item.setCheckState(Qt.Checked)
 
         self._update_count()
+        self._sort_items()  # 加载后排序，已勾选的置顶
 
     def _filter_vocabulary(self, text: str):
         """过滤词条列表"""
@@ -196,6 +202,33 @@ class PresetEditDialog(QDialog):
         count = sum(1 for i in range(self.vocab_list.count())
                    if self.vocab_list.item(i).checkState() == Qt.Checked)
         self.count_label.setText(f"已选择: {count} 条")
+
+    def _sort_items(self):
+        """将已勾选的词条置顶"""
+        # 暂时断开信号，避免排序时触发 itemChanged
+        self.vocab_list.itemChanged.disconnect(self._update_count)
+        self.vocab_list.itemChanged.disconnect(self._sort_items)
+
+        # 收集所有项
+        items = []
+        for i in range(self.vocab_list.count()):
+            item = self.vocab_list.item(i)
+            items.append((item.text(), item.checkState()))
+
+        # 排序：已勾选的在前，未勾选的在后，同类按字母排序
+        items.sort(key=lambda x: (x[1] != Qt.Checked, x[0]))
+
+        # 清空列表并重新添加
+        self.vocab_list.clear()
+        for text, check_state in items:
+            item = QListWidgetItem(text)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(check_state)
+            self.vocab_list.addItem(item)
+
+        # 重新连接信号
+        self.vocab_list.itemChanged.connect(self._update_count)
+        self.vocab_list.itemChanged.connect(self._sort_items)
 
     def _save_preset(self):
         """保存预设"""
@@ -232,3 +265,36 @@ class PresetEditDialog(QDialog):
             if item.checkState() == Qt.Checked:
                 selected.append(item.text())
         return selected
+
+    def closeEvent(self, event):
+        """关闭窗口时自动保存"""
+        # 验证名称（非通用预设）
+        if not self.is_general:
+            name = self.name_input.text().strip()
+            if not name:
+                # 如果没有名称，询问是否放弃
+                reply = MessageBox("提示", "预设名称为空，是否放弃保存？", self)
+                if reply.exec():
+                    event.accept()
+                else:
+                    event.ignore()
+                return
+        else:
+            name = "通用预设"
+
+        # 获取选中的词条
+        selected_affixes = self.get_selected_affixes()
+
+        if not selected_affixes:
+            # 如果没有选择词条，询问是否放弃
+            reply = MessageBox("提示", "未选择任何词条，是否放弃保存？", self)
+            if reply.exec():
+                event.accept()
+            else:
+                event.ignore()
+            return
+
+        # 发送保存信号
+        preset_id = self.preset_data.get("id", "") if self.preset_data else ""
+        self.preset_saved.emit(preset_id, name, selected_affixes)
+        event.accept()
