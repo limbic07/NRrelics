@@ -14,7 +14,7 @@ class SavePage(QWidget):
         layout.setContentsMargins(32, 32, 32, 32)
 
         label = QLabel("存档管理")
-        label.setStyleSheet("font-size: 24px; font-weight: bold;")
+        label.setStyleSheet("font-size: 24pt; font-weight: bold;")
         layout.addWidget(label)
 
         layout.addStretch()

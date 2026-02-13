@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "normal_general": {
+    "id": "normal_general",
+    "name": "普通通用预设",
+    "type": "normal_whitelist",
+    "affixes": [
+      "打倒敌人时，能累积绝招量表",
+      "每次打倒封印监牢里的囚犯，能提升攻击力",
+      "每次打倒黑夜入侵者，能提升攻击力",
+      "出击时，武器战技改为冻霜踏地"
+    ],
+    "is_general": true,
+    "is_active": true
+  },
+  "deepnight_general": {
+    "id": "deepnight_general",
+    "name": "深夜通用预设",
+    "type": "deepnight_whitelist",
+    "affixes": [
+      "提升魔力属性攻击力+3",
+      "提升魔力属性攻击力+4"
+    ],
+    "is_general": true,
+    "is_active": true
+  },
+  "normal_dedicated": {
+    "897d2c0a-8c40-4b8e-b7eb-7a79dbd6b32b": {
+      "id": "897d2c0a-8c40-4b8e-b7eb-7a79dbd6b32b",
+      "name": "双小曲",
+      "type": "normal_whitelist",
+      "affixes": [
+        "提升曲剑的攻击力",
+        "装备三把以上类别为曲剑的武器，能提升攻击力",
+        "通过潜在能力，能比较容易找到曲剑"
+      ],
+      "is_general": false,
+      "is_active": true
+    }
+  },
+  "deepnight_whitelist_dedicated": {
+    "e0ce6a5c-3e1b-4d29-9485-e1f2373c7335": {
+      "id": "e0ce6a5c-3e1b-4d29-9485-e1f2373c7335",
+      "name": "test1",
+      "type": "deepnight_whitelist",
+      "affixes": [
+        "提升物理攻击力+3",
+        "提升物理攻击力+4",
+        "提升魔力属性攻击力+3",
+        "提升魔力属性攻击力+4"
+      ],
+      "is_general": false,
+      "is_active": true
+    }
+  },
+  "deepnight_blacklist": {
+    "id": "deepnight_blacklist",
+    "name": "深夜黑名单",
+    "type": "deepnight_blacklist",
+    "affixes": [],
+    "is_general": false,
+    "is_active": true
+  }
+}

@@ -51,7 +51,7 @@ class RelicCard(CardWidget):
                 color: #333333;
                 border: none;
                 border-radius: 4px;
-                font-size: 11px;
+                font-size: 11pt;
                 font-weight: 600;
             }
             QPushButton:hover {

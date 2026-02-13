@@ -58,7 +58,7 @@ class PresetEditDialog(QDialog):
         else:
             # 通用预设显示标题
             title = QLabel("通用预设词条选择")
-            title.setStyleSheet("font-size: 16px; font-weight: bold;")
+            title.setStyleSheet("font-size: 16pt; font-weight: bold;")
             layout.addWidget(title)
 
         # 搜索框
@@ -71,6 +71,31 @@ class PresetEditDialog(QDialog):
         search_layout.addWidget(search_label)
         search_layout.addWidget(self.search_input)
         layout.addLayout(search_layout)
+
+        # 批量操作按钮
+        batch_layout = QHBoxLayout()
+        batch_layout.addWidget(QLabel("批量操作:"))
+
+        self.select_all_btn = PushButton("全选")
+        self.select_all_btn.setFixedWidth(80)
+        self.select_all_btn.setToolTip("选择所有可见词条（受搜索过滤影响）")
+        self.select_all_btn.clicked.connect(self._select_all)
+        batch_layout.addWidget(self.select_all_btn)
+
+        self.deselect_all_btn = PushButton("全不选")
+        self.deselect_all_btn.setFixedWidth(80)
+        self.deselect_all_btn.setToolTip("取消选择所有可见词条（受搜索过滤影响）")
+        self.deselect_all_btn.clicked.connect(self._deselect_all)
+        batch_layout.addWidget(self.deselect_all_btn)
+
+        self.invert_selection_btn = PushButton("反选")
+        self.invert_selection_btn.setFixedWidth(80)
+        self.invert_selection_btn.setToolTip("反选所有可见词条（受搜索过滤影响）")
+        self.invert_selection_btn.clicked.connect(self._invert_selection)
+        batch_layout.addWidget(self.invert_selection_btn)
+
+        batch_layout.addStretch()
+        layout.addLayout(batch_layout)
 
         # 词条列表
         list_label = QLabel(f"词条列表 (共 {len(self.vocabulary)} 条):")
@@ -152,11 +177,11 @@ class PresetEditDialog(QDialog):
 
         # 统计信息
         self.count_label = QLabel("已选择: 0 条")
-        self.count_label.setStyleSheet("color: #666; font-size: 12px;")
+        self.count_label.setStyleSheet("color: #666; font-size: 12pt;")
         layout.addWidget(self.count_label)
 
+        # 只连接更新计数，不连接排序（排序只在加载时执行一次）
         self.vocab_list.itemChanged.connect(self._update_count)
-        self.vocab_list.itemChanged.connect(self._sort_items)  # 勾选变化时重新排序
 
         # 按钮
         button_layout = QHBoxLayout()
@@ -181,6 +206,9 @@ class PresetEditDialog(QDialog):
         if not self.is_general and "name" in self.preset_data:
             self.name_input.setText(self.preset_data["name"])
 
+        # 暂时断开信号，避免加载时触发排序
+        self.vocab_list.itemChanged.disconnect(self._update_count)
+
         # 勾选已有词条
         selected_affixes = set(self.preset_data.get("affixes", []))
         for i in range(self.vocab_list.count()):
@@ -188,8 +216,12 @@ class PresetEditDialog(QDialog):
             if item.text() in selected_affixes:
                 item.setCheckState(Qt.Checked)
 
+        # 重新连接信号
+        self.vocab_list.itemChanged.connect(self._update_count)
+
+        # 更新计数和排序（只在加载时执行一次）
         self._update_count()
-        self._sort_items()  # 加载后排序，已勾选的置顶
+        self._sort_items()
 
     def _filter_vocabulary(self, text: str):
         """过滤词条列表"""
@@ -207,7 +239,6 @@ class PresetEditDialog(QDialog):
         """将已勾选的词条置顶"""
         # 暂时断开信号，避免排序时触发 itemChanged
         self.vocab_list.itemChanged.disconnect(self._update_count)
-        self.vocab_list.itemChanged.disconnect(self._sort_items)
 
         # 收集所有项
         items = []
@@ -228,7 +259,48 @@ class PresetEditDialog(QDialog):
 
         # 重新连接信号
         self.vocab_list.itemChanged.connect(self._update_count)
-        self.vocab_list.itemChanged.connect(self._sort_items)
+
+    def _select_all(self):
+        """全选所有可见词条"""
+        self.vocab_list.itemChanged.disconnect(self._update_count)
+
+        for i in range(self.vocab_list.count()):
+            item = self.vocab_list.item(i)
+            # 只选择可见的词条
+            if not item.isHidden():
+                item.setCheckState(Qt.Checked)
+
+        self.vocab_list.itemChanged.connect(self._update_count)
+        self._update_count()
+
+    def _deselect_all(self):
+        """取消全选所有可见词条"""
+        self.vocab_list.itemChanged.disconnect(self._update_count)
+
+        for i in range(self.vocab_list.count()):
+            item = self.vocab_list.item(i)
+            # 只取消选择可见的词条
+            if not item.isHidden():
+                item.setCheckState(Qt.Unchecked)
+
+        self.vocab_list.itemChanged.connect(self._update_count)
+        self._update_count()
+
+    def _invert_selection(self):
+        """反选所有可见词条"""
+        self.vocab_list.itemChanged.disconnect(self._update_count)
+
+        for i in range(self.vocab_list.count()):
+            item = self.vocab_list.item(i)
+            # 只反选可见的词条
+            if not item.isHidden():
+                if item.checkState() == Qt.Checked:
+                    item.setCheckState(Qt.Unchecked)
+                else:
+                    item.setCheckState(Qt.Checked)
+
+        self.vocab_list.itemChanged.connect(self._update_count)
+        self._update_count()
 
     def _save_preset(self):
         """保存预设"""

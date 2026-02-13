@@ -108,23 +108,29 @@ class PresetManager:
             "is_active": True
         }
 
-    def load_vocabulary(self, preset_type: str) -> List[str]:
+    def load_vocabulary(self, preset_type: str, for_editing: bool = True) -> List[str]:
         """
         加载词条库
 
         Args:
             preset_type: 预设类型
+            for_editing: 是否用于编辑（True=仅加载常规词条，False=加载完整词条库）
 
         Returns:
             词条列表（已清洗）
         """
+        # 生成缓存键（区分编辑和识别）
+        cache_key = f"{preset_type}_{'edit' if for_editing else 'full'}"
+
         # 检查缓存
-        if preset_type in self._vocab_cache:
-            return self._vocab_cache[preset_type]
+        if cache_key in self._vocab_cache:
+            return self._vocab_cache[cache_key]
 
         # 确定词条库文件
         if preset_type == PRESET_TYPE_NORMAL_WHITELIST:
-            files = ["normal.txt", "normal_special.txt"]
+            # 编辑模式：只加载normal.txt
+            # 识别模式：加载normal.txt + normal_special.txt
+            files = ["normal.txt"] if for_editing else ["normal.txt", "normal_special.txt"]
         elif preset_type == PRESET_TYPE_DEEPNIGHT_WHITELIST:
             files = ["deepnight_pos.txt"]
         elif preset_type == PRESET_TYPE_DEEPNIGHT_BLACKLIST:
@@ -157,7 +163,7 @@ class PresetManager:
                         vocabulary.append(entry)
 
         # 缓存
-        self._vocab_cache[preset_type] = vocabulary
+        self._vocab_cache[cache_key] = vocabulary
         return vocabulary
 
     def _clean_entry(self, entry: str) -> str:

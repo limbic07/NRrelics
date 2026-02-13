@@ -85,7 +85,7 @@ class PresetCard(CardWidget):
             QPushButton {
                 border: none;
                 background: transparent;
-                font-size: 10px;
+                font-size: 10pt;
             }
             QPushButton:hover {
                 background: #f0f0f0;
@@ -101,15 +101,14 @@ class PresetCard(CardWidget):
 
         # 名称
         name_label = QLabel(self.preset_data["name"])
-        name_font = QFont()
-        name_font.setPointSize(10)
+        name_font = QFont("", 10)  # 指定字号避免-1错误
         name_font.setBold(True)
         name_label.setFont(name_font)
         info_layout.addWidget(name_label)
 
         # 词条数量
         count_label = QLabel(f"{len(self.preset_data['affixes'])} 条词条")
-        count_label.setStyleSheet("color: #888; font-size: 10px;")
+        count_label.setStyleSheet("color: #888; font-size: 10pt;")
         info_layout.addWidget(count_label)
 
         top_layout.addLayout(info_layout)
@@ -149,13 +148,13 @@ class PresetCard(CardWidget):
         # 添加词条标签
         for affix in self.preset_data["affixes"][:20]:  # 最多显示20条
             affix_label = QLabel(f"• {affix}")
-            affix_label.setStyleSheet("color: #555; font-size: 9px;")
+            affix_label.setStyleSheet("color: #555; font-size: 9pt;")
             affix_label.setWordWrap(True)
             affixes_layout.addWidget(affix_label)
 
         if len(self.preset_data["affixes"]) > 20:
             more_label = QLabel(f"... 还有 {len(self.preset_data['affixes']) - 20} 条")
-            more_label.setStyleSheet("color: #999; font-size: 9px; font-style: italic;")
+            more_label.setStyleSheet("color: #999; font-size: 9pt; font-style: italic;")
             affixes_layout.addWidget(more_label)
 
         self.affixes_widget.setVisible(False)
@@ -200,7 +199,7 @@ class RepoPage(QWidget):
 
         # 标题
         title = QLabel("仓库清理")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
+        title.setStyleSheet("font-size: 24pt; font-weight: bold;")
         layout.addWidget(title)
 
         # 顶部工具栏（紧凑版）
@@ -282,7 +281,7 @@ class RepoPage(QWidget):
 
         # 标题（紧凑版）
         title = QLabel("预设管理")
-        title.setStyleSheet("font-size: 13px; font-weight: bold; padding: 4px 0;")
+        title.setStyleSheet("font-size: 13pt; font-weight: bold; padding: 4px 0;")
         layout.addWidget(title)
 
         # 滚动区域
@@ -404,11 +403,11 @@ class RepoPage(QWidget):
         card_layout.setSpacing(4)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {color}; font-size: 11px;")
+        title_label.setStyleSheet(f"color: {color}; font-size: 11pt;")
         card_layout.addWidget(title_label)
 
         value_label = QLabel(value)
-        value_label.setStyleSheet(f"color: {color}; font-size: 20px; font-weight: bold;")
+        value_label.setStyleSheet(f"color: {color}; font-size: 20pt; font-weight: bold;")
         card_layout.addWidget(value_label)
 
         return card, value_label
@@ -467,7 +466,8 @@ class RepoPage(QWidget):
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         preset = self.preset_manager.get_general_preset(mode)
         vocab = self.preset_manager.load_vocabulary(
-            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST
+            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST,
+            for_editing=True  # 编辑模式：只加载常规词条
         )
 
         dialog = PresetEditDialog(vocab, preset, is_general=True, parent=self)
@@ -493,7 +493,8 @@ class RepoPage(QWidget):
             return
 
         vocab = self.preset_manager.load_vocabulary(
-            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST
+            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST,
+            for_editing=True  # 编辑模式：只加载常规词条
         )
 
         dialog = PresetEditDialog(vocab, parent=self)
@@ -521,7 +522,8 @@ class RepoPage(QWidget):
             return
 
         vocab = self.preset_manager.load_vocabulary(
-            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST
+            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST,
+            for_editing=True  # 编辑模式：只加载常规词条
         )
 
         dialog = PresetEditDialog(vocab, preset, parent=self)
@@ -556,7 +558,7 @@ class RepoPage(QWidget):
         from ui.dialogs.preset_edit_dialog import PresetEditDialog
 
         preset = self.preset_manager.get_blacklist_preset()
-        vocab = self.preset_manager.load_vocabulary("deepnight_blacklist")
+        vocab = self.preset_manager.load_vocabulary("deepnight_blacklist", for_editing=True)
 
         dialog = PresetEditDialog(vocab, preset, is_general=True, parent=self)
         dialog.preset_saved.connect(lambda pid, name, affixes: self._save_blacklist(affixes))
@@ -649,7 +651,7 @@ class RepoPage(QWidget):
         # 标题
         state_name = state_names.get(relic_info['state'], relic_info['state'])
         title = QLabel(f"#{relic_info['index']} - {state_name}")
-        title.setStyleSheet("font-size: 10px; font-weight: bold; color: #4CAF50;")
+        title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #4CAF50;")
         card_layout.addWidget(title)
 
         # 词条列表
@@ -657,7 +659,7 @@ class RepoPage(QWidget):
             affix_type = "正面" if affix["is_positive"] else "负面"
             color = "#4CAF50" if affix["is_positive"] else "#FF5722"
             affix_label = QLabel(f"[{affix_type}] {affix['cleaned_text']}")
-            affix_label.setStyleSheet(f"font-size: 9px; color: {color};")
+            affix_label.setStyleSheet(f"font-size: 9pt; color: {color};")
             affix_label.setWordWrap(True)
             card_layout.addWidget(affix_label)
 
@@ -695,7 +697,7 @@ class RepoPage(QWidget):
             self.relic_detector = RelicDetector()
 
         if self.repo_cleaner is None:
-            self.repo_cleaner = RepoCleaner(self.preset_manager, engine, self.relic_detector)
+            self.repo_cleaner = RepoCleaner(self.preset_manager, engine, self.relic_detector, self.settings)
         else:
             # 如果已经初始化，只更新引擎
             self.repo_cleaner.ocr_engine = engine

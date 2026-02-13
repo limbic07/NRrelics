@@ -9,6 +9,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Signal, QObject, QThread
+from PySide6.QtGui import QFont
 from ui import MainWindow
 
 
@@ -37,6 +38,23 @@ class Application:
     def __init__(self):
         self.config = self._load_config()
         self.app = QApplication(sys.argv)
+
+        # 设置默认字体，避免Qt尝试加载不存在的MS Sans Serif
+        default_font = QFont("Segoe UI", 9)
+        self.app.setFont(default_font)
+
+        # 设置字体替换，防止Qt尝试使用MS Sans Serif
+        QFont.insertSubstitution("MS Sans Serif", "Segoe UI")
+        QFont.insertSubstitution("MS Shell Dlg", "Segoe UI")
+        QFont.insertSubstitution("MS Shell Dlg 2", "Segoe UI")
+
+        # 设置全局样式表，为所有使用font-weight的元素指定font-family
+        self.app.setStyleSheet("""
+            * {
+                font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+            }
+        """)
+
         self.window = None
         self.ocr_engine = None
         self.ocr_thread = None

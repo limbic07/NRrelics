@@ -18,7 +18,7 @@ class LoggerWidget(QTextEdit):
                 border-radius: 8px;
                 padding: 12px;
                 font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                font-size: 11px;
+                font-size: 11pt;
                 line-height: 1.5;
             }
         """)

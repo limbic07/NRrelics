@@ -34,9 +34,9 @@ class Config:
     
     # === 关键修改：亮度配置 ===
     # 亮度判定阈值 (根据 HUD 显示的 Lum 值微调)
-    BRIGHTNESS_THRESHOLD = 50 
-    # 采样面积占比 (0.65 = 中间 65% 的区域)
-    BRIGHTNESS_CENTER_RATIO = 0.65
+    BRIGHTNESS_THRESHOLD = 45
+    # 采样面积占比 (0.55= 中间 55 的区域)
+    BRIGHTNESS_CENTER_RATIO = 0.55
 
     # 匹配阈值
     TEMPLATE_MATCH_THRESHOLD = 0.60 

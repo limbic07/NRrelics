@@ -1,5 +1,9 @@
 {
   "game_window_title": "NIGHTREIGN",
   "allow_operate_favorited": false,
-  "require_double_valid": true
+  "require_double_valid": true,
+  "game_resolution": [
+    1600,
+    900
+  ]
 }

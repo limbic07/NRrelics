@@ -6,6 +6,8 @@ import time
 import cv2
 import numpy as np
 import pygetwindow as gw
+import win32gui
+import win32con
 import os
 from typing import Tuple, Optional
 from datetime import datetime
@@ -47,6 +49,7 @@ class RepositoryFilter:
     RITUAL_REGION = (130, 30, 280, 90)  # 遗物仪式区域
     SELL_REGION = (580, 130, 640, 160)  # 卖出区域
     FILTER_REGION = (50, 850, 250, 960)  # 筛选勾选区域
+    AFFIX_REGION = (1105, 800, 1805, 1000)  # 词条识别区域 (x1, y1, x2, y2)
 
     # 勾选框基准坐标（基于1920x1080）
     # "遗物"勾选框
@@ -57,25 +60,50 @@ class RepositoryFilter:
     # 调试目录
     DEBUG_DIR = "debug_ocr"
 
-    def __init__(self, ocr_engine=None):
+    def __init__(self, ocr_engine=None, settings=None):
         """
         初始化仓库筛选控制器
 
         Args:
             ocr_engine: OCR引擎实例，用于文字识别
+            settings: 设置字典，包含game_resolution等配置
         """
         self.ocr_engine = ocr_engine
+        self.settings = settings or {}
         self.game_window = self._find_game_window()
-        self.scale_factor = self._calculate_scale_factor()
+        self.scale_x, self.scale_y = self._calculate_scale_factors()
+
+        # 输出调试信息
+        game_resolution = self.settings.get("game_resolution", [1920, 1080])
+        print(f"[调试] 游戏分辨率设置: {game_resolution[0]}x{game_resolution[1]}")
+        if self.game_window:
+            print(f"[调试] 游戏窗口信息:")
+            print(f"  位置: left={self.game_window.left}, top={self.game_window.top}")
+        else:
+            print(f"[调试] 未找到游戏窗口")
+        print(f"  缩放因子: scale_x={self.scale_x:.4f}, scale_y={self.scale_y:.4f}")
 
         # 创建调试目录
         if not os.path.exists(self.DEBUG_DIR):
             os.makedirs(self.DEBUG_DIR)
             print(f"[调试] 创建调试目录: {self.DEBUG_DIR}")
 
+    def refresh_window_info(self):
+        """
+        刷新游戏窗口位置信息
+
+        在开始清理前调用，确保窗口位置是最新的
+        """
+        print("[调试] 刷新游戏窗口位置...")
+        self.game_window = self._find_game_window()
+
+        if self.game_window:
+            print(f"[调试] 更新后的窗口位置:")
+            print(f"  位置: left={self.game_window.left}, top={self.game_window.top}")
+
     def _find_game_window(self) -> Optional[gw.Win32Window]:
         """
-        查找包含NIGHTREIGN的游戏窗口
+        查找包含NIGHTREIGN的游戏窗口（仅用于获取窗口位置）
 
         Returns:
             游戏窗口对象，如果未找到则返回None
@@ -85,49 +113,132 @@ class RepositoryFilter:
             for window in windows:
                 if 'NIGHTREIGN' in window.title.upper():
                     print(f"[成功] 找到游戏窗口: {window.title}")
-                    print(f"  窗口尺寸: {window.width}x{window.height}")
                     return window
 
-            print("[警告] 未找到包含NIGHTREIGN的窗口，将使用屏幕分辨率")
+            print("[警告] 未找到包含NIGHTREIGN的窗口")
             return None
         except Exception as e:
             print(f"[警告] 查找游戏窗口失败: {e}")
             return None
 
-    def _calculate_scale_factor(self) -> float:
-        """计算当前分辨率相对于基准分辨率的缩放因子"""
-        if self.game_window:
-            # 使用游戏窗口尺寸
-            window_width = self.game_window.width
-            window_height = self.game_window.height
-            print(f"[信息] 使用游戏窗口尺寸: {window_width}x{window_height}")
-        else:
-            # 回退到屏幕分辨率
-            window_width, window_height = pyautogui.size()
-            print(f"[信息] 使用屏幕分辨率: {window_width}x{window_height}")
+    def _calculate_scale_factors(self) -> Tuple[float, float]:
+        """计算当前分辨率相对于基准分辨率的缩放因子（使用手动设置的分辨率）"""
+        # 使用手动设置的游戏分辨率
+        game_resolution = self.settings.get("game_resolution", [1920, 1080])
+        window_width = game_resolution[0]
+        window_height = game_resolution[1]
+        print(f"[信息] 使用手动设置的游戏分辨率: {window_width}x{window_height}")
 
         scale_x = window_width / self.BASE_WIDTH
         scale_y = window_height / self.BASE_HEIGHT
-        scale_factor = min(scale_x, scale_y)
 
-        print(f"[信息] 缩放因子: {scale_factor:.3f}")
-        return scale_factor
+        print(f"[信息] 缩放因子: X={scale_x:.3f}, Y={scale_y:.3f}")
+        return scale_x, scale_y
 
     def _scale_region(self, region: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-        """根据缩放因子调整区域坐标"""
+        """根据缩放因子调整区域坐标（分别使用X和Y缩放因子）"""
         x1, y1, x2, y2 = region
         return (
-            int(x1 * self.scale_factor),
-            int(y1 * self.scale_factor),
-            int(x2 * self.scale_factor),
-            int(y2 * self.scale_factor)
+            int(x1 * self.scale_x),
+            int(y1 * self.scale_y),
+            int(x2 * self.scale_x),
+            int(y2 * self.scale_y)
         )
 
+    def _get_client_rect_screen_coords(self) -> Optional[Tuple[int, int, int, int]]:
+        """
+        获取窗口客户区的屏幕坐标（排除标题栏和边框）
+
+        Returns:
+            (left, top, width, height) 或 None
+        """
+        if not self.game_window:
+            return None
+
+        try:
+            # 通过窗口标题查找窗口句柄
+            hwnd = win32gui.FindWindow(None, self.game_window.title)
+            if not hwnd:
+                print("[警告] 无法获取窗口句柄")
+                return None
+
+            # 获取客户区矩形（相对于窗口）
+            client_rect = win32gui.GetClientRect(hwnd)
+            # client_rect = (left, top, right, bottom)，对于客户区，left和top通常是0
+
+            # 将客户区左上角转换为屏幕坐标
+            client_left, client_top = win32gui.ClientToScreen(hwnd, (client_rect[0], client_rect[1]))
+
+            # 计算客户区宽度和高度
+            client_width = client_rect[2] - client_rect[0]
+            client_height = client_rect[3] - client_rect[1]
+
+            print(f"[调试] 客户区屏幕坐标: left={client_left}, top={client_top}, width={client_width}, height={client_height}")
+
+            return (client_left, client_top, client_width, client_height)
+
+        except Exception as e:
+            print(f"[警告] 获取客户区坐标失败: {e}")
+            return None
+
+    def _capture_game_window(self) -> Optional[np.ndarray]:
+        """
+        截取整个游戏窗口图像（仅客户区，排除标题栏和边框）
+
+        Returns:
+            BGR格式的numpy数组，如果失败则返回None
+        """
+        try:
+            if self.game_window:
+                # 尝试获取客户区坐标
+                client_coords = self._get_client_rect_screen_coords()
+
+                if client_coords:
+                    # 使用客户区坐标截图
+                    left, top, width, height = client_coords
+                    screenshot = pyautogui.screenshot(region=(left, top, width, height))
+                else:
+                    # 回退到使用整个窗口（包括边框）
+                    print("[警告] 无法获取客户区，使用整个窗口截图")
+                    screenshot = pyautogui.screenshot(region=(
+                        self.game_window.left,
+                        self.game_window.top,
+                        self.game_window.width,
+                        self.game_window.height
+                    ))
+            else:
+                # 回退到全屏截图
+                screenshot = pyautogui.screenshot()
+
+            return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+        except Exception as e:
+            print(f"[错误] 截图失败: {e}")
+            return None
+
     def _capture_region(self, region: Tuple[int, int, int, int]) -> np.ndarray:
-        """截取指定区域的图像"""
+        """
+        截取指定区域的图像（从游戏窗口中切割）
+
+        Args:
+            region: 基于游戏分辨率的区域坐标 (x1, y1, x2, y2)
+
+        Returns:
+            BGR格式的numpy数组
+        """
+        # 先截取整个游戏窗口
+        window_image = self._capture_game_window()
+        if window_image is None:
+            # 如果截取失败，返回空图像
+            return np.zeros((100, 100, 3), dtype=np.uint8)
+
+        # 缩放区域坐标
         x1, y1, x2, y2 = self._scale_region(region)
-        screenshot = pyautogui.screenshot(region=(x1, y1, x2 - x1, y2 - y1))
-        return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+
+        # 从窗口图像中切割ROI（使用numpy数组切片）
+        # 注意：numpy数组的索引是 [y, x]
+        roi = window_image[y1:y2, x1:x2]
+
+        return roi
 
     def _save_debug_image(self, image: np.ndarray, name: str):
         """保存调试图像"""
@@ -152,6 +263,9 @@ class RepositoryFilter:
         # 截取左上角区域
         image = self._capture_region(self.RITUAL_REGION)
 
+        # 保存调试图片
+        self._save_debug_image(image, "ritual_region")
+
         # OCR识别（不进行纠错）
         result = self.ocr_engine.recognize_raw(image)
         if not result['success']:
@@ -175,6 +289,9 @@ class RepositoryFilter:
 
         # 截取卖出区域
         image = self._capture_region(self.SELL_REGION)
+
+        # 保存调试图片
+        self._save_debug_image(image, "sell_region")
 
         # OCR识别（不进行纠错）
         result = self.ocr_engine.recognize_raw(image)
@@ -240,20 +357,41 @@ class RepositoryFilter:
         # 检测"遗物"勾选框
         normal_region = self._scale_region(self.NORMAL_CHECKBOX)
         normal_image = self._capture_single_region(normal_region)
+        self._save_debug_image(normal_image, "normal_checkbox")
         normal_checked = self._is_checkbox_checked(normal_image)
 
         # 检测"深层的遗物"勾选框
         deepnight_region = self._scale_region(self.DEEPNIGHT_CHECKBOX)
         deepnight_image = self._capture_single_region(deepnight_region)
+        self._save_debug_image(deepnight_image, "deepnight_checkbox")
         deepnight_checked = self._is_checkbox_checked(deepnight_image)
+
+        print(f"[调试] 勾选框状态: 遗物={normal_checked}, 深层的遗物={deepnight_checked}")
 
         return normal_checked, deepnight_checked
 
     def _capture_single_region(self, region: Tuple[int, int, int, int]) -> np.ndarray:
-        """截取指定区域的图像（不接受缩放后的区域）"""
+        """
+        截取指定区域的图像（接受已缩放的区域，从游戏窗口中切割）
+
+        Args:
+            region: 已缩放的区域坐标 (x1, y1, x2, y2)
+
+        Returns:
+            BGR格式的numpy数组
+        """
+        # 先截取整个游戏窗口
+        window_image = self._capture_game_window()
+        if window_image is None:
+            # 如果截取失败，返回空图像
+            return np.zeros((100, 100, 3), dtype=np.uint8)
+
         x1, y1, x2, y2 = region
-        screenshot = pyautogui.screenshot(region=(x1, y1, x2 - x1, y2 - y1))
-        return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+
+        # 从窗口图像中切割ROI（使用numpy数组切片）
+        roi = window_image[y1:y2, x1:x2]
+
+        return roi
 
     def _is_checkbox_checked(self, checkbox_region: np.ndarray) -> bool:
         """
@@ -292,13 +430,31 @@ class RepositoryFilter:
         # 获取精确的勾选框坐标并缩放
         if is_normal:
             region = self._scale_region(self.NORMAL_CHECKBOX)
+            checkbox_name = "遗物"
         else:
             region = self._scale_region(self.DEEPNIGHT_CHECKBOX)
+            checkbox_name = "深层的遗物"
 
-        # 计算中心点
+        # 计算中心点（相对于游戏内容）
         x1, y1, x2, y2 = region
         click_x = (x1 + x2) // 2
         click_y = (y1 + y2) // 2
+
+        # 窗口化模式：使用客户区坐标转换为屏幕坐标
+        if self.game_window:
+            client_coords = self._get_client_rect_screen_coords()
+            if client_coords:
+                client_left, client_top, _, _ = client_coords
+                click_x += client_left
+                click_y += client_top
+                print(f"[调试] 客户区偏移: left={client_left}, top={client_top}")
+            else:
+                # 回退到使用窗口坐标
+                click_x += self.game_window.left
+                click_y += self.game_window.top
+                print(f"[调试] 窗口偏移: left={self.game_window.left}, top={self.game_window.top}")
+
+        print(f"[调试] 点击 {checkbox_name} 勾选框: 屏幕坐标=({click_x}, {click_y})")
 
         AutomationController.click(click_x, click_y)
         time.sleep(0.5)
@@ -364,6 +520,9 @@ class RepositoryFilter:
             True: 筛选成功
             False: 筛选失败
         """
+        # 0. 刷新游戏窗口信息（确保位置和尺寸是最新的）
+        self.refresh_window_info()
+
         # 1. 验证遗物仪式界面
         if not self.verify_ritual_interface():
             return False

@@ -71,20 +71,9 @@ class VocabularyLoader:
                     else:
                         entry = line
 
-                    # 清洗词条（与OCR后处理保持一致）
-                    entry = self._clean_entry(entry)
+                    # 不清洗词条，保留原始格式（包括【】等符号）
                     if entry:
                         self.vocabulary.append(entry)
-
-    def _clean_entry(self, entry: str) -> str:
-        """清洗词条中的特殊符号"""
-        entry = entry.replace('【', '').replace('】', '')
-        entry = entry.replace('"', '').replace('"', '')
-        entry = entry.replace('(', '').replace(')', '')
-        entry = entry.replace('[', '').replace(']', '')
-        entry = entry.replace('{', '').replace('}', '')
-        return entry.strip()
-
 
 # ==================== 词条纠错器 ====================
 
@@ -133,8 +122,9 @@ def postprocess_text(text: str) -> str:
     text = text.replace('(', '【').replace(')', '】')
     text = text.replace('{', '【').replace('}', '】')
 
-    # 3. 删除引号：""
-    text = text.replace('"', '').replace('"', '')
+    # 3. 删除引号："“”
+    text = text.replace('"', '')
+    text = text.replace('“', '').replace('”', '')
 
     # 4. 删除所有空格
     text = text.replace(' ', '').replace('　', '')
@@ -245,6 +235,88 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
         corrected_entries.append(corrected_text)
 
     return corrected_entries
+
+
+def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
+    """
+    对词条列表进行纠错，支持动态断行合并，返回详细信息
+
+    返回格式：
+    [
+        {
+            "text": str,           # 纠错后的文本
+            "similarity": float,   # 相似度
+            "is_corrected": bool   # 是否纠正（相似度 >= 0.9）
+        },
+        ...
+    ]
+    """
+    result = []
+    skip_next = False
+
+    # 定义需要清洗的前导噪声字符
+    NOISE_CHARS = {'万', '了', '可', '"', '"', ''', ''', ' ', '　'}
+
+    def clean_leading_noise(text: str) -> str:
+        """清洗文本前导的噪声字符"""
+        i = 0
+        while i < len(text) and text[i] in NOISE_CHARS:
+            i += 1
+        return text[i:]
+
+    for i, entry in enumerate(entries):
+        if skip_next:
+            skip_next = False
+            continue
+
+        # 获取当前行的相似度信息
+        corrected_text, similarity, is_corrected = corrector.correct_entry(entry)
+
+        # 检查是否需要尝试合并：当前行未被纠正且存在下一行
+        should_try_merge = (
+            not is_corrected and  # 当前行未被纠正
+            i + 1 < len(entries)  # 存在下一行
+        )
+
+        if should_try_merge:
+            next_entry = entries[i + 1]
+
+            # 清洗下一行的前导噪声
+            cleaned_next = clean_leading_noise(next_entry)
+
+            if cleaned_next:  # 清洗后仍有内容
+                # 创建候选合并字符串
+                merged_candidate = entry + cleaned_next
+
+                # 计算合并后的相似度
+                merged_text, merged_similarity, merged_is_corrected = corrector.correct_entry(merged_candidate)
+
+                # 决策：仅当合并后相似度更高时才合并
+                if merged_similarity > similarity:
+                    print(f"    [动态合并] {entry}")
+                    print(f"             + {next_entry}")
+                    print(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
+                    result.append({
+                        "text": merged_text,
+                        "similarity": merged_similarity,
+                        "is_corrected": merged_is_corrected
+                    })
+                    skip_next = True
+                    continue
+
+        # 输出纠错结果
+        if is_corrected:
+            print(f"    [纠正] {entry} -> {corrected_text} (相似度: {similarity:.2%})")
+        else:
+            print(f"    [保留] {entry} (最高相似度: {similarity:.2%})")
+
+        result.append({
+            "text": corrected_text,
+            "similarity": similarity,
+            "is_corrected": is_corrected
+        })
+
+    return result
 
 
 # ==================== OCR 引擎（单例模式） ====================
@@ -421,19 +493,38 @@ class OCREngine:
                 combined_text = '\n'.join(all_text)
                 raw_entries = split_entries(combined_text)
 
-                # 纠错和分类
+                # 先进行断行合并和纠错，获取详细信息
+                corrected_info = []
+                if self.corrector and CORRECTION_CONFIG["enabled"]:
+                    corrected_info = correct_entries_with_info(raw_entries, self.corrector)
+                else:
+                    # 如果没有纠错器，直接使用原始词条
+                    for entry in raw_entries:
+                        corrected_info.append({
+                            "text": entry,
+                            "similarity": 0.0,
+                            "is_corrected": False
+                        })
+
+                # 然后对纠错后的词条进行分类
                 affixes = []
                 positive_count = 0
                 negative_count = 0
 
-                for entry in raw_entries:
-                    affix_info = self._correct_and_classify(entry, mode)
+                for info in corrected_info:
+                    # 只添加匹配到词条库的词条（is_corrected=True 表示相似度 >= 0.9）
+                    if info["is_corrected"]:
+                        is_positive = self._is_positive_affix(info["text"], mode)
 
-                    # 只添加匹配到词条库的词条（相似度 > 0.9）
-                    if not affix_info["is_unknown"]:
-                        affixes.append(affix_info)
+                        affixes.append({
+                            "text": info["text"],
+                            "cleaned_text": info["text"],
+                            "is_positive": is_positive,
+                            "is_unknown": False,
+                            "similarity": info["similarity"]
+                        })
 
-                        if affix_info["is_positive"]:
+                        if is_positive:
                             positive_count += 1
                         else:
                             negative_count += 1

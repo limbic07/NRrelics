@@ -30,7 +30,7 @@ RELIC_STATE_NAMES = {
 class RepoCleaner:
     """仓库清理控制器"""
 
-    def __init__(self, preset_manager: PresetManager, ocr_engine: OCREngine, relic_detector: RelicDetector):
+    def __init__(self, preset_manager: PresetManager, ocr_engine: OCREngine, relic_detector: RelicDetector, settings: dict = None):
         """
         初始化清理控制器
 
@@ -38,13 +38,14 @@ class RepoCleaner:
             preset_manager: 预设管理器
             ocr_engine: OCR引擎
             relic_detector: 遗物检测器
+            settings: 设置字典
         """
         self.preset_manager = preset_manager
         self.ocr_engine = ocr_engine
         self.relic_detector = relic_detector
 
-        # 仓库筛选器（传入OCR引擎用于界面验证）
-        self.repository_filter = RepositoryFilter(ocr_engine)
+        # 仓库筛选器（传入OCR引擎和设置）
+        self.repository_filter = RepositoryFilter(ocr_engine, settings)
 
         # 游戏窗口
         self.game_window = None
@@ -160,9 +161,10 @@ class RepoCleaner:
                     time.sleep(0.5)
                     continue
 
-                # OCR识别
+                # OCR识别（只截取词条区域）
                 log("识别词条中...", "INFO")
-                ocr_result = self.ocr_engine.recognize_with_classification(image, mode)
+                affix_image = self.repository_filter._capture_region(self.repository_filter.AFFIX_REGION)
+                ocr_result = self.ocr_engine.recognize_with_classification(affix_image, mode)
 
                 if not ocr_result["success"]:
                     log("OCR识别失败（重试3次后仍未识别到任何词条），停止清理", "ERROR")
@@ -212,6 +214,16 @@ class RepoCleaner:
             # 清理完成
             log("清理完成", "SUCCESS")
             self._print_stats(log)
+
+            # 自动完成售出操作（仅在自动停止时执行）
+            if self.is_running and cleaning_mode == "sell" and self.pending_sell_count > 0:
+                log(f"执行售出操作 ({self.pending_sell_count}个遗物)...", "INFO")
+                pydirectinput.press('3')  # 打开售出界面
+                time.sleep(0.5)
+                pydirectinput.press('f')  # 确认售出
+                time.sleep(0.5)
+                log("售出完成", "SUCCESS")
+                self.pending_sell_count = 0
 
         except Exception as e:
             log(f"清理过程出错: {e}", "ERROR")
@@ -315,7 +327,7 @@ class RepoCleaner:
             if relic_state == RELIC_STATE_LIGHT:
                 return False
             elif relic_state == RELIC_STATE_DARK_F:
-                return True
+                return not allow_favorited  # 只有在不允许操作被收藏遗物时才跳过
             elif relic_state == RELIC_STATE_DARK_FE:
                 return not allow_favorited
             else:  # E, O

@@ -44,8 +44,8 @@ class RelicDetector:
         # 阈值
         self.canny_threshold1 = 50
         self.canny_threshold2 = 150
-        self.brightness_threshold = 50
-        self.brightness_center_ratio = 0.65
+        self.brightness_threshold = 45
+        self.brightness_center_ratio = 0.55
         self.template_match_threshold = 0.60
         self.icon_search_ratio = 0.35
 
