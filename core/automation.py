@@ -146,7 +146,8 @@ class RepositoryFilter:
             False: 不在遗物仪式界面
         """
         if self.ocr_engine is None:
-            return True
+            print("[警告] OCR引擎未初始化，无法验证界面")
+            return False
 
         # 截取左上角区域
         image = self._capture_region(self.RITUAL_REGION)
@@ -169,7 +170,8 @@ class RepositoryFilter:
             False: 不在卖出界面
         """
         if self.ocr_engine is None:
-            return True
+            print("[警告] OCR引擎未初始化，无法验证界面")
+            return False
 
         # 截取卖出区域
         image = self._capture_region(self.SELL_REGION)
@@ -183,7 +185,7 @@ class RepositoryFilter:
         text = ''.join(result['entries'])
         return '卖出' in text
 
-    def navigate_to_sell_interface(self, max_attempts: int = 5) -> bool:
+    def navigate_to_sell_interface(self, max_attempts: int = 10) -> bool:
         """
         导航到卖出界面（按F2切换）
 

@@ -86,13 +86,12 @@ class Application:
         relic_type = self.config.get("ocr", {}).get("relic_type", "normal")
         if self.ocr_engine:
             self.ocr_engine.load_vocabulary(relic_type)
-            print("✓ OCR 引擎初始化完成")
             # 将引擎传递到 UI 层
             self.window.init_ocr_dependencies(self.ocr_engine)
 
-    def _on_ocr_error(self, error_msg: str):
+    def _on_ocr_error(self, _error_msg: str):
         """OCR 初始化失败"""
-        print(f"✗ OCR 引擎初始化失败: {error_msg}")
+        pass
 
     def run(self):
         """运行应用"""

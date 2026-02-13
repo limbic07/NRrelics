@@ -4,15 +4,14 @@
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QPushButton, QComboBox, QSpinBox, QTabWidget,
-                               QScrollArea, QFrame, QSplitter, QGroupBox, QCheckBox)
+                               QPushButton, QComboBox, QTabWidget,
+                               QScrollArea, QFrame, QSplitter, QGroupBox, QCheckBox, QLineEdit)
 from PySide6.QtCore import Qt, Signal, QThread
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIntValidator
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
-                           ComboBox, SpinBox, MessageBox, InfoBar, InfoBarPosition)
+                           ComboBox, MessageBox, InfoBar, InfoBarPosition)
 
 from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
-from ui.dialogs.preset_edit_dialog import PresetEditDialog
 from ui.components.logger_widget import LoggerWidget
 import json
 import os
@@ -22,6 +21,7 @@ class CleaningThread(QThread):
     """清理线程"""
     log_signal = Signal(str, str)  # (message, level)
     finished_signal = Signal()
+    qualified_relic_signal = Signal(dict)  # 合格遗物信息
 
     def __init__(self, cleaner, mode, cleaning_mode, max_relics, allow_favorited, require_double):
         super().__init__()
@@ -43,6 +43,11 @@ class CleaningThread(QThread):
                 self.require_double,
                 log_callback=self.log_signal.emit
             )
+
+            # 清理完成后，发送所有合格遗物信息
+            for relic_info in self.cleaner.qualified_relics:
+                self.qualified_relic_signal.emit(relic_info)
+
         except Exception as e:
             self.log_signal.emit(f"清理过程出错: {e}", "ERROR")
         finally:
@@ -254,16 +259,15 @@ class RepoPage(QWidget):
         max_label = QLabel("数量:")
         layout.addWidget(max_label)
 
-        self.max_spin = SpinBox()
-        self.max_spin.setRange(1, 2000)
-        self.max_spin.setValue(100)
-        self.max_spin.setFixedWidth(100)
-        # 隐藏上下按钮
-        self.max_spin.setStyleSheet("""
-            QSpinBox::up-button { width: 0px; }
-            QSpinBox::down-button { width: 0px; }
-        """)
-        layout.addWidget(self.max_spin)
+        self.max_input = QLineEdit()
+        self.max_input.setText("100")
+        self.max_input.setFixedWidth(100)
+        self.max_input.setFixedHeight(33)  # 匹配ComboBox高度
+        # 设置验证器：只允许输入1-2000的整数
+        validator = QIntValidator(1, 2000, self)
+        self.max_input.setValidator(validator)
+        self.max_input.setPlaceholderText("1-2000")
+        layout.addWidget(self.max_input)
 
         layout.addStretch()
 
@@ -322,14 +326,14 @@ class RepoPage(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.start_btn = PrimaryPushButton("正在初始化 OCR...")
-        self.start_btn.setFixedSize(100, 32)
+        self.start_btn = PrimaryPushButton("初始化OCR...")
+        self.start_btn.setFixedSize(120, 32)
         self.start_btn.setEnabled(False)
         self.start_btn.clicked.connect(self._start_cleaning)
         button_layout.addWidget(self.start_btn)
 
         self.stop_btn = PushButton("停止")
-        self.stop_btn.setFixedSize(100, 32)
+        self.stop_btn.setFixedSize(120, 32)
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop_cleaning)
         button_layout.addWidget(self.stop_btn)
@@ -369,7 +373,26 @@ class RepoPage(QWidget):
 
         layout.addLayout(stats_layout)
 
-        layout.addStretch()
+        # 合格遗物列表
+        qualified_group = QGroupBox("合格遗物词条")
+        qualified_layout = QVBoxLayout(qualified_group)
+        qualified_layout.setContentsMargins(8, 8, 8, 8)
+        qualified_layout.setSpacing(4)
+
+        # 滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        scroll_content = QWidget()
+        self.qualified_relics_layout = QVBoxLayout(scroll_content)
+        self.qualified_relics_layout.setSpacing(6)
+        self.qualified_relics_layout.addStretch()
+
+        scroll.setWidget(scroll_content)
+        qualified_layout.addWidget(scroll)
+
+        layout.addWidget(qualified_group, 1)
 
         return dashboard
 
@@ -439,6 +462,8 @@ class RepoPage(QWidget):
 
     def _edit_general_preset(self, preset_id: str):
         """编辑通用预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         preset = self.preset_manager.get_general_preset(mode)
         vocab = self.preset_manager.load_vocabulary(
@@ -457,6 +482,8 @@ class RepoPage(QWidget):
 
     def _create_dedicated_preset(self):
         """创建专用预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
 
         # 检查数量限制
@@ -484,6 +511,8 @@ class RepoPage(QWidget):
 
     def _edit_dedicated_preset(self, preset_id: str):
         """编辑专用预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         presets = self.preset_manager.get_dedicated_presets(mode)
         preset = presets.get(preset_id)
@@ -524,6 +553,8 @@ class RepoPage(QWidget):
 
     def _edit_blacklist_preset(self, preset_id: str):
         """编辑黑名单预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
         preset = self.preset_manager.get_blacklist_preset()
         vocab = self.preset_manager.load_vocabulary("deepnight_blacklist")
 
@@ -541,15 +572,19 @@ class RepoPage(QWidget):
         """开始清理"""
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
-        max_relics = self.max_spin.value()
+
+        # 获取数量，如果输入为空则使用默认值100
+        max_relics_text = self.max_input.text().strip()
+        max_relics = int(max_relics_text) if max_relics_text else 100
 
         # 从设置获取参数
         allow_favorited = self.settings.get("allow_operate_favorited", False)
         require_double = self.settings.get("require_double_valid", True)
 
-        # 清空日志
+        # 清空日志和合格遗物列表
         self.logger.clear()
         self.logger.log("开始清理...", "INFO")
+        self._clear_qualified_relics()
 
         # 禁用按钮
         self.start_btn.setEnabled(False)
@@ -561,6 +596,7 @@ class RepoPage(QWidget):
         )
         self.cleaning_thread.log_signal.connect(self.logger.log)
         self.cleaning_thread.finished_signal.connect(self._on_cleaning_finished)
+        self.cleaning_thread.qualified_relic_signal.connect(self._add_qualified_relic)
         self.cleaning_thread.start()
 
     def _stop_cleaning(self):
@@ -585,6 +621,48 @@ class RepoPage(QWidget):
         for key, value_label in self.stat_value_labels.items():
             if key in stats:
                 value_label.setText(str(stats[key]))
+
+    def _clear_qualified_relics(self):
+        """清空合格遗物列表"""
+        while self.qualified_relics_layout.count() > 1:  # 保留最后的stretch
+            item = self.qualified_relics_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+    def _add_qualified_relic(self, relic_info: dict):
+        """添加合格遗物到仪表盘"""
+        # 状态名称映射
+        state_names = {
+            "Light": "自由售出",
+            "E": "已装备",
+            "F": "已收藏",
+            "FE": "已装备且收藏",
+            "O": "官方遗物"
+        }
+
+        # 创建遗物卡片
+        card = CardWidget()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 6, 8, 6)
+        card_layout.setSpacing(4)
+
+        # 标题
+        state_name = state_names.get(relic_info['state'], relic_info['state'])
+        title = QLabel(f"#{relic_info['index']} - {state_name}")
+        title.setStyleSheet("font-size: 10px; font-weight: bold; color: #4CAF50;")
+        card_layout.addWidget(title)
+
+        # 词条列表
+        for affix in relic_info['affixes']:
+            affix_type = "正面" if affix["is_positive"] else "负面"
+            color = "#4CAF50" if affix["is_positive"] else "#FF5722"
+            affix_label = QLabel(f"[{affix_type}] {affix['cleaned_text']}")
+            affix_label.setStyleSheet(f"font-size: 9px; color: {color};")
+            affix_label.setWordWrap(True)
+            card_layout.addWidget(affix_label)
+
+        # 插入到stretch之前
+        self.qualified_relics_layout.insertWidget(self.qualified_relics_layout.count() - 1, card)
 
     def _load_settings(self) -> dict:
         """加载设置"""

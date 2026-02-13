@@ -128,25 +128,26 @@ def postprocess_text(text: str) -> str:
     # 1. 加号标准化：十、＋(全角)、⁺(上标) → +(半角)
     text = text.replace('十', '+').replace('＋', '+')
 
-    # 2. 删除特殊符号：【】、""、()、[]、{}
-    text = text.replace('【', '').replace('】', '')
-    text = text.replace('"', '').replace('"', '')
-    text = text.replace('(', '').replace(')', '')
-    text = text.replace('[', '').replace(']', '')
-    text = text.replace('{', '').replace('}', '')
+    # 2. 括号标准化：[](){}  → 【】
+    text = text.replace('[', '【').replace(']', '】')
+    text = text.replace('(', '【').replace(')', '】')
+    text = text.replace('{', '【').replace('}', '】')
 
-    # 3. 删除所有空格
+    # 3. 删除引号：""
+    text = text.replace('"', '').replace('"', '')
+
+    # 4. 删除所有空格
     text = text.replace(' ', '').replace('　', '')
 
-    # 4. 标点标准化：英文标点 → 中文标点
+    # 5. 标点标准化：英文标点 → 中文标点
     text = text.replace(',', '，')
     text = text.replace(':', '：')
     text = text.replace(';', '；')
 
-    # 5. 修正分隔符：数字1中文 → 数字|中文
+    # 6. 修正分隔符：数字1中文 → 数字|中文
     text = re.sub(r'(\+\d+)\s*1\s*([\u4e00-\u9fa5])', r'\1|\2', text)
 
-    # 6. 删除包含※符号或"仅限能使用的武器类别"的行
+    # 7. 删除包含※符号或"仅限能使用的武器类别"的行
     lines = text.split('\n')
     filtered_lines = []
     for line in lines:
@@ -371,6 +372,7 @@ class OCREngine:
     def recognize_with_classification(self, image: np.ndarray, mode: str = "normal") -> dict:
         """
         执行OCR识别并分类词条（正面/负面）
+        支持重试机制：如果识别不到任何词条库内的词条，最多重试3次
 
         Args:
             image: numpy 图像数组
@@ -388,56 +390,92 @@ class OCREngine:
                     },
                     ...
                 ],
-                "positive_count": int,         # 正面词条数量
-                "negative_count": int,         # 负面词条数量
+                "positive_count": int,         # 正面词条数量（只计算匹配到词条库的）
+                "negative_count": int,         # 负面词条数量（只计算匹配到词条库的）
                 "recognition_time": float,     # 识别耗时(ms)
-                "success": bool
+                "success": bool,
+                "retry_count": int             # 重试次数
             }
         """
-        start_time = time.time()
+        max_retry = CORRECTION_CONFIG.get("max_retry", 3)
 
-        try:
-            result = self.engine.ocr(image)
-            if result is None:
-                return self._empty_classification_result()
+        for retry in range(max_retry):
+            start_time = time.time()
 
-            # 收集所有文本
-            all_text = []
-            for item in result:
-                text = item.get('text', '') if isinstance(item, dict) else item['text']
-                if text.strip():
-                    all_text.append(text)
+            try:
+                result = self.engine.ocr(image)
+                if result is None:
+                    if retry < max_retry - 1:
+                        print(f"[重试 {retry + 1}/{max_retry}] OCR返回None，重试中...")
+                        time.sleep(0.3)
+                        continue
+                    return self._empty_classification_result()
 
-            combined_text = '\n'.join(all_text)
-            raw_entries = split_entries(combined_text)
+                # 收集所有文本
+                all_text = []
+                for item in result:
+                    text = item.get('text', '') if isinstance(item, dict) else item['text']
+                    if text.strip():
+                        all_text.append(text)
 
-            # 纠错和分类
-            affixes = []
-            positive_count = 0
-            negative_count = 0
+                combined_text = '\n'.join(all_text)
+                raw_entries = split_entries(combined_text)
 
-            for entry in raw_entries:
-                affix_info = self._correct_and_classify(entry, mode)
-                affixes.append(affix_info)
+                # 纠错和分类
+                affixes = []
+                positive_count = 0
+                negative_count = 0
 
-                if affix_info["is_positive"]:
-                    positive_count += 1
+                for entry in raw_entries:
+                    affix_info = self._correct_and_classify(entry, mode)
+
+                    # 只添加匹配到词条库的词条（相似度 > 0.9）
+                    if not affix_info["is_unknown"]:
+                        affixes.append(affix_info)
+
+                        if affix_info["is_positive"]:
+                            positive_count += 1
+                        else:
+                            negative_count += 1
+
+                recognition_time = (time.time() - start_time) * 1000  # 转换为毫秒
+
+                # 检查是否识别到任何词条库内的词条
+                if len(affixes) == 0:
+                    if retry < max_retry - 1:
+                        print(f"[重试 {retry + 1}/{max_retry}] 未识别到任何词条库内的词条，重试中...")
+                        time.sleep(0.3)
+                        continue
+                    else:
+                        print(f"[失败] 重试{max_retry}次后仍未识别到任何词条库内的词条")
+                        return {
+                            "affixes": [],
+                            "positive_count": 0,
+                            "negative_count": 0,
+                            "recognition_time": recognition_time,
+                            "success": False,
+                            "retry_count": retry + 1
+                        }
+
+                return {
+                    "affixes": affixes,
+                    "positive_count": positive_count,
+                    "negative_count": negative_count,
+                    "recognition_time": recognition_time,
+                    "success": True,
+                    "retry_count": retry + 1
+                }
+
+            except Exception as e:
+                if retry < max_retry - 1:
+                    print(f"[重试 {retry + 1}/{max_retry}] OCR识别失败: {e}，重试中...")
+                    time.sleep(0.3)
+                    continue
                 else:
-                    negative_count += 1
+                    print(f"[错误] OCR识别失败: {e}")
+                    return self._empty_classification_result()
 
-            recognition_time = (time.time() - start_time) * 1000  # 转换为毫秒
-
-            return {
-                "affixes": affixes,
-                "positive_count": positive_count,
-                "negative_count": negative_count,
-                "recognition_time": recognition_time,
-                "success": True
-            }
-
-        except Exception as e:
-            print(f"[错误] OCR识别失败: {e}")
-            return self._empty_classification_result()
+        return self._empty_classification_result()
 
     def _empty_classification_result(self) -> dict:
         """返回空的分类结果"""
