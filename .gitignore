@@ -1,6 +1,8 @@
+#自行添加
+debug_ocr/
+
 # --- Python 核心 ---
 __pycache__/
-__pycache__/.
 *.py[cod]
 *$py.class
 
@@ -31,6 +33,8 @@ htmlcov/
 .vscode/
 # PyCharm
 .idea/
+# claude
+.claude/
 
 # --- Jupyter Notebook (如果你使用的话) ---
 .ipynb_checkpoints

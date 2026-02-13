@@ -43,6 +43,7 @@ class RepoCleaner:
         self.preset_manager = preset_manager
         self.ocr_engine = ocr_engine
         self.relic_detector = relic_detector
+        self.settings = settings or {}
 
         # 仓库筛选器（传入OCR引擎和设置）
         self.repository_filter = RepositoryFilter(ocr_engine, settings)
@@ -54,6 +55,7 @@ class RepoCleaner:
         self.is_running = False
         self.is_paused = False
         self.pending_sell_count = 0  # 待售出数量（已选中但未完成售出）
+        self.normal_stop = False  # 是否正常停止（达到最大数量或正常完成）
 
         # 统计信息
         self.stats = {
@@ -86,6 +88,7 @@ class RepoCleaner:
         self.is_running = True
         self.is_paused = False
         self.pending_sell_count = 0
+        self.normal_stop = False  # 重置正常停止标志
         self._reset_stats()
         self.qualified_relics = []
 
@@ -112,7 +115,13 @@ class RepoCleaner:
             # 2. 应用筛选
             log("正在应用遗物筛选...", "INFO")
             if not self.repository_filter.apply_filter(mode):
-                log("遗物筛选失败，请确保在遗物仪式界面", "ERROR")
+                game_resolution = self.settings.get("game_resolution", [1920, 1080])
+                log("遗物筛选失败", "ERROR")
+                log("可能原因：", "ERROR")
+                log("  1. 未在遗物仪式界面", "INFO")
+                log("  2. 游戏分辨率与软件设置不匹配", "INFO")
+                log(f"  当前软件设置的游戏分辨率: {game_resolution[0]}x{game_resolution[1]}", "INFO")
+                log("  请在设置页面修改游戏分辨率，使其与游戏内实际分辨率一致", "INFO")
                 return
             log("遗物筛选成功", "SUCCESS")
             time.sleep(1.0)
@@ -125,6 +134,9 @@ class RepoCleaner:
             log(f"通用预设: {len(general_preset['affixes'])}条词条", "INFO")
             log(f"专用预设: {len(dedicated_presets)}个", "INFO")
 
+            # 用于检测卡住的变量
+            last_relic_hash = None  # 上一个遗物的特征哈希
+
             # 4. 主循环
             while self.is_running:
                 if self.is_paused:
@@ -134,6 +146,7 @@ class RepoCleaner:
                 # 检查数量限制
                 if max_relics > 0 and self.stats["total_detected"] >= max_relics:
                     log(f"已达到最大检测数量: {max_relics}", "SUCCESS")
+                    self.normal_stop = True  # 正常停止
                     break
 
                 # 截图（只截取游戏窗口）
@@ -170,6 +183,25 @@ class RepoCleaner:
                     log("OCR识别失败（重试3次后仍未识别到任何词条），停止清理", "ERROR")
                     log("可能原因：不在遗物界面或界面显示异常", "ERROR")
                     break
+
+                # 计算当前遗物特征（词条文本哈希）
+                affix_texts = [affix["cleaned_text"] for affix in ocr_result["affixes"]]
+                current_relic_hash = hash(tuple(sorted(affix_texts)))
+
+                # 检测是否卡住（连续两次识别到相同遗物）
+                if last_relic_hash is not None and current_relic_hash == last_relic_hash:
+                    log("检测到重复遗物，上一个遗物无法出售（很可能是官方遗物），跳过", "WARNING")
+                    # 减去重复计数（因为这是同一个遗物）
+                    self.stats["total_detected"] -= 1
+                    # 按右方向键跳过
+                    pydirectinput.press('right')
+                    time.sleep(1.0)  # 等待跳过完成
+                    # 重置哈希，避免连续检测
+                    last_relic_hash = None
+                    continue
+
+                # 更新上一个遗物哈希
+                last_relic_hash = current_relic_hash
 
                 log(f"识别到 {ocr_result['positive_count']} 条正面词条, {ocr_result['negative_count']} 条负面词条", "INFO")
 
@@ -215,8 +247,8 @@ class RepoCleaner:
             log("清理完成", "SUCCESS")
             self._print_stats(log)
 
-            # 自动完成售出操作（仅在自动停止时执行）
-            if self.is_running and cleaning_mode == "sell" and self.pending_sell_count > 0:
+            # 自动完成售出操作（仅在正常停止时执行）
+            if self.normal_stop and cleaning_mode == "sell" and self.pending_sell_count > 0:
                 log(f"执行售出操作 ({self.pending_sell_count}个遗物)...", "INFO")
                 pydirectinput.press('3')  # 打开售出界面
                 time.sleep(0.5)
