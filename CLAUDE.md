@@ -16,13 +16,49 @@ pip install cnocr opencv-python pyautogui pydirectinput keyboard rapidfuzz PySid
 python main.py
 
 # Test OCR recognition (standalone)
-python cnocr_test.py
+python scripts/cnocr_test.py
 
 # Test repository filter
-python test_filter.py
+python scripts/test_filter.py
 
-# Test cleaning workflow
-python test_repo_cleaning.py
+# Test relic detection
+python scripts/relic_detection_poc.py
+```
+
+## Project Structure
+
+```
+NRrelics/
+├── main.py                 # Application entry point
+├── temp.py                 # Temporary file for user experiments
+├── CLAUDE.md              # Development documentation
+├── requirements.txt       # Python dependencies
+├── core/                  # Core functionality modules
+│   ├── ocr_engine.py     # OCR recognition engine
+│   ├── repo_cleaner.py   # Repository cleaning logic
+│   ├── relic_detector.py # Relic state detection
+│   ├── preset_manager.py # Preset management
+│   └── automation.py     # Game window automation
+├── ui/                    # User interface
+│   ├── main_window.py    # Main application window
+│   ├── pages/            # Application pages
+│   ├── dialogs/          # Dialog windows
+│   └── components/       # Reusable UI components
+├── data/                  # Data files
+│   ├── normal.txt        # Normal mode vocabulary
+│   ├── normal_special.txt # Special affixes vocabulary
+│   ├── deepnight_pos.txt # Deepnight positive vocabulary
+│   ├── deepnight_neg.txt # Deepnight negative vocabulary
+│   ├── presets.json      # User presets
+│   ├── settings.json     # Application settings
+│   ├── tpl_*.png         # Template images for detection
+│   └── icon_*.png        # Application icons
+├── scripts/               # Standalone test/utility scripts
+│   ├── cnocr_test.py     # OCR testing
+│   ├── relic_detection_poc.py # Detection testing
+│   └── test_filter.py    # Filter testing
+├── config/                # Configuration files
+└── docs/                  # Documentation
 ```
 
 ## Architecture
@@ -269,8 +305,10 @@ Manual-stop: warn user to manually sell
 
 ## File Locations
 
-- Vocabulary: `data/normal.txt`, `data/deepnight_pos.txt`, `data/deepnight_neg.txt`
+- Vocabulary: `data/normal.txt`, `data/deepnight_pos.txt`, `data/deepnight_neg.txt`, `data/normal_special.txt`
 - Presets: `data/presets.json`
 - Settings: `data/settings.json`
 - Templates: `data/tpl_lock.png`, `data/tpl_equip.png`, `data/tpl_cursor.png`
+- Icons: `data/icon_bookmark.png`, `data/icon_cup.png`
 - Config: `config/settings.json` (application-level config)
+- Test Scripts: `scripts/` directory
