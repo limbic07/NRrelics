@@ -1,5 +1,6 @@
 #自行添加
 debug_ocr/
+debug/
 
 # --- Python 核心 ---
 __pycache__/
