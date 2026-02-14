@@ -180,8 +180,14 @@ class RepoCleaner:
                 ocr_result = self.ocr_engine.recognize_with_classification(affix_image, mode)
 
                 if not ocr_result["success"]:
-                    log("OCR识别失败（重试3次后仍未识别到任何词条），停止清理", "ERROR")
-                    log("可能原因：不在遗物界面或界面显示异常", "ERROR")
+                    # 检查是否是手动停止导致的识别失败
+                    if self.is_running:
+                        # 正常运行中的识别失败，输出错误信息
+                        log("OCR识别失败（重试3次后仍未识别到任何词条），停止清理", "ERROR")
+                        log("可能原因：不在遗物界面或界面显示异常", "ERROR")
+                    else:
+                        # 手动停止导致的识别失败，不输出错误
+                        log("检测到停止信号，结束清理", "INFO")
                     break
 
                 # 计算当前遗物特征（词条文本哈希）
@@ -424,16 +430,26 @@ class RepoCleaner:
         if general_preset:
             general_vocabs = set(general_preset["affixes"])
 
-            for preset in dedicated_presets:
-                combined_vocabs = general_vocabs | set(preset["affixes"])
-                count, details = self._count_positive_matches(pos_affixes, combined_vocabs)
+            # 如果有专用预设，尝试通用+专用的组合
+            if dedicated_presets:
+                for preset in dedicated_presets:
+                    combined_vocabs = general_vocabs | set(preset["affixes"])
+                    count, details = self._count_positive_matches(pos_affixes, combined_vocabs)
 
-                if count > best_match["count"]:
-                    best_match = {
-                        "count": count,
-                        "preset": f"{general_preset['name']}+{preset['name']}",
-                        "details": details
-                    }
+                    if count > best_match["count"]:
+                        best_match = {
+                            "count": count,
+                            "preset": f"{general_preset['name']}+{preset['name']}",
+                            "details": details
+                        }
+            else:
+                # 如果没有专用预设，只使用通用预设
+                count, details = self._count_positive_matches(pos_affixes, general_vocabs)
+                best_match = {
+                    "count": count,
+                    "preset": general_preset['name'],
+                    "details": details
+                }
 
         # 4. 合格判断
         qualified = best_match["count"] >= required_matches

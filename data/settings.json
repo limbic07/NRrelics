@@ -1,7 +1,7 @@
 {
   "game_window_title": "NIGHTREIGN",
-  "allow_operate_favorited": false,
-  "require_double_valid": true,
+  "allow_operate_favorited": true,
+  "require_double_valid": false,
   "game_resolution": [
     1600,
     900

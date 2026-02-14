@@ -579,6 +579,9 @@ class RepoPage(QWidget):
         max_relics_text = self.max_input.text().strip()
         max_relics = int(max_relics_text) if max_relics_text else 100
 
+        # 重新加载设置（确保使用最新的设置）
+        self.settings = self._load_settings()
+
         # 从设置获取参数
         allow_favorited = self.settings.get("allow_operate_favorited", False)
         require_double = self.settings.get("require_double_valid", True)

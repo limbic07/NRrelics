@@ -38,7 +38,7 @@
         "通过潜在能力，能比较容易找到曲剑"
       ],
       "is_general": false,
-      "is_active": true
+      "is_active": false
     },
     "9e24e6f9-6f6c-46a8-b7d0-5b9db5e0c3ec": {
       "id": "9e24e6f9-6f6c-46a8-b7d0-5b9db5e0c3ec",
@@ -397,7 +397,7 @@
         "出击时，武器祷告改为龙焰"
       ],
       "is_general": false,
-      "is_active": false
+      "is_active": true
     }
   },
   "deepnight_whitelist_dedicated": {
