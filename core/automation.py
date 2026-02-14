@@ -49,7 +49,10 @@ class RepositoryFilter:
     RITUAL_REGION = (130, 30, 280, 90)  # 遗物仪式区域
     SELL_REGION = (580, 130, 640, 160)  # 卖出区域
     FILTER_REGION = (50, 850, 250, 960)  # 筛选勾选区域
+    FILTER_TITLE_REGION = (180, 55, 240, 99)  # 筛选标题区域（用于验证是否在筛选界面）
     AFFIX_REGION = (1105, 800, 1805, 1000)  # 词条识别区域 (x1, y1, x2, y2)
+    COUNT_REGION = (1620, 730, 1675, 760)  # 遗物数量显示区域
+    FIRST_RELIC_POS = (975, 255)  # 第一个遗物的位置（用于移动光标）
 
     # 勾选框基准坐标（基于1920x1080）
     # "遗物"勾选框
@@ -73,20 +76,9 @@ class RepositoryFilter:
         self.game_window = self._find_game_window()
         self.scale_x, self.scale_y = self._calculate_scale_factors()
 
-        # 输出调试信息
-        game_resolution = self.settings.get("game_resolution", [1920, 1080])
-        print(f"[调试] 游戏分辨率设置: {game_resolution[0]}x{game_resolution[1]}")
-        if self.game_window:
-            print(f"[调试] 游戏窗口信息:")
-            print(f"  位置: left={self.game_window.left}, top={self.game_window.top}")
-        else:
-            print(f"[调试] 未找到游戏窗口")
-        print(f"  缩放因子: scale_x={self.scale_x:.4f}, scale_y={self.scale_y:.4f}")
-
         # 创建调试目录
         if not os.path.exists(self.DEBUG_DIR):
             os.makedirs(self.DEBUG_DIR)
-            print(f"[调试] 创建调试目录: {self.DEBUG_DIR}")
 
     def refresh_window_info(self):
         """
@@ -94,12 +86,7 @@ class RepositoryFilter:
 
         在开始清理前调用，确保窗口位置是最新的
         """
-        print("[调试] 刷新游戏窗口位置...")
         self.game_window = self._find_game_window()
-
-        if self.game_window:
-            print(f"[调试] 更新后的窗口位置:")
-            print(f"  位置: left={self.game_window.left}, top={self.game_window.top}")
 
     def _find_game_window(self) -> Optional[gw.Win32Window]:
         """
@@ -112,10 +99,8 @@ class RepositoryFilter:
             windows = gw.getAllWindows()
             for window in windows:
                 if 'NIGHTREIGN' in window.title.upper():
-                    print(f"[成功] 找到游戏窗口: {window.title}")
                     return window
 
-            print("[警告] 未找到包含NIGHTREIGN的窗口")
             return None
         except Exception as e:
             print(f"[警告] 查找游戏窗口失败: {e}")
@@ -127,12 +112,10 @@ class RepositoryFilter:
         game_resolution = self.settings.get("game_resolution", [1920, 1080])
         window_width = game_resolution[0]
         window_height = game_resolution[1]
-        print(f"[信息] 使用手动设置的游戏分辨率: {window_width}x{window_height}")
 
         scale_x = window_width / self.BASE_WIDTH
         scale_y = window_height / self.BASE_HEIGHT
 
-        print(f"[信息] 缩放因子: X={scale_x:.3f}, Y={scale_y:.3f}")
         return scale_x, scale_y
 
     def _scale_region(self, region: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -275,6 +258,49 @@ class RepositoryFilter:
         text = ''.join(result['entries'])
         return '遗物仪式' in text or '遗物' in text
 
+    def detect_relic_count(self) -> int:
+        """
+        检测筛选后的遗物数量
+
+        Returns:
+            int: 检测到的遗物数量，失败返回 0
+        """
+        if self.ocr_engine is None:
+            print("[警告] OCR引擎未初始化，无法检测遗物数量")
+            return 0
+
+        # 截取数量显示区域
+        image = self._capture_region(self.COUNT_REGION)
+
+        # 保存调试图片
+        self._save_debug_image(image, "count_region")
+
+        # OCR识别（单行数字）
+        result = self.ocr_engine.recognize_raw(image)
+        if not result['success']:
+            print("[警告] 遗物数量识别失败")
+            return 0
+
+        # 提取数字
+        text = ''.join(result['entries']).strip()
+        print(f"[调试] 识别到的文本: '{text}'")
+
+        # 尝试解析数字
+        try:
+            # 移除非数字字符
+            import re
+            numbers = re.findall(r'\d+', text)
+            if numbers:
+                count = int(numbers[0])
+                print(f"[信息] 检测到遗物数量: {count}")
+                return count
+            else:
+                print("[警告] 未能从文本中提取数字")
+                return 0
+        except Exception as e:
+            print(f"[错误] 解析遗物数量失败: {e}")
+            return 0
+
     def verify_sell_interface(self) -> bool:
         """
         验证是否在卖出界面
@@ -333,6 +359,48 @@ class RepositoryFilter:
         AutomationController.press_key('4', duration=0.3)
         time.sleep(0.5)
         return True
+
+    def verify_filter_interface(self, max_retry: int = 2) -> bool:
+        """
+        验证是否在筛选界面（而不是排序界面）
+
+        按4后可能进入排序界面而不是筛选界面，需要通过OCR检测标题区域是否有"筛选"字样
+        如果不是筛选界面，按F1切换到筛选界面
+
+        Args:
+            max_retry: 最大重试次数
+
+        Returns:
+            True: 在筛选界面
+            False: 验证失败
+        """
+        if self.ocr_engine is None:
+            print("[警告] OCR引擎未初始化，无法验证筛选界面")
+            return False
+
+        for retry in range(max_retry):
+            # 截取筛选标题区域
+            image = self._capture_region(self.FILTER_TITLE_REGION)
+            self._save_debug_image(image, "filter_title_region")
+
+            # OCR识别
+            result = self.ocr_engine.recognize_raw(image)
+            if result['success']:
+                text = ''.join(result['entries'])
+                print(f"[调试] 筛选标题区域识别到: '{text}'")
+
+                # 检查是否包含"筛选"
+                if '筛选' in text:
+                    print("[信息] 已确认在筛选界面")
+                    return True
+
+            # 不在筛选界面，按F1切换
+            print(f"[警告] 未检测到筛选界面，按F1切换 (尝试 {retry + 1}/{max_retry})")
+            AutomationController.press_key('f1', duration=0.3)
+            time.sleep(0.5)
+
+        print("[错误] 无法进入筛选界面")
+        return False
 
     def reset_filter(self) -> bool:
         """
@@ -509,6 +577,36 @@ class RepositoryFilter:
         AutomationController.press_key('q', duration=0.3)
         time.sleep(0.3)
 
+    def move_to_first_relic(self):
+        """
+        将光标移动到第一个遗物位置
+
+        在筛选完成后调用，确保光标在第一个遗物上，以便后续的状态检测
+        """
+        # 缩放坐标
+        base_x, base_y = self.FIRST_RELIC_POS
+        scaled_x = int(base_x * self.scale_x)
+        scaled_y = int(base_y * self.scale_y)
+
+        # 计算屏幕坐标（加上窗口偏移）
+        try:
+            # 尝试使用客户区坐标
+            client_left, client_top, _, _ = self._get_client_rect_screen_coords()
+            screen_x = client_left + scaled_x
+            screen_y = client_top + scaled_y
+        except Exception:
+            # 回退到使用窗口坐标
+            if self.game_window:
+                screen_x = self.game_window.left + scaled_x
+                screen_y = self.game_window.top + scaled_y
+            else:
+                print("[错误] 无法获取游戏窗口位置")
+                return
+
+        print(f"[信息] 移动光标到第一个遗物位置: 屏幕坐标=({screen_x}, {screen_y})")
+        AutomationController.move_mouse(screen_x, screen_y)
+        time.sleep(0.3)
+
     def apply_filter(self, mode: str) -> bool:
         """
         完整的筛选流程
@@ -536,6 +634,10 @@ class RepositoryFilter:
         if not self.enter_filter_interface():
             return False
 
+        # 3.5. 验证筛选界面（确保不是排序界面）
+        if not self.verify_filter_interface():
+            return False
+
         # 4. 重置筛选
         if not self.reset_filter():
             return False
@@ -547,6 +649,9 @@ class RepositoryFilter:
 
         # 6. 退出筛选界面
         self.exit_filter_interface()
+
+        # 7. 移动光标到第一个遗物
+        self.move_to_first_relic()
 
         return True
 

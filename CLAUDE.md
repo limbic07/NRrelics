@@ -32,7 +32,11 @@ python test_repo_cleaning.py
 **OCREngine** (`ocr_engine.py`)
 - Singleton pattern for CnOcr instance
 - Lazy initialization in background thread (QThread) to avoid blocking UI startup
-- Vocabulary loading from `data/normal.txt`, `data/deepnight_pos.txt`, `data/deepnight_neg.txt`
+- **Dynamic vocabulary loading**: Automatically switches vocabulary based on mode
+  - `self.current_mode` tracks currently loaded vocabulary ("normal" or "deepnight")
+  - `recognize_with_classification()` checks mode and reloads vocabulary if changed
+  - Normal mode: loads normal.txt + normal_special.txt
+  - Deepnight mode: loads deepnight_pos.txt + deepnight_neg.txt
 - **Critical**: Vocabulary is NOT cleaned - special symbols like 【】 must be preserved
 - Text postprocessing: symbol normalization (十→+, []→【】), noise removal (※, 仅限能使用的)
 - Fuzzy correction using rapidfuzz with 90% threshold
@@ -74,6 +78,7 @@ python test_repo_cleaning.py
   - `for_editing=True`: Loads only normal.txt (for preset editing UI)
   - `for_editing=False`: Loads normal.txt + normal_special.txt (for OCR recognition)
   - Deepnight modes always load single file (deepnight_pos.txt or deepnight_neg.txt)
+  - **Critical**: Vocabulary is NOT cleaned - preserves all special symbols like 【】
 
 **RepositoryFilter** (`automation.py`)
 - Game window automation using pyautogui/pydirectinput
@@ -84,11 +89,23 @@ python test_repo_cleaning.py
   - RITUAL_REGION: (130, 30, 280, 90) - verify in relic interface
   - SELL_REGION: (580, 130, 640, 160) - verify sell mode
   - FILTER_REGION: (50, 850, 250, 960) - filter checkbox area
+  - FILTER_TITLE_REGION: (180, 55, 240, 99) - filter title verification (prevents entering sort interface)
   - AFFIX_REGION: (1105, 800, 1805, 1000) - affix OCR region
+  - COUNT_REGION: (1620, 730, 1675, 760) - relic count display for auto-detect
+  - FIRST_RELIC_POS: (975, 255) - cursor position for first relic
 - Checkbox coordinates for filter mode:
   - NORMAL_CHECKBOX: (70, 865, 95, 890)
   - DEEPNIGHT_CHECKBOX: (70, 915, 95, 940)
-- `apply_filter(mode)`: Enters filter interface, adjusts checkboxes, exits
+- `apply_filter(mode)`: Complete filter workflow
+  1. Enters filter interface (press '4')
+  2. Verifies filter interface (OCR checks for "筛选", presses F1 if needed)
+  3. Resets filter (press '1')
+  4. Adjusts checkboxes based on mode
+  5. Exits filter interface (press 'q')
+  6. Moves cursor to first relic position
+- `verify_filter_interface()`: Prevents entering sort interface by mistake
+- `move_to_first_relic()`: Positions cursor on first relic for state detection
+- `detect_relic_count()`: OCR-based auto-detection of filtered relic count
 - `refresh_window_info()`: Refreshes window position (not resolution) before filtering
 
 ### UI Structure (`ui/`)
@@ -104,6 +121,10 @@ python test_repo_cleaning.py
 - Right panel: TabWidget with log + dashboard
 - Dashboard shows: total_detected, qualified, unqualified, skipped, sold, favorited
 - Qualified relics list: displays affixes with color coding (green=positive, red=negative)
+- **Auto-detect relic count**: Checkbox to enable automatic detection of filtered relic count
+  - Default: enabled (auto-detect checked, manual input hidden)
+  - When enabled: calls `RepositoryFilter.detect_relic_count()` after filtering
+  - When disabled: uses manual input value (1-2000)
 - CleaningThread: runs RepoCleaner.start_cleaning() in background, emits log_signal and qualified_relic_signal
 
 **PageSettings** (`pages/page_settings.py`)
@@ -205,9 +226,24 @@ Manual-stop: warn user to manually sell
 - Dark-O → skip (cannot sell official)
 
 **Font Initialization**
-- Always use explicit font size: `QFont("", 10)` or `QFont("Segoe UI", 9)`
-- Never use `QFont()` without parameters (causes point size -1 error)
-- Application sets default font to avoid Qt loading MS Sans Serif
+- **CRITICAL**: Always use explicit font initialization to avoid "QFont::setPointSize: Point size <= 0 (-1)" error
+- **Best Practice**: Use `setFont(QFont("Segoe UI", 9))` instead of stylesheet `font-size: 9pt`
+  - Stylesheets can cause Qt to create fonts with invalid point sizes during parsing
+  - Explicit font initialization ensures valid point size from creation
+- **Never** use `QFont()` without parameters (causes point size -1 error)
+- **Pattern for labels with custom font sizes**:
+  ```python
+  label = QLabel("Text")
+  label.setFont(QFont("Segoe UI", 8))  # Explicit font with size
+  label.setStyleSheet("color: gray;")   # Stylesheet only for color/style
+  ```
+- **Application-level font setup** (in main.py):
+  - Set default font before creating any widgets: `QFont("Segoe UI", 9)`
+  - Add font substitutions for system fonts (MS Sans Serif, MS Shell Dlg, etc.)
+  - Set global stylesheet with font-family and font-size to ensure all elements have valid fonts
+- **Known Issue**: qfluentwidgets may still produce QFont warnings during FluentWindow initialization
+  - This is a library-internal issue and cannot be fully prevented
+  - The warning does not affect functionality
 
 **Auto-save Pattern**
 - Connect widget signals to auto-save method: `widget.textChanged.connect(self._auto_save_settings)`
@@ -219,11 +255,17 @@ Manual-stop: warn user to manually sell
 1. **OCR Region**: Always use `_capture_region(AFFIX_REGION)` for affix OCR, not full window
 2. **Vocabulary Cleaning**: Never clean vocabulary during loading - only clean OCR results
 3. **Vocabulary Loading**: Use `for_editing=True` when loading vocabulary for preset editing UI
-4. **Auto-sell Logic**: Check `is_running` flag to distinguish auto-stop vs manual-stop
-4. **Preset Matching**: Only combine general + one dedicated preset at a time
-5. **Signal Disconnection**: Disconnect itemChanged signals during batch QListWidget operations
-6. **Font Initialization**: Always specify explicit font size to avoid Qt errors
-7. **Skip Logic**: Respect `allow_operate_favorited` setting in both sell and favorite modes
+4. **Vocabulary Mode Switching**: OCREngine automatically reloads vocabulary when mode changes (normal ↔ deepnight)
+5. **Auto-sell Logic**: Check `is_running` flag to distinguish auto-stop vs manual-stop
+6. **Preset Matching**: Only combine general + one dedicated preset at a time
+7. **Signal Disconnection**: Disconnect itemChanged signals during batch QListWidget operations
+8. **Font Initialization**:
+   - ALWAYS use `setFont(QFont("Segoe UI", 9))` for explicit font sizes
+   - NEVER rely solely on stylesheet `font-size` property - it can cause QFont errors
+   - Use stylesheets only for colors and styles, not font sizes
+9. **Skip Logic**: Respect `allow_operate_favorited` setting in both sell and favorite modes
+10. **Filter Interface**: Always verify filter interface after pressing '4' to avoid entering sort interface
+11. **Cursor Position**: Move cursor to first relic after filtering to ensure proper state detection
 
 ## File Locations
 

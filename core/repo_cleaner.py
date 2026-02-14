@@ -126,6 +126,17 @@ class RepoCleaner:
             log("遗物筛选成功", "SUCCESS")
             time.sleep(1.0)
 
+            # 2.5. 自动检测遗物数量（如果 max_relics == 0）
+            if max_relics == 0:
+                log("正在自动检测遗物数量...", "INFO")
+                detected_count = self.repository_filter.detect_relic_count()
+                if detected_count > 0:
+                    max_relics = detected_count
+                    log(f"检测到遗物数量: {max_relics}", "SUCCESS")
+                else:
+                    log("自动检测失败，使用默认值 100", "WARNING")
+                    max_relics = 100
+
             # 3. 获取预设
             general_preset = self.preset_manager.get_general_preset(mode)
             dedicated_presets = self.preset_manager.get_active_dedicated_presets(mode)

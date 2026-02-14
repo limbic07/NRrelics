@@ -148,13 +148,15 @@ class PresetCard(CardWidget):
         # 添加词条标签
         for affix in self.preset_data["affixes"][:20]:  # 最多显示20条
             affix_label = QLabel(f"• {affix}")
-            affix_label.setStyleSheet("color: #555; font-size: 9pt;")
+            affix_label.setFont(QFont("Segoe UI", 9))
+            affix_label.setStyleSheet("color: #555;")
             affix_label.setWordWrap(True)
             affixes_layout.addWidget(affix_label)
 
         if len(self.preset_data["affixes"]) > 20:
             more_label = QLabel(f"... 还有 {len(self.preset_data['affixes']) - 20} 条")
-            more_label.setStyleSheet("color: #999; font-size: 9pt; font-style: italic;")
+            more_label.setFont(QFont("Segoe UI", 9))
+            more_label.setStyleSheet("color: #999; font-style: italic;")
             affixes_layout.addWidget(more_label)
 
         self.affixes_widget.setVisible(False)
@@ -266,7 +268,14 @@ class RepoPage(QWidget):
         validator = QIntValidator(1, 2000, self)
         self.max_input.setValidator(validator)
         self.max_input.setPlaceholderText("1-2000")
+        self.max_input.setVisible(False)  # 默认隐藏输入框
         layout.addWidget(self.max_input)
+
+        # 自动检测复选框
+        self.auto_detect_checkbox = QCheckBox("自动检测")
+        self.auto_detect_checkbox.setChecked(True)  # 默认启用自动检测
+        self.auto_detect_checkbox.stateChanged.connect(self._on_auto_detect_changed)
+        layout.addWidget(self.auto_detect_checkbox)
 
         layout.addStretch()
 
@@ -570,14 +579,30 @@ class RepoPage(QWidget):
         self._refresh_presets()
         InfoBar.success("保存成功", "黑名单已更新", parent=self)
 
+    def _on_auto_detect_changed(self):
+        """自动检测复选框状态改变"""
+        # 使用 isChecked() 更可靠
+        if self.auto_detect_checkbox.isChecked():
+            # 勾选自动检测，隐藏输入框
+            self.max_input.setVisible(False)
+        else:
+            # 取消勾选，显示输入框
+            self.max_input.setVisible(True)
+
     def _start_cleaning(self):
         """开始清理"""
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
 
-        # 获取数量，如果输入为空则使用默认值100
-        max_relics_text = self.max_input.text().strip()
-        max_relics = int(max_relics_text) if max_relics_text else 100
+        # 获取数量
+        auto_detect = self.auto_detect_checkbox.isChecked()
+        if auto_detect:
+            # 自动检测模式，设置为 0 表示自动检测
+            max_relics = 0
+        else:
+            # 手动输入模式
+            max_relics_text = self.max_input.text().strip()
+            max_relics = int(max_relics_text) if max_relics_text else 100
 
         # 重新加载设置（确保使用最新的设置）
         self.settings = self._load_settings()
@@ -662,7 +687,8 @@ class RepoPage(QWidget):
             affix_type = "正面" if affix["is_positive"] else "负面"
             color = "#4CAF50" if affix["is_positive"] else "#FF5722"
             affix_label = QLabel(f"[{affix_type}] {affix['cleaned_text']}")
-            affix_label.setStyleSheet(f"font-size: 9pt; color: {color};")
+            affix_label.setFont(QFont("Segoe UI", 9))
+            affix_label.setStyleSheet(f"color: {color};")
             affix_label.setWordWrap(True)
             card_layout.addWidget(affix_label)
 

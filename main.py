@@ -47,11 +47,14 @@ class Application:
         QFont.insertSubstitution("MS Sans Serif", "Segoe UI")
         QFont.insertSubstitution("MS Shell Dlg", "Segoe UI")
         QFont.insertSubstitution("MS Shell Dlg 2", "Segoe UI")
+        QFont.insertSubstitution("System", "Segoe UI")
+        QFont.insertSubstitution("Default", "Segoe UI")
 
-        # 设置全局样式表，为所有使用font-weight的元素指定font-family
+        # 设置全局样式表，为所有使用font-weight的元素指定font-family和font-size
         self.app.setStyleSheet("""
             * {
                 font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+                font-size: 9pt;
             }
         """)
 
@@ -101,9 +104,8 @@ class Application:
     def _on_ocr_initialized(self):
         """OCR 初始化完成"""
         self.ocr_engine = self.ocr_worker.ocr_engine
-        relic_type = self.config.get("ocr", {}).get("relic_type", "normal")
+        # 词条库已在 initialize() 中加载，无需重复加载
         if self.ocr_engine:
-            self.ocr_engine.load_vocabulary(relic_type)
             # 将引擎传递到 UI 层
             self.window.init_ocr_dependencies(self.ocr_engine)
 

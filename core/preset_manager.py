@@ -157,23 +157,13 @@ class PresetManager:
                     else:
                         entry = line
 
-                    # 清洗词条
-                    entry = self._clean_entry(entry)
+                    # 不清洗词条，保留原始格式（包括【】等特殊符号）
                     if entry:
                         vocabulary.append(entry)
 
         # 缓存
         self._vocab_cache[cache_key] = vocabulary
         return vocabulary
-
-    def _clean_entry(self, entry: str) -> str:
-        """清洗词条中的特殊符号"""
-        entry = entry.replace('【', '').replace('】', '')
-        entry = entry.replace('"', '').replace('"', '')
-        entry = entry.replace('(', '').replace(')', '')
-        entry = entry.replace('[', '').replace(']', '')
-        entry = entry.replace('{', '').replace('}', '')
-        return entry.strip()
 
     # ==================== 通用预设操作 ====================
 

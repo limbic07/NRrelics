@@ -346,6 +346,7 @@ class OCREngine:
 
         # 加载词条库
         self.corrector = None
+        self.current_mode = None  # 记录当前加载的词条库模式
         if CORRECTION_CONFIG["enabled"]:
             print("正在加载词条库...")
             try:
@@ -357,6 +358,7 @@ class OCREngine:
                     vocab_loader.vocabulary,
                     CORRECTION_CONFIG["similarity_threshold"]
                 )
+                self.current_mode = "normal"  # 记录当前模式
                 print(f"词条库加载完成 (共{len(vocab_loader.vocabulary)}条)")
             except Exception as e:
                 print(f"[警告] 词条库加载失败: {e}")
@@ -375,6 +377,7 @@ class OCREngine:
                 vocab_loader.vocabulary,
                 CORRECTION_CONFIG["similarity_threshold"]
             )
+            self.current_mode = relic_type  # 更新当前模式
             print(f"词条库加载完成 (共{len(vocab_loader.vocabulary)}条)")
             return True
         except Exception as e:
@@ -469,6 +472,11 @@ class OCREngine:
                 "retry_count": int             # 重试次数
             }
         """
+        # 检查是否需要重新加载词条库
+        if self.current_mode != mode:
+            print(f"[词条库切换] {self.current_mode} -> {mode}")
+            self.load_vocabulary(mode)
+
         max_retry = CORRECTION_CONFIG.get("max_retry", 3)
 
         for retry in range(max_retry):

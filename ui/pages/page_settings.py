@@ -3,6 +3,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QCheckBox, QGroupBox, QPushButton, QFileDialog, QComboBox)
 from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QFont
 from qfluentwidgets import (CardWidget, SwitchButton, LineEdit,
                            PrimaryPushButton, PushButton, InfoBar, InfoBarPosition)
 import json
@@ -115,7 +116,8 @@ class SettingsPage(QWidget):
 
         # 说明文本
         resolution_desc = QLabel("设置游戏实际运行的分辨率（用于坐标缩放计算）")
-        resolution_desc.setStyleSheet("color: gray; font-size: 8pt;")
+        resolution_desc.setFont(QFont("Segoe UI", 8))
+        resolution_desc.setStyleSheet("color: gray;")
         card_layout.addWidget(resolution_desc)
 
         # 预设配置管理
@@ -136,7 +138,8 @@ class SettingsPage(QWidget):
 
         # 说明文本
         preset_desc = QLabel("导出/导入所有预设配置（导入会覆盖当前配置）")
-        preset_desc.setStyleSheet("color: gray; font-size: 8pt;")
+        preset_desc.setFont(QFont("Segoe UI", 8))
+        preset_desc.setStyleSheet("color: gray;")
         card_layout.addWidget(preset_desc)
 
         return card
@@ -178,7 +181,8 @@ class SettingsPage(QWidget):
 
         # 说明文本
         valid_desc = QLabel("开启: 2条词条匹配即合格 | 关闭: 3条词条匹配才合格")
-        valid_desc.setStyleSheet("color: gray; font-size: 12pt;")
+        valid_desc.setFont(QFont("Segoe UI", 8))
+        valid_desc.setStyleSheet("color: gray;")
         card_layout.addLayout(valid_layout)
         card_layout.addWidget(valid_desc)
 
