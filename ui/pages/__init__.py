@@ -8,8 +8,8 @@ __all__ = ['ShopPage', 'RepoPage', 'SavePage', 'SettingsPage']
 def __getattr__(name):
     """延迟导入页面类"""
     if name == 'ShopPage':
-        from .page_shop import ShopPage
-        return ShopPage
+        from .page_shop import PageShop
+        return PageShop
     elif name == 'RepoPage':
         from .page_repo import RepoPage
         return RepoPage

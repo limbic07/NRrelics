@@ -3,6 +3,7 @@
 from qfluentwidgets import FluentWindow, NavigationItemPosition, FluentIcon, setTheme, Theme
 from PySide6.QtCore import QSize
 from .config import NAVIGATION_CONFIG, WINDOW_CONFIG, THEME_CONFIG
+from ui.components.logger_widget import LoggerWidget
 
 
 class MainWindow(FluentWindow):
@@ -20,6 +21,9 @@ class MainWindow(FluentWindow):
         theme = Theme.LIGHT if THEME_CONFIG["theme"] == "light" else Theme.DARK
         setTheme(theme)
 
+        # 创建共享日志实例
+        self.shared_logger = LoggerWidget()
+
         # 优化导航栏
         self._optimize_navigation()
 
@@ -36,7 +40,7 @@ class MainWindow(FluentWindow):
         from .pages import ShopPage, RepoPage, SavePage, SettingsPage
 
         # 商店筛选
-        self.shop_page = ShopPage()
+        self.shop_page = ShopPage(shared_logger=self.shared_logger)
         self.addSubInterface(
             self.shop_page,
             FluentIcon.SHOPPING_CART,
@@ -45,7 +49,7 @@ class MainWindow(FluentWindow):
         )
 
         # 仓库清理
-        self.repo_page = RepoPage()
+        self.repo_page = RepoPage(shared_logger=self.shared_logger)
         self.addSubInterface(
             self.repo_page,
             FluentIcon.FOLDER,
@@ -75,3 +79,5 @@ class MainWindow(FluentWindow):
         """初始化 OCR 依赖（异步加载完成后调用）"""
         if self.repo_page:
             self.repo_page.set_ocr_engine(engine)
+        if self.shop_page:
+            self.shop_page.set_ocr_engine(engine)

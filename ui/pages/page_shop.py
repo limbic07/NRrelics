@@ -1,21 +1,667 @@
-"""商店筛选页面 - 简洁框架"""
+"""
+商店筛选页面
+自动购买遗物并根据预设筛选，保留合格遗物，出售不合格遗物
+"""
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                               QPushButton, QComboBox, QTabWidget,
+                               QScrollArea, QFrame, QSplitter, QGroupBox, QLineEdit)
+from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtGui import QFont, QIntValidator
+from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
+                           ComboBox, MessageBox, InfoBar, InfoBarPosition)
+
+from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
+from ui.components.logger_widget import LoggerWidget
+import json
+import os
 
 
-class ShopPage(QWidget):
-    """商店筛选页面"""
+# 合格遗物数据文件路径
+QUALIFIED_RELICS_FILE = "data/shop_qualified_relics.json"
 
-    def __init__(self):
+
+class ShopThread(QThread):
+    """商店购买线程"""
+    log_signal = Signal(str, str)  # (message, level)
+    finished_signal = Signal()
+    qualified_relic_signal = Signal(dict)  # 合格遗物信息
+    stats_signal = Signal(dict)  # 统计信息
+
+    def __init__(self, shop_automation, mode, version, stop_currency, require_double):
         super().__init__()
-        self.setObjectName("ShopPage")
+        self.shop_automation = shop_automation
+        self.mode = mode
+        self.version = version
+        self.stop_currency = stop_currency
+        self.require_double = require_double
 
+    def run(self):
+        """运行商店购买"""
+        try:
+            self.shop_automation.start_shopping(
+                self.mode,
+                self.version,
+                self.stop_currency,
+                self.require_double,
+                log_callback=self.log_signal.emit,
+                stats_callback=self.stats_signal.emit
+            )
+
+            # 购买完成后，发送所有合格遗物信息
+            for relic_info in self.shop_automation.qualified_relics:
+                self.qualified_relic_signal.emit(relic_info)
+
+        except Exception as e:
+            self.log_signal.emit(f"购买过程出错: {e}", "ERROR")
+        finally:
+            self.finished_signal.emit()
+
+
+# 导入PresetCard from page_repo
+from ui.pages.page_repo import PresetCard
+
+
+class PageShop(QWidget):
+    """商店筛选页面"""
+    settings_changed = Signal()
+
+    def __init__(self, shared_logger=None):
+        super().__init__()
+        self.setObjectName("PageShop")
+
+        # 初始化组件
+        self.preset_manager = PresetManager()
+        self.ocr_engine = None  # 延迟加载，初始为 None
+
+        # 商店自动化实例（延迟初始化）
+        self.shop_automation = None
+
+        # 当前模式
+        self.current_mode = "normal"
+
+        # 购买线程
+        self.shop_thread = None
+
+        # 统计数据
+        self.stats = {
+            "total_purchased": 0,
+            "qualified": 0,
+            "unqualified": 0,
+            "sold": 0
+        }
+
+        # 加载持久化的合格遗物
+        self.qualified_relics = self._load_qualified_relics()
+
+        # 加载设置
+        self.settings = self._load_settings()
+
+        # 共享日志实例
+        self.shared_logger = shared_logger
+
+        self._init_ui()
+        self._refresh_presets()
+        self._load_qualified_relics_ui()
+
+    def set_ocr_engine(self, engine):
+        """设置 OCR 引擎（异步加载完成后调用）"""
+        self.ocr_engine = engine
+        self.start_btn.setEnabled(True)
+        self.start_btn.setText("开始购买")
+
+    def _load_settings(self) -> dict:
+        """加载设置"""
+        settings_file = "data/settings.json"
+        if os.path.exists(settings_file):
+            with open(settings_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return {}
+
+    def _init_ui(self):
+        """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setContentsMargins(16, 8, 16, 16)
+        layout.setSpacing(6)
 
-        label = QLabel("商店筛选")
-        label.setStyleSheet("font-size: 24pt; font-weight: bold;")
-        layout.addWidget(label)
+        # 标题
+        title = QLabel("商店筛选")
+        title.setStyleSheet("font-size: 24pt; font-weight: bold;")
+        layout.addWidget(title)
+
+        # 顶部工具栏
+        toolbar = self._create_toolbar()
+        layout.addWidget(toolbar)
+
+        # 主内容区域（分割器）
+        splitter = QSplitter(Qt.Horizontal)
+
+        # 左侧：预设面板
+        preset_panel = self._create_preset_panel()
+        splitter.addWidget(preset_panel)
+
+        # 右侧：日志和仪表盘
+        right_panel = self._create_right_panel()
+        splitter.addWidget(right_panel)
+
+        # 调整比例
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 3)
+
+        # 设置初始尺寸（确保2:3比例）
+        splitter.setSizes([400, 600])
+
+        layout.addWidget(splitter, 1)
+
+    def _create_toolbar(self) -> CardWidget:
+        """创建顶部工具栏"""
+        card = CardWidget()
+        card.setFixedHeight(60)
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(12)
+
+        # 模式选择
+        mode_label = QLabel("模式:")
+        layout.addWidget(mode_label)
+
+        self.mode_combo = ComboBox()
+        self.mode_combo.addItems(["普通", "深夜"])
+        self.mode_combo.setFixedWidth(100)
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        layout.addWidget(self.mode_combo)
+
+        layout.addSpacing(10)
+
+        # 遗物版本
+        version_label = QLabel("版本:")
+        layout.addWidget(version_label)
+
+        self.version_combo = ComboBox()
+        self.version_combo.addItems(["新版", "旧版"])
+        self.version_combo.setFixedWidth(100)
+        layout.addWidget(self.version_combo)
+
+        layout.addSpacing(10)
+
+        # 停止购买暗痕
+        currency_label = QLabel("停止暗痕:")
+        layout.addWidget(currency_label)
+
+        self.currency_input = QLineEdit()
+        self.currency_input.setText("0")
+        self.currency_input.setFixedWidth(120)
+        self.currency_input.setFixedHeight(33)
+        validator = QIntValidator(0, 999999, self)
+        self.currency_input.setValidator(validator)
+        self.currency_input.setPlaceholderText("0-999999")
+        layout.addWidget(self.currency_input)
 
         layout.addStretch()
+
+        # 开始/停止按钮
+        self.start_btn = PrimaryPushButton("初始化OCR...")
+        self.start_btn.setFixedHeight(36)
+        self.start_btn.setFixedWidth(120)
+        self.start_btn.setEnabled(False)
+        self.start_btn.clicked.connect(self._start_shopping)
+        layout.addWidget(self.start_btn)
+
+        self.stop_btn = PushButton("停止")
+        self.stop_btn.setFixedHeight(36)
+        self.stop_btn.setFixedWidth(80)
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self._stop_shopping)
+        layout.addWidget(self.stop_btn)
+
+        return card
+
+    def _create_preset_panel(self) -> QWidget:
+        """创建预设面板（与仓库清理共享）"""
+        panel = QWidget()
+        panel.setMinimumWidth(400)  # 设置最小宽度
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        # 标题
+        title = QLabel("预设管理")
+        title.setStyleSheet("font-size: 13pt; font-weight: bold; padding: 4px 0;")
+        layout.addWidget(title)
+
+        # 滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        scroll_content = QWidget()
+        self.preset_layout = QVBoxLayout(scroll_content)
+        self.preset_layout.setSpacing(8)
+
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll, 1)
+
+        return panel
+
+    def _create_right_panel(self) -> QWidget:
+        """创建右侧面板（日志+仪表盘）"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        # TabWidget
+        tab_widget = QTabWidget()
+
+        # 日志标签页（使用共享日志或创建新的）
+        if self.shared_logger:
+            self.logger = self.shared_logger
+        else:
+            self.logger = LoggerWidget()
+        tab_widget.addTab(self.logger, "日志")
+
+        # 仪表盘标签页
+        dashboard = self._create_dashboard()
+        tab_widget.addTab(dashboard, "仪表盘")
+
+        layout.addWidget(tab_widget)
+
+        return panel
+
+    def _create_dashboard(self) -> QWidget:
+        """创建仪表盘"""
+        dashboard = QWidget()
+        layout = QVBoxLayout(dashboard)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        # 统计卡片
+        stats_layout = QHBoxLayout()
+
+        self.stat_value_labels = {}
+
+        purchased_card, purchased_value = self._create_stat_card("已购买", "0", "#2196F3")
+        self.stat_value_labels["total_purchased"] = purchased_value
+        stats_layout.addWidget(purchased_card)
+
+        qualified_card, qualified_value = self._create_stat_card("合格", "0", "#4CAF50")
+        self.stat_value_labels["qualified"] = qualified_value
+        stats_layout.addWidget(qualified_card)
+
+        unqualified_card, unqualified_value = self._create_stat_card("不合格", "0", "#FF9800")
+        self.stat_value_labels["unqualified"] = unqualified_value
+        stats_layout.addWidget(unqualified_card)
+
+        sold_card, sold_value = self._create_stat_card("已售出", "0", "#F44336")
+        self.stat_value_labels["sold"] = sold_value
+        stats_layout.addWidget(sold_card)
+
+        layout.addLayout(stats_layout)
+
+        # 合格遗物列表
+        qualified_group = QGroupBox("合格遗物词条")
+        qualified_layout = QVBoxLayout(qualified_group)
+        qualified_layout.setContentsMargins(8, 8, 8, 8)
+        qualified_layout.setSpacing(4)
+
+        # 清空按钮
+        clear_btn = PushButton("清空记录")
+        clear_btn.clicked.connect(self._clear_qualified_relics)
+        qualified_layout.addWidget(clear_btn)
+
+        # 滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        scroll_content = QWidget()
+        self.qualified_relics_layout = QVBoxLayout(scroll_content)
+        self.qualified_relics_layout.setSpacing(6)
+        self.qualified_relics_layout.addStretch()
+
+        scroll.setWidget(scroll_content)
+        qualified_layout.addWidget(scroll)
+
+        layout.addWidget(qualified_group, 1)
+
+        return dashboard
+
+    def _create_stat_card(self, title: str, value: str, color: str) -> tuple:
+        """创建统计卡片，返回(card, value_label)"""
+        card = CardWidget()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(12, 10, 12, 10)
+        card_layout.setSpacing(4)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"color: {color}; font-size: 11pt;")
+        card_layout.addWidget(title_label)
+
+        value_label = QLabel(value)
+        value_label.setStyleSheet(f"color: {color}; font-size: 20pt; font-weight: bold;")
+        card_layout.addWidget(value_label)
+
+        return card, value_label
+
+    def _refresh_presets(self):
+        """刷新预设列表"""
+        # 清空现有预设
+        while self.preset_layout.count():
+            item = self.preset_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+
+        # 通用预设
+        general_preset = self.preset_manager.get_general_preset(mode)
+        if general_preset:
+            card = PresetCard(general_preset, is_general=True)
+            card.edit_clicked.connect(self._edit_general_preset)
+            self.preset_layout.addWidget(card)
+
+        # 专用预设
+        dedicated_presets = self.preset_manager.get_dedicated_presets(mode)
+        for preset in dedicated_presets.values():
+            card = PresetCard(preset, is_general=False)
+            card.edit_clicked.connect(self._edit_dedicated_preset)
+            card.delete_clicked.connect(self._delete_preset)
+            card.toggle_clicked.connect(self._toggle_preset)
+            self.preset_layout.addWidget(card)
+
+        # 添加按钮
+        add_btn = PrimaryPushButton("+ 创建专用预设")
+        add_btn.setFixedHeight(32)
+        add_btn.clicked.connect(self._create_dedicated_preset)
+        self.preset_layout.addWidget(add_btn)
+
+        # 深夜模式：黑名单
+        if mode == "deepnight":
+            blacklist = self.preset_manager.get_blacklist_preset()
+            if blacklist:
+                card = PresetCard(blacklist, is_general=True)
+                card.edit_clicked.connect(self._edit_blacklist_preset)
+                self.preset_layout.addWidget(card)
+
+        self.preset_layout.addStretch()
+
+    def _on_mode_changed(self):
+        """模式切换"""
+        self.current_mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        self._refresh_presets()
+
+    def _edit_general_preset(self, preset_id: str):
+        """编辑通用预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        preset = self.preset_manager.get_general_preset(mode)
+        vocab = self.preset_manager.load_vocabulary(
+            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST,
+            for_editing=True
+        )
+
+        dialog = PresetEditDialog(vocab, preset, is_general=True, parent=self)
+        dialog.preset_saved.connect(lambda pid, name, affixes: self._save_general_preset(mode, affixes))
+        dialog.exec()
+
+    def _save_general_preset(self, mode: str, affixes: list):
+        """保存通用预设"""
+        self.preset_manager.update_general_preset(mode, affixes)
+        self._refresh_presets()
+        InfoBar.success("保存成功", "通用预设已更新", parent=self)
+
+    def _create_dedicated_preset(self):
+        """创建专用预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+
+        # 检查数量限制
+        dedicated_presets = self.preset_manager.get_dedicated_presets(mode)
+        if len(dedicated_presets) >= 20:
+            MessageBox("错误", "专用预设数量已达上限（20个）", self).exec()
+            return
+
+        vocab = self.preset_manager.load_vocabulary(
+            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST,
+            for_editing=True
+        )
+
+        dialog = PresetEditDialog(vocab, None, is_general=False, parent=self)
+        dialog.preset_saved.connect(lambda pid, name, affixes: self._save_dedicated_preset(mode, name, affixes))
+        dialog.exec()
+
+    def _save_dedicated_preset(self, mode: str, name: str, affixes: list):
+        """保存专用预设"""
+        self.preset_manager.create_dedicated_preset(mode, name, affixes)
+        self._refresh_presets()
+        InfoBar.success("创建成功", f"专用预设 \"{name}\" 已创建", parent=self)
+
+    def _edit_dedicated_preset(self, preset_id: str):
+        """编辑专用预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        preset = self.preset_manager.get_preset_by_id(preset_id)
+        vocab = self.preset_manager.load_vocabulary(
+            PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST,
+            for_editing=True
+        )
+
+        dialog = PresetEditDialog(vocab, preset, is_general=False, parent=self)
+        dialog.preset_saved.connect(lambda pid, name, affixes: self._update_dedicated_preset(pid, name, affixes))
+        dialog.exec()
+
+    def _update_dedicated_preset(self, preset_id: str, name: str, affixes: list):
+        """更新专用预设"""
+        self.preset_manager.update_dedicated_preset(preset_id, name, affixes)
+        self._refresh_presets()
+        InfoBar.success("保存成功", f"专用预设 \"{name}\" 已更新", parent=self)
+
+    def _delete_preset(self, preset_id: str):
+        """删除预设"""
+        preset = self.preset_manager.get_preset_by_id(preset_id)
+        if not preset:
+            return
+
+        msg_box = MessageBox("确认删除", f"确定要删除预设 \"{preset['name']}\" 吗？", self)
+        if msg_box.exec():
+            self.preset_manager.delete_preset(preset_id)
+            self._refresh_presets()
+            InfoBar.success("删除成功", f"预设 \"{preset['name']}\" 已删除", parent=self)
+
+    def _toggle_preset(self, preset_id: str):
+        """切换预设启用状态"""
+        self.preset_manager.toggle_preset(preset_id)
+        self._refresh_presets()
+
+    def _edit_blacklist_preset(self, preset_id: str):
+        """编辑黑名单预设"""
+        from ui.dialogs.preset_edit_dialog import PresetEditDialog
+
+        preset = self.preset_manager.get_blacklist_preset()
+        vocab = self.preset_manager.load_vocabulary(
+            "deepnight_blacklist",
+            for_editing=True
+        )
+
+        dialog = PresetEditDialog(vocab, preset, is_general=True, parent=self)
+        dialog.preset_saved.connect(lambda pid, name, affixes: self._save_blacklist_preset(affixes))
+        dialog.exec()
+
+    def _save_blacklist_preset(self, affixes: list):
+        """保存黑名单预设"""
+        self.preset_manager.update_blacklist_preset(affixes)
+        self._refresh_presets()
+        InfoBar.success("保存成功", "黑名单预设已更新", parent=self)
+
+    def _start_shopping(self):
+        """开始购买"""
+        if self.shop_thread and self.shop_thread.isRunning():
+            InfoBar.warning("提示", "购买正在进行中", parent=self)
+            return
+
+        # 检查 OCR 引擎是否已加载
+        if not self.ocr_engine:
+            InfoBar.error("错误", "OCR 引擎未加载，请稍后再试", parent=self)
+            return
+
+        # 初始化商店自动化（延迟初始化）
+        if not self.shop_automation:
+            from core.shop_automation import ShopAutomation
+            from core.automation import RepositoryFilter
+
+            repo_filter = RepositoryFilter(self.settings)
+            self.shop_automation = ShopAutomation(
+                self.ocr_engine,
+                self.preset_manager,
+                repo_filter,
+                self.settings
+            )
+
+        # 获取参数
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        version = "new" if self.version_combo.currentIndex() == 0 else "old"
+        stop_currency = int(self.currency_input.text() or "0")
+
+        # 获取三有效设置
+        settings_file = "data/settings.json"
+        require_double = True  # 默认双有效
+        if os.path.exists(settings_file):
+            with open(settings_file, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+                require_double = settings.get("require_double_valid", True)
+
+        # 清空日志和统计
+        self.logger.clear()
+        self.stats = {
+            "total_purchased": 0,
+            "qualified": 0,
+            "unqualified": 0,
+            "sold": 0
+        }
+        self._update_stats()
+
+        # 创建并启动线程
+        self.shop_thread = ShopThread(
+            self.shop_automation,
+            mode,
+            version,
+            stop_currency,
+            require_double
+        )
+        self.shop_thread.log_signal.connect(self.logger.log)
+        self.shop_thread.qualified_relic_signal.connect(self._add_qualified_relic)
+        self.shop_thread.stats_signal.connect(self._update_stats_from_signal)
+        self.shop_thread.finished_signal.connect(self._on_shopping_finished)
+        self.shop_thread.start()
+
+        # 更新按钮状态
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+
+        self.logger.log("开始购买遗物...", "INFO")
+
+    def _stop_shopping(self):
+        """停止购买"""
+        if self.shop_automation:
+            self.shop_automation.stop()
+            self.logger.log("正在停止购买...", "WARNING")
+
+    def _on_shopping_finished(self):
+        """购买完成"""
+        self.start_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        self.logger.log("购买已完成", "INFO")
+
+    def _add_qualified_relic(self, relic_info: dict):
+        """添加合格遗物到UI和持久化存储"""
+        # 添加到内存
+        self.qualified_relics.append(relic_info)
+
+        # 持久化保存
+        self._save_qualified_relics()
+
+        # 添加到UI
+        self._add_qualified_relic_ui(relic_info)
+
+    def _add_qualified_relic_ui(self, relic_info: dict):
+        """添加合格遗物到UI"""
+        card = CardWidget()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 6, 8, 6)
+        card_layout.setSpacing(4)
+
+        # 时间戳
+        timestamp_label = QLabel(relic_info.get("timestamp", ""))
+        timestamp_label.setFont(QFont("Segoe UI", 8))
+        timestamp_label.setStyleSheet("color: gray;")
+        card_layout.addWidget(timestamp_label)
+
+        # 词条列表
+        affixes = relic_info.get("affixes", [])
+        for affix_info in affixes:
+            affix_text = affix_info.get("text", "")
+            is_positive = affix_info.get("is_positive", True)
+            color = "#4CAF50" if is_positive else "#F44336"
+
+            affix_label = QLabel(f"• {affix_text}")
+            affix_label.setFont(QFont("Segoe UI", 9))
+            affix_label.setStyleSheet(f"color: {color};")
+            card_layout.addWidget(affix_label)
+
+        # 插入到布局顶部（最新的在上面）
+        self.qualified_relics_layout.insertWidget(0, card)
+
+    def _update_stats(self):
+        """更新统计显示"""
+        self.stat_value_labels["total_purchased"].setText(str(self.stats["total_purchased"]))
+        self.stat_value_labels["qualified"].setText(str(self.stats["qualified"]))
+        self.stat_value_labels["unqualified"].setText(str(self.stats["unqualified"]))
+        self.stat_value_labels["sold"].setText(str(self.stats["sold"]))
+
+    def _update_stats_from_signal(self, stats: dict):
+        """从信号更新统计"""
+        self.stats.update(stats)
+        self._update_stats()
+
+    def _load_qualified_relics(self) -> list:
+        """从文件加载合格遗物"""
+        if os.path.exists(QUALIFIED_RELICS_FILE):
+            try:
+                with open(QUALIFIED_RELICS_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"加载合格遗物失败: {e}")
+                return []
+        return []
+
+    def _save_qualified_relics(self):
+        """保存合格遗物到文件"""
+        try:
+            os.makedirs(os.path.dirname(QUALIFIED_RELICS_FILE), exist_ok=True)
+            with open(QUALIFIED_RELICS_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.qualified_relics, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存合格遗物失败: {e}")
+
+    def _load_qualified_relics_ui(self):
+        """加载合格遗物到UI"""
+        for relic_info in self.qualified_relics:
+            self._add_qualified_relic_ui(relic_info)
+
+    def _clear_qualified_relics(self):
+        """清空合格遗物记录"""
+        msg_box = MessageBox("确认清空", "确定要清空所有合格遗物记录吗？", self)
+        if msg_box.exec():
+            self.qualified_relics.clear()
+            self._save_qualified_relics()
+
+            # 清空UI
+            while self.qualified_relics_layout.count() > 1:  # 保留stretch
+                item = self.qualified_relics_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+
+            InfoBar.success("清空成功", "合格遗物记录已清空", parent=self)

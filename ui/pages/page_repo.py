@@ -15,6 +15,11 @@ from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRE
 from ui.components.logger_widget import LoggerWidget
 import json
 import os
+from datetime import datetime
+
+# 持久化数据文件路径
+SOLD_RELICS_FILE = "data/repo_sold_relics.json"
+FAVORITED_RELICS_FILE = "data/repo_favorited_relics.json"
 
 
 class CleaningThread(QThread):
@@ -172,7 +177,7 @@ class PresetCard(CardWidget):
 class RepoPage(QWidget):
     """仓库清理页面"""
 
-    def __init__(self):
+    def __init__(self, shared_logger=None):
         super().__init__()
         self.setObjectName("RepoPage")
 
@@ -190,6 +195,13 @@ class RepoPage(QWidget):
 
         # 加载设置
         self.settings = self._load_settings()
+
+        # 共享日志实例
+        self.shared_logger = shared_logger
+
+        # 加载持久化的售出和收藏遗物
+        self.sold_relics = self._load_sold_relics()
+        self.favorited_relics = self._load_favorited_relics()
 
         self._init_ui()
 
@@ -223,6 +235,9 @@ class RepoPage(QWidget):
         splitter.setStretchFactor(0, 2)
         splitter.setStretchFactor(1, 3)
 
+        # 设置初始尺寸（确保2:3比例）
+        splitter.setSizes([400, 600])
+
         layout.addWidget(splitter, 1)
 
     def _create_toolbar(self) -> CardWidget:
@@ -252,6 +267,7 @@ class RepoPage(QWidget):
         self.clean_mode_combo = ComboBox()
         self.clean_mode_combo.addItems(["售出", "收藏"])
         self.clean_mode_combo.setFixedWidth(100)
+        self.clean_mode_combo.currentIndexChanged.connect(self._on_clean_mode_changed)
         layout.addWidget(self.clean_mode_combo)
 
         layout.addSpacing(10)
@@ -279,11 +295,27 @@ class RepoPage(QWidget):
 
         layout.addStretch()
 
+        # 开始/停止按钮
+        self.start_btn = PrimaryPushButton("初始化OCR...")
+        self.start_btn.setFixedHeight(36)
+        self.start_btn.setFixedWidth(120)
+        self.start_btn.setEnabled(False)
+        self.start_btn.clicked.connect(self._start_cleaning)
+        layout.addWidget(self.start_btn)
+
+        self.stop_btn = PushButton("停止")
+        self.stop_btn.setFixedHeight(36)
+        self.stop_btn.setFixedWidth(80)
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self._stop_cleaning)
+        layout.addWidget(self.stop_btn)
+
         return card
 
     def _create_preset_panel(self) -> QWidget:
         """创建预设面板"""
         panel = QWidget()
+        panel.setMinimumWidth(400)  # 设置最小宽度
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
@@ -320,8 +352,11 @@ class RepoPage(QWidget):
         # Tab Widget
         tab_widget = QTabWidget()
 
-        # 日志面板
-        self.logger = LoggerWidget()
+        # 日志面板（使用共享日志或创建新的）
+        if self.shared_logger:
+            self.logger = self.shared_logger
+        else:
+            self.logger = LoggerWidget()
         tab_widget.addTab(self.logger, "日志")
 
         # 仪表盘
@@ -329,24 +364,6 @@ class RepoPage(QWidget):
         tab_widget.addTab(dashboard, "仪表盘")
 
         layout.addWidget(tab_widget)
-
-        # 控制按钮（紧凑版）
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        self.start_btn = PrimaryPushButton("初始化OCR...")
-        self.start_btn.setFixedSize(120, 32)
-        self.start_btn.setEnabled(False)
-        self.start_btn.clicked.connect(self._start_cleaning)
-        button_layout.addWidget(self.start_btn)
-
-        self.stop_btn = PushButton("停止")
-        self.stop_btn.setFixedSize(120, 32)
-        self.stop_btn.setEnabled(False)
-        self.stop_btn.clicked.connect(self._stop_cleaning)
-        button_layout.addWidget(self.stop_btn)
-
-        layout.addLayout(button_layout)
 
         return panel
 
@@ -381,11 +398,22 @@ class RepoPage(QWidget):
 
         layout.addLayout(stats_layout)
 
-        # 合格遗物列表
-        qualified_group = QGroupBox("合格遗物词条")
-        qualified_layout = QVBoxLayout(qualified_group)
-        qualified_layout.setContentsMargins(8, 8, 8, 8)
-        qualified_layout.setSpacing(4)
+        # 合格遗物列表（动态标题）
+        cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
+        if cleaning_mode == "sell":
+            title_text = "已售出遗物词条"
+        else:
+            title_text = "已收藏遗物词条"
+
+        self.relics_group = QGroupBox(title_text)
+        relics_layout = QVBoxLayout(self.relics_group)
+        relics_layout.setContentsMargins(8, 8, 8, 8)
+        relics_layout.setSpacing(4)
+
+        # 清空按钮
+        clear_btn = PushButton("清空记录")
+        clear_btn.clicked.connect(self._clear_relics_records)
+        relics_layout.addWidget(clear_btn)
 
         # 滚动区域
         scroll = QScrollArea()
@@ -393,14 +421,17 @@ class RepoPage(QWidget):
         scroll.setFrameShape(QFrame.NoFrame)
 
         scroll_content = QWidget()
-        self.qualified_relics_layout = QVBoxLayout(scroll_content)
-        self.qualified_relics_layout.setSpacing(6)
-        self.qualified_relics_layout.addStretch()
+        self.relics_layout = QVBoxLayout(scroll_content)
+        self.relics_layout.setSpacing(6)
+        self.relics_layout.addStretch()
 
         scroll.setWidget(scroll_content)
-        qualified_layout.addWidget(scroll)
+        relics_layout.addWidget(scroll)
 
-        layout.addWidget(qualified_group, 1)
+        layout.addWidget(self.relics_group, 1)
+
+        # 加载持久化的遗物到UI
+        self._load_relics_ui()
 
         return dashboard
 
@@ -467,6 +498,10 @@ class RepoPage(QWidget):
         """模式切换"""
         self.current_mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         self._refresh_presets()
+
+    def _on_clean_mode_changed(self):
+        """清理模式切换"""
+        self._update_relics_display()
 
     def _edit_general_preset(self, preset_id: str):
         """编辑通用预设"""
@@ -611,10 +646,10 @@ class RepoPage(QWidget):
         allow_favorited = self.settings.get("allow_operate_favorited", False)
         require_double = self.settings.get("require_double_valid", True)
 
-        # 清空日志和合格遗物列表
+        # 清空日志和遗物列表
         self.logger.clear()
         self.logger.log("开始清理...", "INFO")
-        self._clear_qualified_relics()
+        self._clear_relics_records()
 
         # 禁用按钮
         self.start_btn.setEnabled(False)
@@ -645,6 +680,13 @@ class RepoPage(QWidget):
         stats = self.repo_cleaner.stats
         self._update_dashboard(stats)
 
+        # 保存售出/收藏遗物到持久化存储
+        cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
+        if cleaning_mode == "sell":
+            self._save_sold_relics()
+        else:
+            self._save_favorited_relics()
+
     def _update_dashboard(self, stats: dict):
         """更新仪表盘"""
         # 更新统计卡片的值
@@ -652,10 +694,10 @@ class RepoPage(QWidget):
             if key in stats:
                 value_label.setText(str(stats[key]))
 
-    def _clear_qualified_relics(self):
-        """清空合格遗物列表"""
-        while self.qualified_relics_layout.count() > 1:  # 保留最后的stretch
-            item = self.qualified_relics_layout.takeAt(0)
+    def _clear_relics_records(self):
+        """清空遗物列表"""
+        while self.relics_layout.count() > 1:  # 保留最后的stretch
+            item = self.relics_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
@@ -693,7 +735,21 @@ class RepoPage(QWidget):
             card_layout.addWidget(affix_label)
 
         # 插入到stretch之前
-        self.qualified_relics_layout.insertWidget(self.qualified_relics_layout.count() - 1, card)
+        self.relics_layout.insertWidget(self.relics_layout.count() - 1, card)
+
+        # 保存到对应的持久化列表
+        cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
+        relic_record = {
+            "timestamp": datetime.now().isoformat(),
+            "index": relic_info["index"],
+            "state": relic_info["state"],
+            "affixes": relic_info["affixes"]
+        }
+
+        if cleaning_mode == "sell":
+            self.sold_relics.append(relic_record)
+        else:
+            self.favorited_relics.append(relic_record)
 
     def _load_settings(self) -> dict:
         """加载设置"""
@@ -712,6 +768,111 @@ class RepoPage(QWidget):
                 "allow_operate_favorited": False,
                 "require_double_valid": True
             }
+
+    def _load_sold_relics(self) -> list:
+        """从文件加载售出遗物"""
+        if os.path.exists(SOLD_RELICS_FILE):
+            try:
+                with open(SOLD_RELICS_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"加载售出遗物失败: {e}")
+                return []
+        return []
+
+    def _load_favorited_relics(self) -> list:
+        """从文件加载收藏遗物"""
+        if os.path.exists(FAVORITED_RELICS_FILE):
+            try:
+                with open(FAVORITED_RELICS_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"加载收藏遗物失败: {e}")
+                return []
+        return []
+
+    def _save_sold_relics(self):
+        """保存售出遗物到文件"""
+        try:
+            os.makedirs(os.path.dirname(SOLD_RELICS_FILE), exist_ok=True)
+            with open(SOLD_RELICS_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.sold_relics, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存售出遗物失败: {e}")
+
+    def _save_favorited_relics(self):
+        """保存收藏遗物到文件"""
+        try:
+            os.makedirs(os.path.dirname(FAVORITED_RELICS_FILE), exist_ok=True)
+            with open(FAVORITED_RELICS_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.favorited_relics, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存收藏遗物失败: {e}")
+
+    def _load_relics_ui(self):
+        """加载遗物到UI"""
+        cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
+        relics = self.sold_relics if cleaning_mode == "sell" else self.favorited_relics
+
+        for relic_info in relics:
+            self._add_relic_ui(relic_info)
+
+    def _add_relic_ui(self, relic_info: dict):
+        """添加遗物到UI"""
+        state_names = {
+            "Light": "自由售出",
+            "E": "已装备",
+            "F": "已收藏",
+            "FE": "已装备且收藏",
+            "O": "官方遗物"
+        }
+
+        card = CardWidget()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 6, 8, 6)
+        card_layout.setSpacing(4)
+
+        # 标题
+        state_name = state_names.get(relic_info.get("state", ""), relic_info.get("state", ""))
+        timestamp = relic_info.get("timestamp", "")
+        title = QLabel(f"#{relic_info['index']} - {state_name}")
+        title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #4CAF50;")
+        card_layout.addWidget(title)
+
+        # 时间戳
+        if timestamp:
+            time_label = QLabel(timestamp)
+            time_label.setFont(QFont("Segoe UI", 8))
+            time_label.setStyleSheet("color: gray;")
+            card_layout.addWidget(time_label)
+
+        # 词条列表
+        for affix in relic_info.get("affixes", []):
+            affix_type = "正面" if affix["is_positive"] else "负面"
+            color = "#4CAF50" if affix["is_positive"] else "#FF5722"
+            affix_label = QLabel(f"[{affix_type}] {affix['cleaned_text']}")
+            affix_label.setFont(QFont("Segoe UI", 9))
+            affix_label.setStyleSheet(f"color: {color};")
+            affix_label.setWordWrap(True)
+            card_layout.addWidget(affix_label)
+
+        # 插入到stretch之前
+        self.relics_layout.insertWidget(self.relics_layout.count() - 1, card)
+
+    def _update_relics_display(self):
+        """更新遗物显示（根据清理模式切换）"""
+        # 清空现有遗物
+        self._clear_relics_records()
+
+        # 更新标题
+        cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
+        if cleaning_mode == "sell":
+            self.relics_group.setTitle("已售出遗物词条（持久化保存）")
+        else:
+            self.relics_group.setTitle("已收藏遗物词条（持久化保存）")
+
+        # 加载对应模式的遗物
+        self._load_relics_ui()
 
     def set_ocr_engine(self, engine):
         """设置 OCR 引擎（异步加载完成后调用）"""

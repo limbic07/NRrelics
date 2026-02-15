@@ -20,8 +20,8 @@ RELIC_STATE_DARK_O = "O"
 class RelicDetector:
     """遗物状态检测器"""
 
-    def __init__(self, icon_cup_path: str = "icon_cup.png",
-                 icon_bookmark_path: str = "icon_bookmark.png"):
+    def __init__(self, icon_cup_path: str = "data/icon_cup.png",
+                 icon_bookmark_path: str = "data/icon_bookmark.png"):
         """
         初始化遗物检测器
 

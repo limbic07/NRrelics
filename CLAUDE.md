@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-NRrelic Bot v2 is a PySide6-based GUI application for automating relic management in Elden Ring：NIGHTREIGN. It uses OCR (CnOcr) to recognize relic affixes, fuzzy matching (rapidfuzz) to correct OCR errors, and template matching to detect relic states. The core workflow: capture game window → detect relic state → OCR affixes → match against presets → execute actions (sell/favorite).
+NRrelic Bot v2 is a PySide6-based GUI application for automating relic management in Elden Ring：NIGHTREIGN. It uses OCR (CnOcr) to recognize relic affixes, fuzzy matching (rapidfuzz) to correct OCR errors, and template matching to detect relic states.
+
+**Core Features:**
+1. **Repository Cleaning**: Capture game window → detect relic state → OCR affixes → match against presets → execute actions (sell/favorite)
+2. **Shop Filtering**: Auto-enter merchant → purchase relics (10-pull) → OCR affixes → match presets → keep qualified/sell unqualified
 
 ## Development Commands
 
@@ -36,6 +40,7 @@ NRrelics/
 ├── core/                  # Core functionality modules
 │   ├── ocr_engine.py     # OCR recognition engine
 │   ├── repo_cleaner.py   # Repository cleaning logic
+│   ├── shop_automation.py # Shop purchasing automation
 │   ├── relic_detector.py # Relic state detection
 │   ├── preset_manager.py # Preset management
 │   └── automation.py     # Game window automation
@@ -51,7 +56,9 @@ NRrelics/
 │   ├── deepnight_neg.txt # Deepnight negative vocabulary
 │   ├── presets.json      # User presets
 │   ├── settings.json     # Application settings
+│   ├── shop_qualified_relics.json # Shop qualified relics (persistent)
 │   ├── tpl_*.png         # Template images for detection
+│   ├── template_relic.jpg # Relic icon template for shop
 │   └── icon_*.png        # Application icons
 ├── scripts/               # Standalone test/utility scripts
 │   ├── cnocr_test.py     # OCR testing
@@ -144,6 +151,31 @@ NRrelics/
 - `detect_relic_count()`: OCR-based auto-detection of filtered relic count
 - `refresh_window_info()`: Refreshes window position (not resolution) before filtering
 
+**ShopAutomation** (`shop_automation.py`)
+- Handles merchant interface navigation and relic purchasing
+- **ROI scaling**: Same base resolution 1920x1080 as RepositoryFilter
+- Key regions (base coordinates):
+  - MERCHANT_NAME_REGION: (135, 40, 330, 80) - detect "小壶商人巴萨"
+  - RELIC_ICON_REGION: (95, 845, 185, 930) - template matching for relic icon
+  - AFFIX_REGION: (1105, 800, 1805, 1000) - same as repo cleaning
+  - MERCHANT_MENU_COORD: (170, 590) - click to enter merchant from main menu
+- Purchase coordinates (mode-specific):
+  - New Normal: (145, 890)
+  - Old Normal: (260, 890)
+  - New Deepnight: (375, 890)
+  - Old Deepnight: (490, 890)
+- `start_shopping()`: Main purchasing loop
+  1. Enter merchant interface (detect or navigate from main menu)
+  2. Scroll to find relic icon (template matching with scaled template)
+  3. Click purchase based on mode/version
+  4. Process 10 purchased relics (OCR → match → keep/sell)
+  5. Close interface and repeat until currency limit
+- `_match_relic_template()`: Template matching with resolution scaling
+  - **Critical**: Template image must be scaled to current game resolution
+  - Uses cv2.matchTemplate with threshold 0.7
+- Matching logic: Same as RepoCleaner (shares PresetManager)
+- Qualified relics are persisted to `data/shop_qualified_relics.json`
+
 ### UI Structure (`ui/`)
 
 **MainWindow** (`main_window.py`)
@@ -162,6 +194,21 @@ NRrelics/
   - When enabled: calls `RepositoryFilter.detect_relic_count()` after filtering
   - When disabled: uses manual input value (1-2000)
 - CleaningThread: runs RepoCleaner.start_cleaning() in background, emits log_signal and qualified_relic_signal
+
+**PageShop** (`pages/page_shop.py`)
+- Shop filtering interface (similar structure to PageRepo)
+- Left panel: preset cards (shared with repo cleaning via PresetManager)
+- Right panel: TabWidget with log + dashboard
+- Toolbar settings:
+  - Mode: Normal or Deepnight
+  - Version: New or Old
+  - Stop Currency: manual input (0-999999), default 0
+- Dashboard shows: total_purchased, qualified, unqualified, sold
+- **Qualified relics persistence**: Saved to `data/shop_qualified_relics.json`
+  - Loaded on app startup
+  - Updated in real-time during shopping
+  - Clear button to reset records
+- ShopThread: runs ShopAutomation.start_shopping() in background, emits log_signal, qualified_relic_signal, and stats_signal
 
 **PageSettings** (`pages/page_settings.py`)
 - Auto-save on change (no save button)
@@ -212,6 +259,34 @@ Auto-stop: press '3' then 'f' to sell (if pending_sell_count > 0)
 Manual-stop: warn user to manually sell
 ```
 
+**Shop Filtering Flow:**
+```
+User clicks "Start" in PageShop
+  ↓
+ShopThread.run()
+  ↓
+ShopAutomation.start_shopping()
+  ↓
+1. Enter merchant interface:
+   a. OCR MERCHANT_NAME_REGION for "小壶商人巴萨"
+   b. If not found: press 'm' → click MERCHANT_MENU_COORD
+  ↓
+2. Loop until currency limit:
+   a. Scroll up to find relic (template match RELIC_ICON_REGION)
+   b. Click purchase coordinate based on mode/version
+   c. Press 'f' to confirm purchase (10-pull)
+   d. Process 10 relics:
+      - Capture AFFIX_REGION → OCR affixes
+      - Match against presets (same logic as repo cleaning)
+      - If qualified: keep, add to qualified_relics list
+      - If unqualified: press 'f' to sell
+      - Press 'right' to next relic
+   e. Press 'q' to close purchase interface
+   f. Repeat from step 2a
+  ↓
+Save qualified relics to data/shop_qualified_relics.json
+```
+
 ### Critical Implementation Details
 
 **ROI Scaling**
@@ -228,6 +303,14 @@ Manual-stop: warn user to manually sell
   - This ensures correct positioning when game window is not at screen origin (0, 0)
   - Window position is detected dynamically, but resolution is from manual setting
 - Never use full window for OCR - always use AFFIX_REGION for affix recognition
+
+**Template Matching (Shop Automation)**
+- Template images (e.g., `data/template_relic.jpg`) must be scaled to current game resolution
+- Scaling formula: `cv2.resize(template, None, fx=scale_x, fy=scale_y)`
+  - scale_x and scale_y are calculated same as ROI scaling
+- Template matching uses `cv2.matchTemplate()` with `TM_CCOEFF_NORMED` method
+- Default threshold: 0.7 (can be adjusted based on accuracy needs)
+- **Critical**: Always scale template before matching, never match at base resolution
 
 **Vocabulary Loading**
 - Vocabulary files use format: `行号→词条内容`
