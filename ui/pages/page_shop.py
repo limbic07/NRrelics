@@ -192,9 +192,9 @@ class PageShop(QWidget):
         self.currency_input.setText("0")
         self.currency_input.setFixedWidth(120)
         self.currency_input.setFixedHeight(33)
-        validator = QIntValidator(0, 999999, self)
+        validator = QIntValidator(0, 2147483647, self)  # 使用int最大值
         self.currency_input.setValidator(validator)
-        self.currency_input.setPlaceholderText("0-999999")
+        self.currency_input.setPlaceholderText("输入暗痕数量")
         layout.addWidget(self.currency_input)
 
         layout.addStretch()

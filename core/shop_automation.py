@@ -6,7 +6,12 @@
 import time
 import cv2
 import numpy as np
+import pydirectinput
+import pyautogui
 from datetime import datetime
+from typing import Optional
+
+from core.preset_manager import PresetManager
 
 
 class ShopAutomation:
@@ -19,8 +24,8 @@ class ShopAutomation:
     # 商人名称检测区域
     MERCHANT_NAME_REGION = (135, 40, 330, 80)
 
-    # 遗物图标检测区域
-    RELIC_ICON_REGION = (95, 845, 185, 930)
+    # 遗物图标检测区域（需要比模板大，留出匹配余量）
+    RELIC_ICON_REGION = (90, 840, 190, 940)
 
     # 遗物购买坐标（基于模式）
     RELIC_PURCHASE_COORDS = {
@@ -30,11 +35,31 @@ class ShopAutomation:
         ("old", "deepnight"): (490, 890)
     }
 
-    # 词条识别区域（与仓库清理相同）
-    AFFIX_REGION = (1105, 800, 1805, 1000)
-
     # 商人界面入口坐标
     MERCHANT_MENU_COORD = (170, 590)
+
+    # 模板匹配阈值
+    TEMPLATE_MATCH_THRESHOLD = 0.7
+
+    # 暗痕（货币）检测区域（基于1080p）
+    CURRENCY_REGION = (480, 100, 595, 135)
+
+    # 商店界面词条ROI（6行单行识别，基于1080p）
+    SHOP_LINE_ROI_X_START = 666
+    SHOP_LINE_ROI_X_END = 1300
+    SHOP_LINE_ROI_COORDS = [
+        # 第一组
+        (612, 634),   # 第 1 行
+        (634, 658),   # 第 2 行
+
+        # 第二组
+        (676, 700),   # 第 3 行
+        (700, 722),   # 第 4 行
+
+        # 第三组
+        (740, 764),   # 第 5 行
+        (764, 786),   # 第 6 行
+    ]
 
     def __init__(self, ocr_engine, preset_manager, repo_filter, settings: dict):
         """
@@ -43,7 +68,7 @@ class ShopAutomation:
         Args:
             ocr_engine: OCR引擎实例
             preset_manager: 预设管理器实例
-            repo_filter: 仓库过滤器实例（用于窗口捕获和坐标缩放）
+            repo_filter: RepositoryFilter实例（用于窗口捕获和坐标缩放）
             settings: 设置字典
         """
         self.ocr_engine = ocr_engine
@@ -67,8 +92,11 @@ class ShopAutomation:
 
         # 加载遗物模板
         self.relic_template = cv2.imread("data/template_relic.jpg")
-        if self.relic_template is None:
-            raise FileNotFoundError("遗物模板图片不存在: data/template_relic.jpg")
+        if self.relic_template is not None:
+            self.relic_template_gray = cv2.cvtColor(self.relic_template, cv2.COLOR_BGR2GRAY)
+        else:
+            self.relic_template_gray = None
+            print("[警告] 遗物模板图片不存在: data/template_relic.jpg")
 
     def start_shopping(self, mode: str, version: str, stop_currency: int,
                       require_double: bool, log_callback=None, stats_callback=None):
@@ -78,47 +106,83 @@ class ShopAutomation:
         Args:
             mode: 模式 ("normal" 或 "deepnight")
             version: 版本 ("new" 或 "old")
-            stop_currency: 停止购买的暗痕数量
+            stop_currency: 停止购买次数
             require_double: 是否需要双有效（True=双有效，False=三有效）
             log_callback: 日志回调函数
             stats_callback: 统计回调函数
         """
         self.is_running = True
+        self.stats = {"total_purchased": 0, "qualified": 0, "unqualified": 0, "sold": 0}
         self.qualified_relics.clear()
 
+        def log(message, level="INFO"):
+            if log_callback:
+                log_callback(message, level)
+            else:
+                print(f"[{level}] {message}")
+
         try:
+            # 刷新窗口信息
+            self.repo_filter.refresh_window_info()
+
+            # 加载预设
+            general_preset, dedicated_presets, blacklist_preset = self._load_presets(mode)
+
+            # 等待3秒，给用户时间切换到游戏界面
+            log("等待3秒，请切换到游戏商人界面...", "INFO")
+            for _ in range(30):
+                if not self.is_running:
+                    return
+                time.sleep(0.1)
+
             # 1. 检测并进入商人界面
-            if not self._enter_merchant_interface(log_callback):
-                if log_callback:
-                    log_callback("无法进入商人界面", "ERROR")
+            if not self._enter_merchant_interface(log):
                 return
 
-            # 2. 循环购买
+            # 2. 首次寻找遗物
+            if not self._find_relic(log):
+                log("首次寻找遗物失败", "ERROR")
+                return
+
+            # 3. 循环购买
+            first_purchase = True
             while self.is_running:
-                # 检查暗痕数量（TODO: 实现暗痕检测）
-                # 暂时使用购买次数作为停止条件
+                # 检查停止条件
                 if stop_currency > 0 and self.stats["total_purchased"] >= stop_currency:
-                    if log_callback:
-                        log_callback(f"已达到停止条件（购买{self.stats['total_purchased']}次）", "INFO")
+                    log(f"已达到停止条件（购买{self.stats['total_purchased']}次）", "SUCCESS")
                     break
 
-                # 3. 寻找并购买遗物
-                if not self._find_and_purchase_relic(mode, version, log_callback):
-                    if log_callback:
-                        log_callback("未找到遗物或购买失败", "ERROR")
-                    break
+                # 检测暗痕数量
+                current_currency = self._detect_currency(log)
+                if current_currency >= 0 and stop_currency > 0:
+                    if current_currency < stop_currency:
+                        log(f"暗痕不足（当前{current_currency} < 停止值{stop_currency}），停止购买", "WARNING")
+                        break
 
-                # 4. 处理购买的遗物（10个）
-                self._process_purchased_relics(mode, require_double, log_callback, stats_callback)
+                # 4. 执行购买
+                if first_purchase:
+                    # 首次购买：点击遗物坐标
+                    if not self._execute_first_purchase(mode, version, log):
+                        break
+                    first_purchase = False
+                else:
+                    # 后续购买：直接按F购买
+                    if not self._execute_subsequent_purchase(log):
+                        break
 
-                # 5. 关闭购买界面，准备下一轮
-                self._close_purchase_interface(log_callback)
+                # 5. 处理购买的10个遗物
+                self._process_purchased_relics(
+                    mode, require_double, general_preset, dedicated_presets,
+                    blacklist_preset, log, stats_callback
+                )
 
+                # 6. 确认操作（按f）
+                pydirectinput.press('f')
                 time.sleep(0.5)
+                log("已确认操作", "INFO")
 
         except Exception as e:
-            if log_callback:
-                log_callback(f"购买过程出错: {e}", "ERROR")
+            log(f"购买过程出错: {e}", "ERROR")
         finally:
             self.is_running = False
 
@@ -126,305 +190,321 @@ class ShopAutomation:
         """停止购买"""
         self.is_running = False
 
-    def _enter_merchant_interface(self, log_callback=None) -> bool:
-        """
-        检测并进入商人界面
+    def _load_presets(self, mode: str):
+        """加载预设"""
+        general_preset = self.preset_manager.get_general_preset(mode)
+        dedicated_presets = self.preset_manager.get_dedicated_presets(mode)
+        blacklist_preset = None
+        if mode == "deepnight":
+            blacklist_preset = self.preset_manager.get_blacklist_preset()
+        return general_preset, dedicated_presets, blacklist_preset
 
-        Returns:
-            bool: 是否成功进入
-        """
-        # 捕获游戏窗口
-        full_image = self.repo_filter.capture_game_window()
-        if full_image is None:
-            if log_callback:
-                log_callback("无法捕获游戏窗口", "ERROR")
+    def _get_window_offset(self):
+        """获取游戏窗口客户区的屏幕坐标偏移"""
+        client_rect = self.repo_filter._get_client_rect_screen_coords()
+        if client_rect:
+            return client_rect[0], client_rect[1]
+        return 0, 0
+
+    def _click_scaled_coord(self, base_coord):
+        """点击缩放后的坐标（自动加上窗口偏移）"""
+        x = int(base_coord[0] * self.repo_filter.scale_x)
+        y = int(base_coord[1] * self.repo_filter.scale_y)
+        offset_x, offset_y = self._get_window_offset()
+        screen_x = offset_x + x
+        screen_y = offset_y + y
+        pyautogui.moveTo(screen_x, screen_y)
+        time.sleep(0.1)
+        pyautogui.click()
+
+    def _enter_merchant_interface(self, log) -> bool:
+        """检测并进入商人界面"""
+        # 截图检测商人名称
+        image = self.repo_filter._capture_game_window()
+        if image is None:
+            log("无法捕获游戏窗口", "ERROR")
             return False
 
-        # 检测商人名称
+        # OCR识别商人名称区域
         merchant_region = self.repo_filter._capture_region(self.MERCHANT_NAME_REGION)
-        if merchant_region is None:
-            if log_callback:
-                log_callback("无法捕获商人名称区域", "ERROR")
-            return False
-
-        # OCR识别
-        result = self.ocr_engine.ocr.ocr(merchant_region, cls=False)
-        if result and result[0]:
-            text = "".join([line[1][0] for line in result[0]])
-            if "小壶商人巴萨" in text:
-                if log_callback:
-                    log_callback("已在商人界面", "INFO")
+        result = self.ocr_engine.recognize_raw(merchant_region)
+        if result["success"] and result["entries"]:
+            text = "".join(result["entries"])
+            if "小壶商人巴萨" in text or "商人" in text:
+                log("已在商人界面", "INFO")
                 return True
 
         # 不在商人界面，尝试进入
-        if log_callback:
-            log_callback("不在商人界面，尝试进入...", "INFO")
-
-        # 按m打开菜单
-        import pydirectinput
+        log("不在商人界面，尝试进入...", "INFO")
         pydirectinput.press('m')
         time.sleep(0.5)
 
-        # 点击商人入口
-        scaled_coord = self._scale_coord(self.MERCHANT_MENU_COORD)
-        window = self.repo_filter.window
-        if window:
-            click_x = window.left + scaled_coord[0]
-            click_y = window.top + scaled_coord[1]
-            import pyautogui
-            pyautogui.click(click_x, click_y)
-            time.sleep(1.0)
+        self._click_scaled_coord(self.MERCHANT_MENU_COORD)
+        time.sleep(1.0)
 
-            if log_callback:
-                log_callback("已进入商人界面", "INFO")
-            return True
+        # 验证是否进入
+        merchant_region = self.repo_filter._capture_region(self.MERCHANT_NAME_REGION)
+        result = self.ocr_engine.recognize_raw(merchant_region)
+        if result["success"] and result["entries"]:
+            text = "".join(result["entries"])
+            if "小壶商人巴萨" in text or "商人" in text:
+                log("已进入商人界面", "INFO")
+                return True
 
+        log("无法进入商人界面", "ERROR")
         return False
 
-    def _find_and_purchase_relic(self, mode: str, version: str, log_callback=None) -> bool:
+    def _detect_currency(self, log) -> int:
         """
-        寻找并购买遗物
-
-        Args:
-            mode: 模式
-            version: 版本
-            log_callback: 日志回调
+        检测当前暗痕数量
 
         Returns:
-            bool: 是否成功购买
+            暗痕数量，识别失败返回-1
         """
-        import pydirectinput
-        import pyautogui
+        currency_region = self.repo_filter._capture_region(self.CURRENCY_REGION)
+        if currency_region is None:
+            log("无法捕获暗痕区域", "WARNING")
+            return -1
 
-        # 滚动查找遗物
+        result = self.ocr_engine.recognize_raw(currency_region)
+        if not result["success"] or not result["entries"]:
+            log("暗痕识别失败", "WARNING")
+            return -1
+
+        # 提取数字
+        text = "".join(result["entries"])
+        # 移除非数字字符
+        digits = "".join(c for c in text if c.isdigit())
+
+        if not digits:
+            log(f"暗痕文本无数字: {text}", "WARNING")
+            return -1
+
+        try:
+            currency = int(digits)
+            log(f"当前暗痕: {currency}", "INFO")
+            return currency
+        except ValueError:
+            log(f"暗痕转换失败: {digits}", "WARNING")
+            return -1
+
+    def _capture_shop_line_rois(self) -> list:
+        """
+        截取商店界面6行单行ROI区域（用于单行OCR识别）
+
+        Returns:
+            6个单行图像的列表，每个图像是numpy数组
+        """
+        window_image = self.repo_filter._capture_game_window()
+        if window_image is None:
+            return [np.zeros((100, 100, 3), dtype=np.uint8) for _ in self.SHOP_LINE_ROI_COORDS]
+
+        line_images = []
+        for y_start, y_end in self.SHOP_LINE_ROI_COORDS:
+            region = (self.SHOP_LINE_ROI_X_START, y_start, self.SHOP_LINE_ROI_X_END, y_end)
+            x1, y1, x2, y2 = self.repo_filter._scale_region(region)
+            line_images.append(window_image[y1:y2, x1:x2])
+
+        return line_images
+
+    def _find_relic(self, log) -> bool:
+        """滚动寻找遗物"""
         max_scroll_attempts = 20
         for i in range(max_scroll_attempts):
             if not self.is_running:
                 return False
 
-            # 按上方向键滚动
             pydirectinput.press('up')
             time.sleep(0.2)
 
-            # 捕获遗物图标区域
+            # 捕获遗物图标区域并模板匹配
             relic_icon_region = self.repo_filter._capture_region(self.RELIC_ICON_REGION)
-            if relic_icon_region is None:
-                continue
+            if relic_icon_region is not None and self._match_relic_template(relic_icon_region):
+                log(f"找到遗物（滚动{i+1}次）", "INFO")
+                return True
 
-            # 模板匹配
-            if self._match_relic_template(relic_icon_region):
-                if log_callback:
-                    log_callback(f"找到遗物（滚动{i+1}次）", "INFO")
-
-                # 点击购买
-                purchase_coord = self.RELIC_PURCHASE_COORDS.get((version, mode))
-                if purchase_coord:
-                    scaled_coord = self._scale_coord(purchase_coord)
-                    window = self.repo_filter.window
-                    if window:
-                        click_x = window.left + scaled_coord[0]
-                        click_y = window.top + scaled_coord[1]
-                        pyautogui.click(click_x, click_y)
-                        time.sleep(0.5)
-
-                        # 确认购买（假设需要按f确认）
-                        pydirectinput.press('f')
-                        time.sleep(1.0)
-
-                        self.stats["total_purchased"] += 10  # 十连购买
-                        if log_callback:
-                            log_callback(f"购买成功（十连），总购买: {self.stats['total_purchased']}", "INFO")
-                        return True
-
-        if log_callback:
-            log_callback("未找到遗物", "WARNING")
+        log("未找到遗物", "WARNING")
         return False
 
+    def _execute_first_purchase(self, mode: str, version: str, log) -> bool:
+        """首次购买：移动鼠标到遗物位置 → 按F购买 → F2切换十连 → F确认 → F跳过动画"""
+        purchase_coord = self.RELIC_PURCHASE_COORDS.get((version, mode))
+        if purchase_coord is None:
+            log(f"未找到购买坐标: version={version}, mode={mode}", "ERROR")
+            return False
+
+        # 移动鼠标到遗物位置
+        x = int(purchase_coord[0] * self.repo_filter.scale_x)
+        y = int(purchase_coord[1] * self.repo_filter.scale_y)
+        offset_x, offset_y = self._get_window_offset()
+        screen_x = offset_x + x
+        screen_y = offset_y + y
+        pyautogui.moveTo(screen_x, screen_y)
+        time.sleep(0.1)
+
+        # 按F购买
+        pydirectinput.press('f')
+        time.sleep(0.3)  # 等待购买界面打开
+        pydirectinput.press('f2')
+        pydirectinput.press('f')
+        pydirectinput.press('f')
+
+        self.stats["total_purchased"] += 10
+        log(f"十连购买成功，总购买: {self.stats['total_purchased']}", "INFO")
+        return True
+
+    def _execute_subsequent_purchase(self, log) -> bool:
+        """后续购买：直接按F购买 → F2切换十连 → F确认 → F跳过动画"""
+        pydirectinput.press('f')
+        time.sleep(0.3)  # 等待购买界面打开
+        pydirectinput.press('f2')
+        pydirectinput.press('f')
+        pydirectinput.press('f')
+
+        self.stats["total_purchased"] += 10
+        log(f"十连购买成功，总购买: {self.stats['total_purchased']}", "INFO")
+        return True
+
     def _match_relic_template(self, region_image) -> bool:
-        """
-        模板匹配检测遗物图标
+        """模板匹配检测遗物图标"""
+        if self.relic_template_gray is None or region_image is None or region_image.size == 0:
+            print(f"[模板匹配] 模板或区域为空")
+            return False
 
-        Args:
-            region_image: 区域图像
-
-        Returns:
-            bool: 是否匹配
-        """
-        # 缩放模板到当前分辨率
-        game_resolution = self.settings.get("game_resolution", [1920, 1080])
-        scale_x = game_resolution[0] / self.BASE_WIDTH
-        scale_y = game_resolution[1] / self.BASE_HEIGHT
-
+        # 使用 repo_filter 的缩放因子
         scaled_template = cv2.resize(
-            self.relic_template,
-            None,
-            fx=scale_x,
-            fy=scale_y,
+            self.relic_template_gray, None,
+            fx=self.repo_filter.scale_x,
+            fy=self.repo_filter.scale_y,
             interpolation=cv2.INTER_LINEAR
         )
 
-        # 模板匹配
-        result = cv2.matchTemplate(region_image, scaled_template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+        print(f"[模板匹配] 模板原始尺寸: {self.relic_template_gray.shape}, 缩放后: {scaled_template.shape}, 区域尺寸: {region_image.shape}, 缩放因子: ({self.repo_filter.scale_x:.4f}, {self.repo_filter.scale_y:.4f})")
 
-        # 匹配阈值
-        threshold = 0.7
-        return max_val >= threshold
+        # 检查模板尺寸是否合法
+        if (scaled_template.shape[0] > region_image.shape[0] or
+            scaled_template.shape[1] > region_image.shape[1]):
+            print(f"[模板匹配] 模板尺寸大于区域，跳过")
+            return False
 
-    def _process_purchased_relics(self, mode: str, require_double: bool,
-                                  log_callback=None, stats_callback=None):
-        """
-        处理购买的遗物（10个）
+        # 转灰度匹配
+        if len(region_image.shape) == 3:
+            region_gray = cv2.cvtColor(region_image, cv2.COLOR_BGR2GRAY)
+        else:
+            region_gray = region_image
 
-        Args:
-            mode: 模式
-            require_double: 是否双有效
-            log_callback: 日志回调
-            stats_callback: 统计回调
-        """
-        import pydirectinput
+        result = cv2.matchTemplate(region_gray, scaled_template, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, _ = cv2.minMaxLoc(result)
 
-        # 处理10个遗物
+        print(f"[模板匹配] 匹配度: {max_val:.4f}, 阈值: {self.TEMPLATE_MATCH_THRESHOLD}")
+
+        # 保存调试图像（仅第一次）
+        cv2.imwrite("debug_shop_region.png", region_image)
+        cv2.imwrite("debug_shop_template_scaled.png", scaled_template)
+
+        return max_val >= self.TEMPLATE_MATCH_THRESHOLD
+
+    def _process_purchased_relics(self, mode, require_double, general_preset,
+                                   dedicated_presets, blacklist_preset, log, stats_callback):
+        """处理购买的10个遗物（参考仓库清理流程）"""
         for i in range(10):
             if not self.is_running:
                 break
 
-            if log_callback:
-                log_callback(f"处理第 {i+1}/10 个遗物", "INFO")
+            log(f"处理第 {i+1}/10 个遗物", "INFO")
 
-            # 1. OCR识别词条
-            affix_image = self.repo_filter._capture_region(self.AFFIX_REGION)
-            if affix_image is None:
-                if log_callback:
-                    log_callback("无法捕获词条区域", "ERROR")
+            # 1. OCR识别（使用商店界面专用的6行单行ROI）
+            line_images = self._capture_shop_line_rois()
+            ocr_result = self.ocr_engine.recognize_with_classification_from_lines(line_images, mode)
+
+            if not ocr_result["success"]:
+                log("OCR识别失败，跳过", "ERROR")
                 pydirectinput.press('right')
-                time.sleep(0.3)
                 continue
 
-            # 识别词条
-            affixes = self.ocr_engine.recognize_with_classification(affix_image, mode)
-            if not affixes:
-                if log_callback:
-                    log_callback("OCR识别失败", "ERROR")
-                pydirectinput.press('right')
-                time.sleep(0.3)
-                continue
+            # 输出词条信息
+            for affix in ocr_result["affixes"]:
+                affix_type = "正面" if affix["is_positive"] else "负面"
+                log(f"  [{affix_type}] {affix['cleaned_text']}", "INFO")
 
-            # 2. 匹配预设
-            is_qualified = self._match_affixes(affixes, mode, require_double, log_callback)
+            # 2. 词条匹配（与仓库清理逻辑一致）
+            is_qualified = self._match_affixes(
+                ocr_result, general_preset, dedicated_presets,
+                blacklist_preset, require_double
+            )
 
             # 3. 执行操作
             if is_qualified:
                 self.stats["qualified"] += 1
-                # 保留合格遗物
+                log(f"合格遗物，保留", "SUCCESS")
+
+                # 记录合格遗物
                 relic_info = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "affixes": [{"text": a["text"], "is_positive": a["is_positive"]} for a in affixes]
+                    "index": self.stats["total_purchased"] - 10 + i + 1,
+                    "affixes": ocr_result["affixes"]
                 }
                 self.qualified_relics.append(relic_info)
 
-                if log_callback:
-                    affix_texts = [a["text"] for a in affixes]
-                    log_callback(f"合格遗物: {', '.join(affix_texts)}", "SUCCESS")
+                # 按右方向键跳过（保留）
+                pydirectinput.press('right')
             else:
                 self.stats["unqualified"] += 1
-                # 出售不合格遗物
-                pydirectinput.press('f')
-                time.sleep(0.2)
                 self.stats["sold"] += 1
+                log(f"不合格遗物，出售", "INFO")
 
-                if log_callback:
-                    affix_texts = [a["text"] for a in affixes]
-                    log_callback(f"不合格遗物已售出: {', '.join(affix_texts)}", "INFO")
+                # 按3出售
+                pydirectinput.press('3')
 
             # 更新统计
             if stats_callback:
                 stats_callback(self.stats.copy())
 
-            # 移动到下一个遗物
-            pydirectinput.press('right')
-            time.sleep(0.3)
-
-    def _match_affixes(self, affixes: list, mode: str, require_double: bool, log_callback=None) -> bool:
+    def _match_affixes(self, ocr_result, general_preset, dedicated_presets,
+                       blacklist_preset, require_double) -> bool:
         """
-        匹配词条（与仓库清理逻辑相同）
-
-        Args:
-            affixes: 词条列表
-            mode: 模式
-            require_double: 是否双有效
-            log_callback: 日志回调
-
-        Returns:
-            bool: 是否合格
+        词条匹配（与仓库清理逻辑一致）
         """
+        pos_affixes = [a for a in ocr_result["affixes"] if a["is_positive"]]
+        neg_affixes = [a for a in ocr_result["affixes"] if not a["is_positive"]]
+
         # 单个正面词条 → 不合格
-        positive_affixes = [a for a in affixes if a.get("is_positive", True)]
-        if len(positive_affixes) == 1:
+        if len(pos_affixes) <= 1:
             return False
 
-        # 深夜模式：黑名单检查
-        if mode == "deepnight":
-            blacklist = self.preset_manager.get_blacklist_preset()
-            if blacklist and blacklist.get("is_active", True):
-                blacklist_affixes = set(blacklist.get("affixes", []))
-                for affix in affixes:
-                    if affix["text"] in blacklist_affixes:
-                        return False
+        # 黑名单匹配（深夜模式）
+        if blacklist_preset and blacklist_preset.get("is_active", True):
+            blacklist_set = set(blacklist_preset.get("affixes", []))
+            for neg in neg_affixes:
+                if neg["cleaned_text"] in blacklist_set:
+                    return False
 
         # 白名单匹配
-        general_preset = self.preset_manager.get_general_preset(mode)
-        dedicated_presets = self.preset_manager.get_dedicated_presets(mode)
+        required_matches = 2 if require_double else 3
 
-        # 通用预设词条
-        general_affixes = set(general_preset.get("affixes", [])) if general_preset and general_preset.get("is_active", True) else set()
+        general_vocabs = set()
+        if general_preset and general_preset.get("is_active", True):
+            general_vocabs = set(general_preset.get("affixes", []))
 
-        # 遍历每个专用预设
-        for preset in dedicated_presets.values():
-            if not preset.get("is_active", True):
-                continue
-
-            # 合并通用+专用
-            combined_affixes = general_affixes | set(preset.get("affixes", []))
-
-            # 匹配检查
-            matched_count = sum(1 for a in affixes if a["text"] in combined_affixes)
-
-            # 双有效：至少2个匹配，三有效：至少3个匹配
-            required_matches = 2 if require_double else 3
-            if matched_count >= required_matches:
-                return True
+        # 通用 + 每个专用预设
+        if dedicated_presets:
+            for preset in dedicated_presets.values() if isinstance(dedicated_presets, dict) else dedicated_presets:
+                if not preset.get("is_active", True):
+                    continue
+                combined_vocabs = general_vocabs | set(preset.get("affixes", []))
+                count = sum(1 for a in pos_affixes if a["cleaned_text"] in combined_vocabs)
+                if count >= required_matches:
+                    return True
 
         # 只检查通用预设
-        if general_affixes:
-            matched_count = sum(1 for a in affixes if a["text"] in general_affixes)
-            required_matches = 2 if require_double else 3
-            if matched_count >= required_matches:
+        if general_vocabs:
+            count = sum(1 for a in pos_affixes if a["cleaned_text"] in general_vocabs)
+            if count >= required_matches:
                 return True
 
         return False
 
-    def _close_purchase_interface(self, log_callback=None):
+    def _close_purchase_interface(self, log):
         """关闭购买界面"""
-        import pydirectinput
         pydirectinput.press('q')
         time.sleep(0.5)
-
-        if log_callback:
-            log_callback("关闭购买界面", "INFO")
-
-    def _scale_coord(self, coord: tuple) -> tuple:
-        """
-        缩放坐标到当前分辨率
-
-        Args:
-            coord: 基准坐标 (x, y)
-
-        Returns:
-            tuple: 缩放后的坐标
-        """
-        game_resolution = self.settings.get("game_resolution", [1920, 1080])
-        scale_x = game_resolution[0] / self.BASE_WIDTH
-        scale_y = game_resolution[1] / self.BASE_HEIGHT
-
-        return (int(coord[0] * scale_x), int(coord[1] * scale_y))
+        log("关闭购买界面", "INFO")

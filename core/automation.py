@@ -29,8 +29,10 @@ class AutomationController:
 
     @staticmethod
     def click(x: int, y: int, button: str = 'left'):
-        """点击鼠标"""
-        pyautogui.click(x, y, button=button)
+        """点击鼠标（先移动再点击，兼容游戏窗口）"""
+        pyautogui.moveTo(x, y)
+        time.sleep(0.1)
+        pyautogui.click()
 
     @staticmethod
     def screenshot():

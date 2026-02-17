@@ -10,6 +10,7 @@ class LoggerWidget(QTextEdit):
     def __init__(self):
         super().__init__()
         self.setReadOnly(True)
+        self.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)  # 启用自动换行
         self.setStyleSheet("""
             QTextEdit {
                 background-color: #ffffff;
