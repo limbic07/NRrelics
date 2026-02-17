@@ -66,7 +66,7 @@ class PageShop(QWidget):
     """商店筛选页面"""
     settings_changed = Signal()
 
-    def __init__(self, shared_logger=None):
+    def __init__(self, log_manager=None):
         super().__init__()
         self.setObjectName("PageShop")
 
@@ -97,8 +97,8 @@ class PageShop(QWidget):
         # 加载设置
         self.settings = self._load_settings()
 
-        # 共享日志实例
-        self.shared_logger = shared_logger
+        # 日志管理器
+        self.log_manager = log_manager
 
         self._init_ui()
         self._refresh_presets()
@@ -253,11 +253,10 @@ class PageShop(QWidget):
         # TabWidget
         tab_widget = QTabWidget()
 
-        # 日志标签页（使用共享日志或创建新的）
-        if self.shared_logger:
-            self.logger = self.shared_logger
-        else:
-            self.logger = LoggerWidget()
+        # 日志标签页
+        self.logger = LoggerWidget()
+        if self.log_manager:
+            self.log_manager.subscribe(self.logger)
         tab_widget.addTab(self.logger, "日志")
 
         # 仪表盘标签页
@@ -535,6 +534,8 @@ class PageShop(QWidget):
 
         # 清空日志和统计
         self.logger.clear()
+        if self.log_manager:
+            self.log_manager.clear_all()  # 清空所有订阅者的日志
         self.stats = {
             "total_purchased": 0,
             "qualified": 0,
@@ -542,6 +543,13 @@ class PageShop(QWidget):
             "sold": 0
         }
         self._update_stats()
+
+        # 清空合格遗物列表和UI
+        self.qualified_relics.clear()
+        while self.qualified_relics_layout.count() > 1:  # 保留stretch
+            item = self.qualified_relics_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
         # 创建并启动线程
         self.shop_thread = ShopThread(
@@ -551,7 +559,7 @@ class PageShop(QWidget):
             stop_currency,
             require_double
         )
-        self.shop_thread.log_signal.connect(self.logger.log)
+        self.shop_thread.log_signal.connect(self._on_log)
         self.shop_thread.qualified_relic_signal.connect(self._add_qualified_relic)
         self.shop_thread.stats_signal.connect(self._update_stats_from_signal)
         self.shop_thread.finished_signal.connect(self._on_shopping_finished)
@@ -561,19 +569,35 @@ class PageShop(QWidget):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
 
-        self.logger.log("开始购买遗物...", "INFO")
+        if self.log_manager:
+            self.log_manager.log("开始购买遗物...", "INFO")
+        else:
+            self.logger.log("开始购买遗物...", "INFO")
+
+    def _on_log(self, message: str, level: str):
+        """处理日志信号"""
+        if self.log_manager:
+            self.log_manager.log(message, level)
+        else:
+            self.logger.log(message, level)
 
     def _stop_shopping(self):
         """停止购买"""
         if self.shop_automation:
             self.shop_automation.stop()
-            self.logger.log("正在停止购买...", "WARNING")
+            if self.log_manager:
+                self.log_manager.log("正在停止购买...", "WARNING")
+            else:
+                self.logger.log("正在停止购买...", "WARNING")
 
     def _on_shopping_finished(self):
         """购买完成"""
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
-        self.logger.log("购买已完成", "INFO")
+        if self.log_manager:
+            self.log_manager.log("购买已完成", "INFO")
+        else:
+            self.logger.log("购买已完成", "INFO")
 
     def _add_qualified_relic(self, relic_info: dict):
         """添加合格遗物到UI和持久化存储"""

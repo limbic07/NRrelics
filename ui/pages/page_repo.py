@@ -177,7 +177,7 @@ class PresetCard(CardWidget):
 class RepoPage(QWidget):
     """仓库清理页面"""
 
-    def __init__(self, shared_logger=None):
+    def __init__(self, log_manager=None):
         super().__init__()
         self.setObjectName("RepoPage")
 
@@ -196,12 +196,15 @@ class RepoPage(QWidget):
         # 加载设置
         self.settings = self._load_settings()
 
-        # 共享日志实例
-        self.shared_logger = shared_logger
+        # 日志管理器
+        self.log_manager = log_manager
 
         # 加载持久化的售出和收藏遗物
         self.sold_relics = self._load_sold_relics()
         self.favorited_relics = self._load_favorited_relics()
+
+        # 标记是否手动停止
+        self.is_manual_stop = False
 
         self._init_ui()
 
@@ -352,11 +355,10 @@ class RepoPage(QWidget):
         # Tab Widget
         tab_widget = QTabWidget()
 
-        # 日志面板（使用共享日志或创建新的）
-        if self.shared_logger:
-            self.logger = self.shared_logger
-        else:
-            self.logger = LoggerWidget()
+        # 日志面板
+        self.logger = LoggerWidget()
+        if self.log_manager:
+            self.log_manager.subscribe(self.logger)
         tab_widget.addTab(self.logger, "日志")
 
         # 仪表盘
@@ -642,14 +644,25 @@ class RepoPage(QWidget):
         # 重新加载设置（确保使用最新的设置）
         self.settings = self._load_settings()
 
+        # 更新 repo_cleaner 的设置
+        if self.repo_cleaner:
+            self.repo_cleaner.settings = self.settings
+
         # 从设置获取参数
         allow_favorited = self.settings.get("allow_operate_favorited", False)
         require_double = self.settings.get("require_double_valid", True)
 
         # 清空日志和遗物列表
         self.logger.clear()
-        self.logger.log("开始清理...", "INFO")
+        if self.log_manager:
+            self.log_manager.clear_all()  # 清空所有订阅者的日志
+            self.log_manager.log("开始清理...", "INFO")
+        else:
+            self.logger.log("开始清理...", "INFO")
         self._clear_relics_records()
+
+        # 重置手动停止标志
+        self.is_manual_stop = False
 
         # 禁用按钮
         self.start_btn.setEnabled(False)
@@ -659,22 +672,44 @@ class RepoPage(QWidget):
         self.cleaning_thread = CleaningThread(
             self.repo_cleaner, mode, cleaning_mode, max_relics, allow_favorited, require_double
         )
-        self.cleaning_thread.log_signal.connect(self.logger.log)
+        self.cleaning_thread.log_signal.connect(self._on_log)
         self.cleaning_thread.finished_signal.connect(self._on_cleaning_finished)
         self.cleaning_thread.qualified_relic_signal.connect(self._add_qualified_relic)
         self.cleaning_thread.start()
 
+    def _on_log(self, message: str, level: str):
+        """处理日志信号"""
+        if self.log_manager:
+            self.log_manager.log(message, level)
+        else:
+            self.logger.log(message, level)
+
     def _stop_cleaning(self):
         """停止清理"""
         if self.cleaning_thread:
+            self.is_manual_stop = True
             self.repo_cleaner.stop_cleaning()
-            self.logger.log("正在停止清理...", "WARNING")
+            if self.log_manager:
+                self.log_manager.log("正在停止清理...", "WARNING")
+            else:
+                self.logger.log("正在停止清理...", "WARNING")
 
     def _on_cleaning_finished(self):
         """清理完成"""
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
-        self.logger.log("清理已完成", "SUCCESS")
+
+        if self.is_manual_stop:
+            if self.log_manager:
+                self.log_manager.log("清理已停止", "WARNING")
+            else:
+                self.logger.log("清理已停止", "WARNING")
+            self.is_manual_stop = False
+        else:
+            if self.log_manager:
+                self.log_manager.log("清理已完成", "SUCCESS")
+            else:
+                self.logger.log("清理已完成", "SUCCESS")
 
         # 更新统计
         stats = self.repo_cleaner.stats
@@ -701,26 +736,20 @@ class RepoPage(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
+        # 同时清空内存中的遗物列表
+        self.sold_relics.clear()
+        self.favorited_relics.clear()
+
     def _add_qualified_relic(self, relic_info: dict):
         """添加合格遗物到仪表盘"""
-        # 状态名称映射
-        state_names = {
-            "Light": "自由售出",
-            "E": "已装备",
-            "F": "已收藏",
-            "FE": "已装备且收藏",
-            "O": "官方遗物"
-        }
-
         # 创建遗物卡片
         card = CardWidget()
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(8, 6, 8, 6)
         card_layout.setSpacing(4)
 
-        # 标题
-        state_name = state_names.get(relic_info['state'], relic_info['state'])
-        title = QLabel(f"#{relic_info['index']} - {state_name}")
+        # 标题（只显示编号）
+        title = QLabel(f"#{relic_info['index']}")
         title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #4CAF50;")
         card_layout.addWidget(title)
 
@@ -742,7 +771,6 @@ class RepoPage(QWidget):
         relic_record = {
             "timestamp": datetime.now().isoformat(),
             "index": relic_info["index"],
-            "state": relic_info["state"],
             "affixes": relic_info["affixes"]
         }
 
@@ -819,27 +847,18 @@ class RepoPage(QWidget):
 
     def _add_relic_ui(self, relic_info: dict):
         """添加遗物到UI"""
-        state_names = {
-            "Light": "自由售出",
-            "E": "已装备",
-            "F": "已收藏",
-            "FE": "已装备且收藏",
-            "O": "官方遗物"
-        }
-
         card = CardWidget()
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(8, 6, 8, 6)
         card_layout.setSpacing(4)
 
-        # 标题
-        state_name = state_names.get(relic_info.get("state", ""), relic_info.get("state", ""))
-        timestamp = relic_info.get("timestamp", "")
-        title = QLabel(f"#{relic_info['index']} - {state_name}")
+        # 标题（只显示编号）
+        title = QLabel(f"#{relic_info['index']}")
         title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #4CAF50;")
         card_layout.addWidget(title)
 
         # 时间戳
+        timestamp = relic_info.get("timestamp", "")
         if timestamp:
             time_label = QLabel(timestamp)
             time_label.setFont(QFont("Segoe UI", 8))
@@ -867,9 +886,9 @@ class RepoPage(QWidget):
         # 更新标题
         cleaning_mode = "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite"
         if cleaning_mode == "sell":
-            self.relics_group.setTitle("已售出遗物词条（持久化保存）")
+            self.relics_group.setTitle("已售出遗物词条")
         else:
-            self.relics_group.setTitle("已收藏遗物词条（持久化保存）")
+            self.relics_group.setTitle("已收藏遗物词条")
 
         # 加载对应模式的遗物
         self._load_relics_ui()
@@ -896,4 +915,7 @@ class RepoPage(QWidget):
         self.start_btn.setEnabled(True)
         self.start_btn.setText("开始清理")
         # 输出成功日志
-        self.logger.log("OCR 引擎异步加载完成", "SUCCESS")
+        if self.log_manager:
+            self.log_manager.log("OCR 引擎异步加载完成", "SUCCESS")
+        else:
+            self.logger.log("OCR 引擎异步加载完成", "SUCCESS")

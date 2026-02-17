@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 重要说明
+
+**所有回复必须使用中文。** Claude 在与此项目交互时必须始终用中文回答用户的问题和提供建议。
+
 ## Project Overview
 
 NRrelic Bot v2 is a PySide6-based GUI application for automating relic management in Elden Ring：NIGHTREIGN. It uses OCR (CnOcr) to recognize relic affixes, fuzzy matching (rapidfuzz) to correct OCR errors, and template matching to detect relic states.
@@ -125,9 +129,9 @@ NRrelics/
 
 **RepositoryFilter** (`automation.py`)
 - Game window automation using pyautogui/pydirectinput
-- **ROI scaling**: Base resolution 1920x1080, scales to manual game resolution setting
-- Accepts settings dict in __init__ to get game_resolution
-- Window position is detected dynamically, but resolution is from manual setting
+- **ROI scaling**: Base resolution 1920x1080, scales to dynamically detected window client area resolution
+- Resolution is automatically detected from game window client area in `_calculate_scale_factors()`
+- Window position and resolution are both detected dynamically via `refresh_window_info()`
 - Key regions (base coordinates):
   - RITUAL_REGION: (130, 30, 280, 90) - verify in relic interface
   - SELL_REGION: (580, 130, 640, 160) - verify sell mode
@@ -214,10 +218,6 @@ NRrelics/
 - Auto-save on change (no save button)
 - Settings:
   - game_window_title: default "NIGHTREIGN"
-  - game_resolution: [width, height] - manual game resolution setting
-    - Default: detected screen resolution on first launch
-    - Common options: 1920x1080, 2560x1440, 3840x2160, etc.
-    - Used for ROI coordinate scaling calculations
   - allow_operate_favorited: whether to process favorited relics
   - require_double_valid: True=2 affixes match, False=3 affixes match
 - Stored in `data/settings.json`
@@ -291,23 +291,23 @@ Save qualified relics to data/shop_qualified_relics.json
 
 **ROI Scaling**
 - All ROI coordinates are defined at base resolution 1920x1080
-- `_scale_region()` automatically scales coordinates based on manual game resolution setting
+- `_scale_region()` automatically scales coordinates based on dynamically detected window client area resolution
 - **Scaling logic**: Uses separate scale_x and scale_y factors for accurate coordinate mapping
-  - scale_x = game_resolution_width / BASE_WIDTH
-  - scale_y = game_resolution_height / BASE_HEIGHT
-  - Game resolution is manually set in settings (not auto-detected)
-  - Default resolution is set to screen resolution on first launch
+  - scale_x = detected_client_width / BASE_WIDTH
+  - scale_y = detected_client_height / BASE_HEIGHT
+  - Resolution is automatically detected from game window client area (excludes title bar and borders)
+  - Detection happens in `_calculate_scale_factors()` by calling `_get_client_rect_screen_coords()`
   - This ensures correct scaling even when aspect ratio differs from 16:9
 - **Window offset**: For windowed mode, all screen coordinates must add window.left and window.top
   - `_capture_region()`, `_capture_single_region()`, and `click_checkbox()` automatically add offset
   - This ensures correct positioning when game window is not at screen origin (0, 0)
-  - Window position is detected dynamically, but resolution is from manual setting
+  - Window position is detected dynamically via `refresh_window_info()`
 - Never use full window for OCR - always use AFFIX_REGION for affix recognition
 
 **Template Matching (Shop Automation)**
 - Template images (e.g., `data/template_relic.jpg`) must be scaled to current game resolution
 - Scaling formula: `cv2.resize(template, None, fx=scale_x, fy=scale_y)`
-  - scale_x and scale_y are calculated same as ROI scaling
+  - scale_x and scale_y are calculated same as ROI scaling (from detected client area)
 - Template matching uses `cv2.matchTemplate()` with `TM_CCOEFF_NORMED` method
 - Default threshold: 0.7 (can be adjusted based on accuracy needs)
 - **Critical**: Always scale template before matching, never match at base resolution

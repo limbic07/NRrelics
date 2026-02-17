@@ -1,7 +1,7 @@
 """设置页面"""
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QCheckBox, QGroupBox, QPushButton, QFileDialog, QComboBox)
+                               QLineEdit, QCheckBox, QGroupBox, QPushButton, QFileDialog)
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont
 from qfluentwidgets import (CardWidget, SwitchButton, LineEdit,
@@ -72,53 +72,6 @@ class SettingsPage(QWidget):
         window_layout.addWidget(window_label)
         window_layout.addWidget(self.window_title_input)
         card_layout.addLayout(window_layout)
-
-        # 游戏分辨率
-        resolution_layout = QHBoxLayout()
-        resolution_label = QLabel("游戏分辨率:")
-        resolution_label.setFixedWidth(150)
-        self.resolution_combo = QComboBox()
-        self.resolution_combo.setEditable(True)  # 允许手动输入
-
-        # 常见分辨率选项
-        resolutions = [
-            "1920x1080 (Full HD)",
-            "2560x1440 (2K)",
-            "3840x2160 (4K)",
-            "1600x900",
-            "1366x768",
-            "1280x720 (HD)",
-            "1440x900",
-            "1680x1050"
-        ]
-        self.resolution_combo.addItems(resolutions)
-
-        # 设置当前分辨率
-        current_res = self.settings.get("game_resolution", [1920, 1080])
-        current_res_str = f"{current_res[0]}x{current_res[1]}"
-
-        # 检查当前分辨率是否在预设列表中
-        found = False
-        for i, res in enumerate(resolutions):
-            if res.startswith(current_res_str):
-                self.resolution_combo.setCurrentIndex(i)
-                found = True
-                break
-
-        # 如果当前分辨率不在预设列表中，直接设置文本
-        if not found:
-            self.resolution_combo.setCurrentText(current_res_str)
-
-        self.resolution_combo.currentTextChanged.connect(self._auto_save_settings)
-        resolution_layout.addWidget(resolution_label)
-        resolution_layout.addWidget(self.resolution_combo)
-        card_layout.addLayout(resolution_layout)
-
-        # 说明文本
-        resolution_desc = QLabel("设置游戏实际运行的分辨率（用于坐标缩放计算）")
-        resolution_desc.setFont(QFont("Segoe UI", 8))
-        resolution_desc.setStyleSheet("color: gray;")
-        card_layout.addWidget(resolution_desc)
 
         # 预设配置管理
         preset_layout = QHBoxLayout()
@@ -327,18 +280,15 @@ class SettingsPage(QWidget):
     def _load_settings(self) -> dict:
         """加载设置"""
         if not os.path.exists(self.settings_file):
-            # 首次启动，使用默认设置（包含检测到的屏幕分辨率）
-            import pyautogui
-            screen_width, screen_height = pyautogui.size()
+            # 首次启动，使用默认设置
             default_settings = self._default_settings()
-            default_settings["game_resolution"] = [screen_width, screen_height]
 
             # 保存默认设置
             try:
                 os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
                 with open(self.settings_file, 'w', encoding='utf-8') as f:
                     json.dump(default_settings, f, ensure_ascii=False, indent=2)
-                print(f"[信息] 首次启动，检测到屏幕分辨率: {screen_width}x{screen_height}")
+                print(f"[信息] 首次启动，创建默认设置")
             except Exception as e:
                 print(f"[错误] 保存默认设置失败: {e}")
 
@@ -347,15 +297,6 @@ class SettingsPage(QWidget):
         try:
             with open(self.settings_file, 'r', encoding='utf-8') as f:
                 settings = json.load(f)
-                # 如果设置中没有game_resolution，添加默认值
-                if "game_resolution" not in settings:
-                    import pyautogui
-                    screen_width, screen_height = pyautogui.size()
-                    settings["game_resolution"] = [screen_width, screen_height]
-                    # 保存更新后的设置
-                    with open(self.settings_file, 'w', encoding='utf-8') as f:
-                        json.dump(settings, f, ensure_ascii=False, indent=2)
-                    print(f"[信息] 添加游戏分辨率设置: {screen_width}x{screen_height}")
                 return settings
         except Exception as e:
             print(f"[错误] 加载设置失败: {e}")
@@ -366,59 +307,15 @@ class SettingsPage(QWidget):
         return {
             "game_window_title": "NIGHTREIGN",
             "allow_operate_favorited": False,
-            "require_double_valid": True,
-            "game_resolution": [1920, 1080]
+            "require_double_valid": True
         }
 
     def _auto_save_settings(self):
         """自动保存设置"""
-        # 解析分辨率
-        resolution_text = self.resolution_combo.currentText().strip()
-
-        # 提取分辨率数字（支持 "1920x1080" 或 "1920x1080 (Full HD)" 格式）
-        try:
-            # 移除括号及其内容，只保留分辨率部分
-            if '(' in resolution_text:
-                resolution_text = resolution_text.split('(')[0].strip()
-
-            # 分割宽和高
-            parts = resolution_text.lower().split('x')
-            if len(parts) != 2:
-                raise ValueError("分辨率格式错误")
-
-            width = int(parts[0].strip())
-            height = int(parts[1].strip())
-
-            # 验证分辨率范围（最小 640x480，最大 7680x4320）
-            if width < 640 or width > 7680 or height < 480 or height > 4320:
-                raise ValueError("分辨率超出有效范围")
-
-            resolution = [width, height]
-
-        except (ValueError, IndexError) as e:
-            # 格式错误，使用默认值
-            print(f"[警告] 分辨率格式错误: {resolution_text}，使用默认值 1920x1080")
-            resolution = [1920, 1080]
-
-            # 显示错误提示
-            InfoBar.warning(
-                title="分辨率格式错误",
-                content=f"请使用正确的格式（如 1920x1080），已恢复为默认值",
-                orient=Qt.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=3000,
-                parent=self
-            )
-
-            # 恢复显示为默认值
-            self.resolution_combo.setCurrentText("1920x1080 (Full HD)")
-
         self.settings = {
             "game_window_title": self.window_title_input.text(),
             "allow_operate_favorited": self.allow_favorited_switch.isChecked(),
-            "require_double_valid": self.require_double_switch.isChecked(),
-            "game_resolution": resolution
+            "require_double_valid": self.require_double_switch.isChecked()
         }
 
         try:
@@ -434,37 +331,10 @@ class SettingsPage(QWidget):
 
     def _save_settings(self):
         """保存设置"""
-        # 解析分辨率（与 _auto_save_settings 相同的逻辑）
-        resolution_text = self.resolution_combo.currentText().strip()
-
-        try:
-            # 移除括号及其内容，只保留分辨率部分
-            if '(' in resolution_text:
-                resolution_text = resolution_text.split('(')[0].strip()
-
-            # 分割宽和高
-            parts = resolution_text.lower().split('x')
-            if len(parts) != 2:
-                raise ValueError("分辨率格式错误")
-
-            width = int(parts[0].strip())
-            height = int(parts[1].strip())
-
-            # 验证分辨率范围
-            if width < 640 or width > 7680 or height < 480 or height > 4320:
-                raise ValueError("分辨率超出有效范围")
-
-            resolution = [width, height]
-
-        except (ValueError, IndexError):
-            print(f"[警告] 分辨率格式错误: {resolution_text}，使用默认值 1920x1080")
-            resolution = [1920, 1080]
-
         self.settings = {
             "game_window_title": self.window_title_input.text(),
             "allow_operate_favorited": self.allow_favorited_switch.isChecked(),
-            "require_double_valid": self.require_double_switch.isChecked(),
-            "game_resolution": resolution
+            "require_double_valid": self.require_double_switch.isChecked()
         }
 
         try:

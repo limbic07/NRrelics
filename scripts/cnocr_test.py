@@ -17,14 +17,29 @@ from rapidfuzz import fuzz
 
 # ==================== 配置区域 ====================
 
-# ROI区域配置 (x, y, width, height)
-ROI = (1105, 800, 700, 200)
+# 六行单行ROI区域配置（普通模式和深夜模式通用）
+# X轴范围：
+x_start = 1107
+x_end = 1700
+
+# Y轴范围：这 6 行文本其实分为 3 组，组与组之间有轻微的缝隙
+line_coords = [
+    # 第一组
+    (810, 833),  # 第 1 行
+    (833, 858),  # 第 2 行
+
+    # 第二组
+    (870, 893),  # 第 3 行
+    (893, 917),  # 第 4 行
+
+    # 第三组
+    (930, 954),  # 第 5 行
+    (954, 978)   # 第 6 行
+]
 
 # 循环次数
-LOOP_COUNT = 50
+LOOP_COUNT = 500
 
-# 每次识别后的延迟（秒）
-DELAY_AFTER_OCR = 0.1
 
 # 输出文件路径
 OUTPUT_FILE = "ocr_results.txt"
@@ -65,7 +80,7 @@ LINE_BREAK_DICT = {
 # 词条纠错配置
 CORRECTION_CONFIG = {
     "enabled": True,              # 是否启用词条纠错
-    "similarity_threshold": 0.9,  # 相似度阈值（90%）
+    "similarity_threshold": 0.85,  # 相似度阈值（60%）
     "max_retry": 3,               # 未知词条最大重试次数
     "data_dir": "data",           # 词条库目录
 }
@@ -118,7 +133,7 @@ class VocabularyLoader:
 
 class EntryCorrector:
     """词条纠错器，使用模糊匹配修正OCR错误"""
-    def __init__(self, vocabulary: list, threshold: float = 0.9):
+    def __init__(self, vocabulary: list, threshold: float = 0.8):
         self.vocabulary = vocabulary
         self.threshold = threshold
 
@@ -159,29 +174,48 @@ def postprocess_text(text: str) -> str:
     # 0. 全角数字 → 半角数字
     text = text.translate(str.maketrans('０１２３４５６７８９', '0123456789'))
 
-    # 1. 加号标准化：十、＋(全角)、⁺(上标) → +(半角)
+    # 1. OCR常见误识别修正（字母 → 数字）
+    # 词条库不包含英文字母，所以将常见误识别的字母转换为数字
+    text = text.replace('I', '1')  # 大写I → 1
+    text = text.replace('l', '1')  # 小写l → 1
+    text = text.replace('O', '0')  # 大写O → 0
+    text = text.replace('o', '0')  # 小写o → 0
+    text = text.replace('S', '5')  # 大写S → 5
+    text = text.replace('s', '5')  # 小写s → 5
+    text = text.replace('B', '8')  # 大写B → 8
+    text = text.replace('Z', '2')  # 大写Z → 2
+    text = text.replace('z', '2')  # 小写z → 2
+
+    # 1.5. 罗马数字 → 阿拉伯数字
+    text = text.replace('Ⅰ', '1')  # 罗马数字Ⅰ → 1
+    text = text.replace('Ⅱ', '2')  # 罗马数字Ⅱ → 2
+    text = text.replace('Ⅲ', '3')  # 罗马数字Ⅲ → 3
+    text = text.replace('Ⅳ', '4')  # 罗马数字Ⅳ → 4
+    text = text.replace('Ⅴ', '5')  # 罗马数字Ⅴ → 5
+
+    # 2. 加号标准化：十、＋(全角)、⁺(上标) → +(半角)
     text = text.replace('十', '+').replace('＋', '+')
 
-    # 2. 括号标准化：[](){}  → 【】
+    # 3. 括号标准化：[](){}  → 【】
     text = text.replace('[', '【').replace(']', '】')
     text = text.replace('(', '【').replace(')', '】')
     text = text.replace('{', '【').replace('}', '】')
 
-    # 3. 删除引号：""
+    # 4. 删除引号：""
     text = text.replace('"', '').replace('"', '')
 
-    # 4. 删除所有空格
+    # 5. 删除所有空格
     text = text.replace(' ', '').replace('　', '')
 
-    # 5. 标点标准化：英文标点 → 中文标点
+    # 6. 标点标准化：英文标点 → 中文标点
     text = text.replace(',', '，')
     text = text.replace(':', '：')
     text = text.replace(';', '；')
 
-    # 6. 修正分隔符：数字1中文 → 数字|中文
+    # 7. 修正分隔符：数字1中文 → 数字|中文
     text = re.sub(r'(\+\d+)\s*1\s*([\u4e00-\u9fa5])', r'\1|\2', text)
 
-    # 7. 删除包含※符号或"仅限能使用的武器类别"的行
+    # 8. 删除包含※符号或"仅限能使用的武器类别"的行
     lines = text.split('\n')
     filtered_lines = []
     for line in lines:
@@ -283,29 +317,31 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
 
 # ==================== 图像处理函数 ====================
 
-def capture_roi() -> np.ndarray:
-    """截取屏幕ROI区域"""
+def capture_line_rois() -> list:
+    """截取屏幕单行ROI区域（6行通用）"""
     screenshot = pyautogui.screenshot()
     image = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 
-    if ROI:
-        x, y, w, h = ROI
-        image = image[y:y+h, x:x+w]
+    line_images = []
+    for y_start, y_end in line_coords:
+        line_image = image[y_start:y_end, x_start:x_end]
+        line_images.append(line_image)
 
-    return image
+    return line_images
 
 
 # ==================== OCR引擎 ====================
 
 class OCREngine:
     """CnOCR引擎封装"""
-    def __init__(self):
+    def __init__(self, relic_type: str):
         print("正在加载OCR模型...")
+        self.relic_type = relic_type
 
         try:
-            # 使用默认配置初始化CnOcr引擎
+            # 使用默认模型
             self.engine = CnOcr()
-            print("OCR模型加载完成")
+            print(f"OCR模型加载完成 ({relic_type}模式)")
 
         except Exception as e:
             print(f"[错误] OCR模型加载失败: {e}")
@@ -318,7 +354,7 @@ class OCREngine:
             try:
                 vocab_loader = VocabularyLoader(
                     CORRECTION_CONFIG["data_dir"],
-                    RELIC_TYPE
+                    relic_type
                 )
                 self.corrector = EntryCorrector(
                     vocab_loader.vocabulary,
@@ -330,33 +366,100 @@ class OCREngine:
                 print("将继续使用OCR结果，不进行纠错")
 
 
-    def ocr(self, image) -> tuple:
-        """执行OCR，返回处理后的词条列表和纠错时间"""
-        result = self.engine.ocr(image)
+    def ocr_single_line(self, image) -> tuple:
+        """执行单行OCR识别（深夜模式）"""
+        result = self.engine.ocr_for_single_line(image)
         if result is None:
-            return [], 0.0
+            return "", 0.0
 
-        # 第一步：收集所有 items 的文本，拼接成一段完整的长文本
+        # ocr_for_single_line 返回字典格式
+        text = result.get('text', '')
+        score = result.get('score', 0.0)
+
+        # 清洗单字符"一"（空词条"-"的误识别）
+        text = text.strip()
+        if text == "一":
+            return "", 0.0
+
+        return text, score
+
+
+    def ocr_multi_line(self, images) -> tuple:
+        """执行多行OCR识别（普通模式），对6行分别使用单行识别"""
+        if not isinstance(images, list):
+            # 如果不是列表，转换为列表
+            images = [images]
+
         all_text = []
-        for item in result:
-            text = item.get('text', '') if isinstance(item, dict) else item['text']
-            if text.strip():
+        all_scores = []
+        for line_image in images:
+            text, score = self.ocr_single_line(line_image)
+            if text:
                 all_text.append(text)
+                all_scores.append(score)
 
-        # 用换行符拼接所有文本
+        # 拼接所有文本
         combined_text = '\n'.join(all_text)
 
-        # 第二步：一次性处理完整的文本（这样 split_entries 才能看到所有行）
+        # 处理完整的文本（符号标准化、分割词条）
         all_raw_entries = split_entries(combined_text)
 
-        # 第三步：对所有行进行纠错
+        # 对所有行进行纠错
         correction_time = 0.0
         if self.corrector and CORRECTION_CONFIG["enabled"]:
             correction_start = time.time()
             all_raw_entries = correct_entries(all_raw_entries, self.corrector)
             correction_time = time.time() - correction_start
 
-        return all_raw_entries, correction_time
+        return all_raw_entries, correction_time, all_scores
+
+
+    def ocr(self, image_or_images) -> tuple:
+        """执行OCR，根据模式自动选择单行或多行识别"""
+        if self.relic_type == "deepnight":
+            # 深夜模式：单行识别
+            if isinstance(image_or_images, list):
+                # 多个单行图像
+                all_text = []
+                all_scores = []
+                for line_image in image_or_images:
+                    text, score = self.ocr_single_line(line_image)
+                    if text:
+                        all_text.append(text)
+                        all_scores.append(score)
+
+                # 拼接所有文本
+                combined_text = '\n'.join(all_text)
+
+                # 处理完整的文本（符号标准化、分割词条）
+                all_entries = split_entries(combined_text)
+
+                # 对所有行进行纠错（包括动态断行合并）
+                correction_time = 0.0
+                if self.corrector and CORRECTION_CONFIG["enabled"]:
+                    correction_start = time.time()
+                    all_entries = correct_entries(all_entries, self.corrector)
+                    correction_time = time.time() - correction_start
+
+                return all_entries, correction_time, all_scores
+            else:
+                # 单个图像
+                text, score = self.ocr_single_line(image_or_images)
+                if text:
+                    # 处理文本
+                    entries = split_entries(text)
+                    # 纠错
+                    correction_time = 0.0
+                    if self.corrector and CORRECTION_CONFIG["enabled"]:
+                        correction_start = time.time()
+                        entries = correct_entries(entries, self.corrector)
+                        correction_time = time.time() - correction_start
+                    return entries, correction_time, [score]
+                else:
+                    return [], 0.0, []
+        else:
+            # 普通模式：多行识别
+            return self.ocr_multi_line(image_or_images)
 
 
 # ==================== 主程序 ====================
@@ -490,7 +593,8 @@ def run_game_test():
     print("=" * 50)
     print("游戏物品词条OCR识别工具")
     print("=" * 50)
-    print(f"ROI区域: {ROI}")
+    print(f"模式: {RELIC_TYPE}模式 (6行单行识别)")
+    print(f"识别区域: X({x_start}-{x_end}), 6行")
     print(f"循环次数: {LOOP_COUNT}")
     print(f"输出文件: {OUTPUT_FILE}")
     print("-" * 50)
@@ -499,7 +603,7 @@ def run_game_test():
     print("-" * 50)
 
     # 初始化OCR引擎
-    engine = OCREngine()
+    engine = OCREngine(RELIC_TYPE)
 
     # 等待F11开始
     print("\n等待按下 F11 开始...")
@@ -522,13 +626,19 @@ def run_game_test():
 
         # 1. 截图时间
         capture_start = time.time()
-        image = capture_roi()
+        images = capture_line_rois()  # 统一使用6行ROI截图
         capture_time = time.time() - capture_start
 
         # 2. OCR时间（包含纠错）
         ocr_start = time.time()
-        entries, correction_time = engine.ocr(image)
+        entries, correction_time, scores = engine.ocr(images)
         ocr_time = time.time() - ocr_start
+
+        # 输出识别结果和置信度
+        if entries:
+            print(f"  识别到 {len(entries)} 条词条:")
+            for idx, (entry, score) in enumerate(zip(entries, scores), 1):
+                print(f"    [{idx}] {entry} (置信度: {score:.2%})")
 
         # 3. 重试时间
         retry_start = time.time()
@@ -536,6 +646,7 @@ def run_game_test():
 
         # 检查是否有未知词条或空白词条（仅在启用纠错时检查）
         has_unknown = False
+        known_count = 0  # 已知词条数量
         if engine.corrector and CORRECTION_CONFIG["enabled"]:
             for entry in entries:
                 # 检查是否为空白词条
@@ -550,7 +661,9 @@ def run_game_test():
 
                 # 检查是否为未知词条
                 _, similarity, is_corrected = engine.corrector.correct_entry(entry)
-                if not is_corrected:
+                if is_corrected:
+                    known_count += 1  # 统计已知词条
+                else:
                     has_unknown = True
                     unknown_entries.append({
                         "index": i + 1,
@@ -558,60 +671,60 @@ def run_game_test():
                         "similarity": similarity
                     })
 
-            # 如果有未知词条或空白词条，重试最多3次
-            if has_unknown:
-                print(f"  [警告] 检测到未知词条或空白词条，准备重试...")
+            # 只有当全部都是未知词条或空白时才重试（known_count == 0）
+            if has_unknown and known_count == 0:
+                print(f"  [警告] 全部为未知词条或空白词条，准备重试...")
                 while retry_count < CORRECTION_CONFIG["max_retry"]:
                     print(f"  [重试] {retry_count + 1}/{CORRECTION_CONFIG['max_retry']}")
                     time.sleep(0.5)
 
-                    # 重新截图识别
-                    image = capture_roi()
-                    entries, correction_time_retry = engine.ocr(image)
+                    # 重新截图识别（统一使用6行ROI）
+                    images = capture_line_rois()
+                    entries, correction_time_retry, scores = engine.ocr(images)
                     correction_time += correction_time_retry
 
                     # 再次检查
                     has_unknown = False
+                    known_count = 0
                     for entry in entries:
                         # 检查是否为空白词条
                         if not entry.strip():
                             has_unknown = True
-                            break
+                            continue
 
                         # 检查是否为未知词条
                         _, similarity, is_corrected = engine.corrector.correct_entry(entry)
-                        if not is_corrected:
+                        if is_corrected:
+                            known_count += 1
+                        else:
                             has_unknown = True
-                            break
 
-                    if not has_unknown:
-                        print(f"  [成功] 重试后词条已识别")
+                    # 只要有至少1条已知词条，就算成功
+                    if known_count > 0:
+                        print(f"  [成功] 重试后识别到 {known_count} 条已知词条")
+                        # 输出重试后的结果
+                        if entries:
+                            print(f"  重试后识别到 {len(entries)} 条词条:")
+                            for idx, (entry, score) in enumerate(zip(entries, scores), 1):
+                                print(f"    [{idx}] {entry} (置信度: {score:.2%})")
                         break
 
                     retry_count += 1
 
-                # ==================== 调试代码开始 ====================
-                # 3次重试后仍有未知词条，记录并继续（原来是保存并中止）
-                if has_unknown:
+                # 3次重试后仍全部为未知词条，记录并继续
+                if has_unknown and known_count == 0:
                     print("\n" + "=" * 50)
-                    print("[调试] 检测到未知词条，已记录，继续识别...")
+                    print("[调试] 全部为未知词条，已记录，继续识别...")
                     print("=" * 50)
                     print("最近的未知词条:")
                     for unknown in unknown_entries[-5:]:  # 显示最后5个
                         print(f"  [{unknown['index']}] {unknown['entry']} (相似度: {unknown['similarity']:.2%})")
                     print("=" * 50 + "\n")
-                    # 原来的中止逻辑（已注释）：
-                    # save_partial_results(all_results, OUTPUT_FILE)
-                    # print(f"\n已保存当前进度到: {OUTPUT_FILE}")
-                    # print("程序已中止")
-                    # return
-                # ==================== 调试代码结束 ====================
 
         retry_time = time.time() - retry_start
 
-        # 4. 其他操作时间（延迟、按键）
+        # 4. 其他操作时间（按键）
         other_start = time.time()
-        time.sleep(DELAY_AFTER_OCR)
         if i < LOOP_COUNT - 1:  # 最后一次不需要按键
             pydirectinput.press('right')
             time.sleep(0.2)  # 等待游戏响应

@@ -10,46 +10,49 @@ import cv2
 import numpy as np
 import pyautogui
 import keyboard
+import time
 from pathlib import Path
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Optional, Dict, List
+from collections import deque
 
 class Config:
     DEBUG_MODE = True
-    
-    # 1. ROI 配置 (请确保填入你的 roi_selector 参数)
-    ROI_START_X_RATIO = 0.46 
+
+    # 1. ROI 配置
+    ROI_START_X_RATIO = 0.46
     ROI_START_Y_RATIO = 0.19
     ROI_WIDTH_RATIO = 0.5
     ROI_HEIGHT_RATIO = 0.49
 
     # 2. 几何特征
-    MIN_CURSOR_AREA = 2000
+    MIN_CURSOR_AREA = 500
     MAX_CURSOR_AREA = 40000
-    SHAPE_ASPECT_RATIO_MIN = 0.85
+    SHAPE_ASPECT_RATIO_MIN = 0.85  # 光标是正方形
     SHAPE_ASPECT_RATIO_MAX = 1.15
 
-    # 3. 阈值
-    CANNY_THRESHOLD1 = 50
-    CANNY_THRESHOLD2 = 150
-    
-    # === 关键修改：亮度配置 ===
-    # 亮度判定阈值 (根据 HUD 显示的 Lum 值微调)
+    # 3. 时域最大值投影参数
+    TEMPORAL_FRAME_COUNT = 5  # 缓存帧数（N）
+    CANNY_THRESHOLD1 = 30    # Canny低阈值
+    CANNY_THRESHOLD2 = 100   # Canny高阈值
+
+    # 4. 亮度配置
     BRIGHTNESS_THRESHOLD = 45
-    # 采样面积占比 (0.55= 中间 55 的区域)
     BRIGHTNESS_CENTER_RATIO = 0.55
 
-    # 匹配阈值
-    TEMPLATE_MATCH_THRESHOLD = 0.60 
-    # 图标搜索区域占比 (0.35 = 角落 35%)
+    # 5. 匹配阈值
+    TEMPLATE_MATCH_THRESHOLD = 0.60
     ICON_SEARCH_RATIO = 0.35
 
 class RelicDetector:
-    def __init__(self, icon_cup_path: str = "icon_cup.png",
-                 icon_bookmark_path: str = "icon_bookmark.png"):
+    def __init__(self, icon_cup_path: str = "data/icon_cup.png",
+                 icon_bookmark_path: str = "data/icon_bookmark.png"):
         self.config = Config()
         print(f"[初始化] 加载模板...")
         self.template_cup = self._load_template_simple(icon_cup_path)
         self.template_bookmark = self._load_template_simple(icon_bookmark_path)
+
+        # 时域最大值投影缓冲区
+        self.frame_buffer = deque(maxlen=self.config.TEMPORAL_FRAME_COUNT)
 
     def _load_template_simple(self, path: str) -> Optional[np.ndarray]:
         if not Path(path).exists():
@@ -60,6 +63,10 @@ class RelicDetector:
         return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     def detect_cursor(self, image: np.ndarray) -> Tuple[Optional[Tuple], Optional[int], Optional[Tuple]]:
+        """
+        检测光标位置
+        使用时域最大值投影 + Canny边缘检测
+        """
         h, w = image.shape[:2]
         rx = int(w * self.config.ROI_START_X_RATIO)
         ry = int(h * self.config.ROI_START_Y_RATIO)
@@ -67,32 +74,74 @@ class RelicDetector:
         rh = int(h * self.config.ROI_HEIGHT_RATIO)
         rx, ry = max(0, rx), max(0, ry)
         rw, rh = min(w - rx, rw), min(h - ry, rh)
-        
+
         roi_img = image[ry:ry+rh, rx:rx+rw]
-        gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # 转换到HSV空间，使用V通道（亮度）
+        hsv = cv2.cvtColor(roi_img, cv2.COLOR_BGR2HSV)
+        v_channel = hsv[:, :, 2]
+
+        # 添加当前帧到缓冲区
+        self.frame_buffer.append(v_channel)
+
+        # 计算时域最大值投影
+        if len(self.frame_buffer) > 0:
+            max_projection = self._compute_temporal_max_projection()
+        else:
+            max_projection = v_channel
+
+        # 高斯模糊去噪
+        blurred = cv2.GaussianBlur(max_projection, (5, 5), 0)
+
+        # Canny边缘检测
         edges = cv2.Canny(blurred, self.config.CANNY_THRESHOLD1, self.config.CANNY_THRESHOLD2)
+
+        # 形态学处理：连接相邻的边缘
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        edges = cv2.dilate(edges, kernel, iterations=1)
+        edges = cv2.dilate(edges, kernel, iterations=2)
+
+        # 查找轮廓
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+
+        # 从右下角开始寻找光标（优先考虑下方，然后考虑右方）
         best_cursor = None
-        max_score = 0
+        max_position_score = -1
+
         for cnt in contours:
             area = cv2.contourArea(cnt)
-            if area < self.config.MIN_CURSOR_AREA or area > self.config.MAX_CURSOR_AREA: continue
+            if area < self.config.MIN_CURSOR_AREA or area > self.config.MAX_CURSOR_AREA:
+                continue
+
             peri = cv2.arcLength(cnt, True)
             approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
             if len(approx) == 4:
                 x, y, cw, ch = cv2.boundingRect(approx)
-                asp = float(cw) / ch
+                asp = float(cw) / ch if ch > 0 else 0
                 if self.config.SHAPE_ASPECT_RATIO_MIN <= asp <= self.config.SHAPE_ASPECT_RATIO_MAX:
-                    if area > max_score:
-                        max_score = area
+                    position_score = y * 10000 + x
+                    if position_score > max_position_score:
+                        max_position_score = position_score
                         best_cursor = (x + rx, y + ry, cw, ch)
-        
-        if best_cursor: return best_cursor, best_cursor[2], (rx, ry)
+
+        if best_cursor:
+            return best_cursor, best_cursor[2], (rx, ry)
         return None, None, (rx, ry)
+
+    def _compute_temporal_max_projection(self) -> np.ndarray:
+        """
+        计算时域最大值投影
+        将缓冲区中所有帧沿时间维度求最大值
+        """
+        if len(self.frame_buffer) == 0:
+            return np.zeros((1, 1), dtype=np.uint8)
+
+        # 将所有帧堆叠成3D数组 (height, width, frames)
+        frame_stack = np.stack(list(self.frame_buffer), axis=2)
+
+        # 沿时间维度（axis=2）求最大值
+        max_projection = np.max(frame_stack, axis=2)
+
+        return max_projection.astype(np.uint8)
 
     def detect_state(self, image: np.ndarray, cursor_box: Tuple, scale_factor: float) -> Dict:
         x, y, w, h = cursor_box

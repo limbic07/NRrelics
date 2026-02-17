@@ -3,7 +3,7 @@
 from qfluentwidgets import FluentWindow, NavigationItemPosition, FluentIcon, setTheme, Theme
 from PySide6.QtCore import QSize
 from .config import NAVIGATION_CONFIG, WINDOW_CONFIG, THEME_CONFIG
-from ui.components.logger_widget import LoggerWidget
+from ui.components.log_manager import LogManager
 
 
 class MainWindow(FluentWindow):
@@ -21,8 +21,8 @@ class MainWindow(FluentWindow):
         theme = Theme.LIGHT if THEME_CONFIG["theme"] == "light" else Theme.DARK
         setTheme(theme)
 
-        # 创建共享日志实例
-        self.shared_logger = LoggerWidget()
+        # 创建中央日志管理器
+        self.log_manager = LogManager()
 
         # 优化导航栏
         self._optimize_navigation()
@@ -40,7 +40,7 @@ class MainWindow(FluentWindow):
         from .pages import ShopPage, RepoPage, SavePage, SettingsPage
 
         # 商店筛选
-        self.shop_page = ShopPage(shared_logger=self.shared_logger)
+        self.shop_page = ShopPage(log_manager=self.log_manager)
         self.addSubInterface(
             self.shop_page,
             FluentIcon.SHOPPING_CART,
@@ -49,7 +49,7 @@ class MainWindow(FluentWindow):
         )
 
         # 仓库清理
-        self.repo_page = RepoPage(shared_logger=self.shared_logger)
+        self.repo_page = RepoPage(log_manager=self.log_manager)
         self.addSubInterface(
             self.repo_page,
             FluentIcon.FOLDER,

@@ -60,6 +60,26 @@ class RepositoryFilter:
     # "深层的遗物"勾选框
     DEEPNIGHT_CHECKBOX = (70, 915, 95, 940)
 
+    # 六行单行ROI区域配置（用于单行OCR识别）
+    # X轴范围
+    LINE_ROI_X_START = 1107
+    LINE_ROI_X_END = 1700
+
+    # Y轴范围：这 6 行文本其实分为 3 组，组与组之间有轻微的缝隙
+    LINE_ROI_COORDS = [
+        # 第一组
+        (810, 833),   # 第 1 行
+        (833, 858),   # 第 2 行
+
+        # 第二组
+        (870, 893),   # 第 3 行
+        (893, 917),   # 第 4 行
+
+        # 第三组
+        (930, 954),   # 第 5 行
+        (954, 978)    # 第 6 行
+    ]
+
     # 调试目录
     DEBUG_DIR = "debug_ocr"
 
@@ -69,7 +89,7 @@ class RepositoryFilter:
 
         Args:
             ocr_engine: OCR引擎实例，用于文字识别
-            settings: 设置字典，包含game_resolution等配置
+            settings: 设置字典（不再使用game_resolution字段）
         """
         self.ocr_engine = ocr_engine
         self.settings = settings or {}
@@ -82,11 +102,12 @@ class RepositoryFilter:
 
     def refresh_window_info(self):
         """
-        刷新游戏窗口位置信息
+        刷新游戏窗口位置和分辨率信息
 
-        在开始清理前调用，确保窗口位置是最新的
+        在开始清理前调用，确保窗口位置和缩放因子是最新的
         """
         self.game_window = self._find_game_window()
+        self.scale_x, self.scale_y = self._calculate_scale_factors()
 
     def _find_game_window(self) -> Optional[gw.Win32Window]:
         """
@@ -107,14 +128,30 @@ class RepositoryFilter:
             return None
 
     def _calculate_scale_factors(self) -> Tuple[float, float]:
-        """计算当前分辨率相对于基准分辨率的缩放因子（使用手动设置的分辨率）"""
-        # 使用手动设置的游戏分辨率
-        game_resolution = self.settings.get("game_resolution", [1920, 1080])
-        window_width = game_resolution[0]
-        window_height = game_resolution[1]
+        """计算当前分辨率相对于基准分辨率的缩放因子（动态检测窗口客户区分辨率）"""
+        # 获取窗口客户区信息
+        client_rect = self._get_client_rect_screen_coords()
+
+        if client_rect:
+            # 使用客户区的宽度和高度
+            _, _, window_width, window_height = client_rect
+        else:
+            # 如果无法获取客户区信息，使用默认分辨率
+            print("[警告] 无法获取窗口客户区信息，使用默认分辨率 1920x1080")
+            window_width = 1920
+            window_height = 1080
 
         scale_x = window_width / self.BASE_WIDTH
         scale_y = window_height / self.BASE_HEIGHT
+
+        # 输出缩放因子信息
+        print("=" * 60)
+        print("[分辨率缩放信息]")
+        print(f"  基准分辨率: {self.BASE_WIDTH}x{self.BASE_HEIGHT}")
+        print(f"  检测到的游戏窗口客户区分辨率: {window_width}x{window_height}")
+        print(f"  缩放因子 X: {scale_x:.4f} ({window_width}/{self.BASE_WIDTH})")
+        print(f"  缩放因子 Y: {scale_y:.4f} ({window_height}/{self.BASE_HEIGHT})")
+        print("=" * 60)
 
         return scale_x, scale_y
 
@@ -222,6 +259,23 @@ class RepositoryFilter:
         roi = window_image[y1:y2, x1:x2]
 
         return roi
+
+    def capture_line_rois(self) -> list:
+        """
+        截取6行单行ROI区域（用于单行OCR识别）
+
+        Returns:
+            6个单行图像的列表，每个图像是numpy数组
+        """
+        line_images = []
+        for y_start, y_end in self.LINE_ROI_COORDS:
+            # 构建完整的ROI坐标 (x1, y1, x2, y2)
+            region = (self.LINE_ROI_X_START, y_start, self.LINE_ROI_X_END, y_end)
+            # 使用 _capture_region() 方法获取单行ROI（自动处理缩放）
+            line_roi = self._capture_region(region)
+            line_images.append(line_roi)
+
+        return line_images
 
     def _save_debug_image(self, image: np.ndarray, name: str):
         """保存调试图像"""
@@ -466,7 +520,7 @@ class RepositoryFilter:
         判断勾选框区域是否被勾选
 
         Args:
-            checkbox_region: 勾选框区域的BGR图像 (25x25)
+            checkbox_region: 勾选框区域的BGR图像
 
         Returns:
             True: 已勾选
@@ -474,9 +528,16 @@ class RepositoryFilter:
         """
         h, w = checkbox_region.shape[:2]
 
-        # 排除边框，只检测框内部中心区域
-        margin = 6
-        inner_region = checkbox_region[margin:h-margin, margin:w-margin]
+        # 使用相对比例排除边框，只检测框内部中心区域
+        # 边框约占24%（6/25），使用相对比例确保在不同分辨率下都能正确识别
+        margin_ratio = 0.24
+        margin_h = int(h * margin_ratio)
+        margin_w = int(w * margin_ratio)
+        inner_region = checkbox_region[margin_h:h-margin_h, margin_w:w-margin_w]
+
+        if inner_region.size == 0:
+            print("[警告] 勾选框内部区域为空，返回未勾选")
+            return False
 
         # 转换为灰度图
         gray = cv2.cvtColor(inner_region, cv2.COLOR_BGR2GRAY)
@@ -484,9 +545,18 @@ class RepositoryFilter:
         # 计算中心区域平均灰度值
         mean_val = cv2.mean(gray)[0]
 
+        # 输出调试信息
+        print(f"[调试] 勾选框尺寸: {w}x{h}, 内部区域尺寸: {inner_region.shape[1]}x{inner_region.shape[0]}, 平均灰度值: {mean_val:.2f}")
+
         # 框内有√：平均灰度值较高（约109）
         # 框内是空的：平均灰度值较低（约58）
-        return mean_val > 90
+        # 使用动态阈值：(109 + 58) / 2 = 83.5，取85为阈值
+        threshold = 85
+        is_checked = mean_val > threshold
+
+        print(f"[调试] 判断结果: {'已勾选' if is_checked else '未勾选'} (阈值={threshold})")
+
+        return is_checked
 
     def click_checkbox(self, is_normal: bool):
         """

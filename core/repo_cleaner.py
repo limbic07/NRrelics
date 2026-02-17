@@ -91,6 +91,7 @@ class RepoCleaner:
         self.normal_stop = False  # 重置正常停止标志
         self._reset_stats()
         self.qualified_relics = []
+        self.relic_detector.frame_buffer.clear()  # 清空帧缓冲区，开始新的检测
 
         # 日志函数
         def log(message: str, level: str = "INFO"):
@@ -105,28 +106,34 @@ class RepoCleaner:
             self.game_window = self._find_game_window()
             if not self.game_window:
                 log("未找到游戏窗口", "ERROR")
-            else:
-                log(f"找到游戏窗口: {self.game_window.title} ({self.game_window.width}x{self.game_window.height})", "SUCCESS")
 
             # 1. 等待3秒，给用户时间切换到游戏界面
-            log("等待3秒，请切换到游戏界面...", "INFO")
-            time.sleep(3.0)
+            log("等待3秒，请切换到游戏遗物仪式界面...", "INFO")
+            for _ in range(30):  # 30 * 0.1 = 3秒，可中断
+                if not self.is_running:
+                    return
+                time.sleep(0.1)
 
             # 2. 应用筛选
+            if not self.is_running:
+                return
             log("正在应用遗物筛选...", "INFO")
             if not self.repository_filter.apply_filter(mode):
-                game_resolution = self.settings.get("game_resolution", [1920, 1080])
                 log("遗物筛选失败", "ERROR")
                 log("可能原因：", "ERROR")
                 log("  1. 未在遗物仪式界面", "INFO")
-                log("  2. 游戏分辨率与软件设置不匹配", "INFO")
-                log(f"  当前软件设置的游戏分辨率: {game_resolution[0]}x{game_resolution[1]}", "INFO")
-                log("  请在设置页面修改游戏分辨率，使其与游戏内实际分辨率一致", "INFO")
+                log("  2. 游戏窗口未找到或无法获取客户区信息", "INFO")
+                self.is_running = False  # 标记为停止状态
                 return
             log("遗物筛选成功", "SUCCESS")
-            time.sleep(1.0)
+            for _ in range(10):  # 10 * 0.1 = 1秒，可中断
+                if not self.is_running:
+                    return
+                time.sleep(0.1)
 
             # 2.5. 自动检测遗物数量（如果 max_relics == 0）
+            if not self.is_running:
+                return
             if max_relics == 0:
                 log("正在自动检测遗物数量...", "INFO")
                 detected_count = self.repository_filter.detect_relic_count()
@@ -138,6 +145,8 @@ class RepoCleaner:
                     max_relics = 100
 
             # 3. 获取预设
+            if not self.is_running:
+                return
             general_preset = self.preset_manager.get_general_preset(mode)
             dedicated_presets = self.preset_manager.get_active_dedicated_presets(mode)
             blacklist_preset = self.preset_manager.get_blacklist_preset() if mode == "deepnight" else None
@@ -160,16 +169,30 @@ class RepoCleaner:
                     self.normal_stop = True  # 正常停止
                     break
 
-                # 截图（只截取游戏窗口）
-                image = self._capture_game_window()
+                # 截图积累帧缓冲区（快速截图N次填满buffer，捕捉光标呼吸灯效果）
+                for frame_i in range(self.relic_detector.temporal_frame_count):
+                    if not self.is_running:
+                        return
+                    image = self.repository_filter._capture_game_window()
+                    if image is None:
+                        continue
+                    # 前N-1帧只积累buffer，不做检测
+                    if frame_i < self.relic_detector.temporal_frame_count - 1:
+                        self.relic_detector.detect_cursor(image, self.repository_filter.scale_x, self.repository_filter.scale_y)
+                        time.sleep(0.03)  # 30ms间隔，5帧共约150ms
+
                 if image is None:
                     log("截图失败，跳过", "ERROR")
                     pydirectinput.press('right')
-                    time.sleep(0.5)
+                    self.relic_detector.frame_buffer.clear()
+                    for _ in range(5):  # 0.5秒，可中断
+                        if not self.is_running:
+                            return
+                        time.sleep(0.1)
                     continue
 
-                # 状态检测
-                relic_state = self.relic_detector.detect_state(image)
+                # 状态检测（最后一帧同时做检测）
+                relic_state = self.relic_detector.detect_state(image, 1.0, self.repository_filter.scale_x, self.repository_filter.scale_y)
                 self.stats["total_detected"] += 1
 
                 state_name = RELIC_STATE_NAMES.get(relic_state, relic_state)
@@ -182,13 +205,30 @@ class RepoCleaner:
                     log("跳过该遗物", "INFO")
                     self.stats["skipped"] += 1
                     pydirectinput.press('right')
-                    time.sleep(0.5)
+                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
+                    for _ in range(5):  # 0.5秒，可中断
+                        if not self.is_running:
+                            return
+                        time.sleep(0.1)
                     continue
 
-                # OCR识别（只截取词条区域）
+                # OCR识别（使用6行单行ROI）
                 log("识别词条中...", "INFO")
-                affix_image = self.repository_filter._capture_region(self.repository_filter.AFFIX_REGION)
-                ocr_result = self.ocr_engine.recognize_with_classification(affix_image, mode)
+                line_images = self.repository_filter.capture_line_rois()
+
+                # 对6行图像分别进行单行识别
+                all_text = []
+                for line_image in line_images:
+                    text, _ = self.ocr_engine.recognize_single_line(line_image)
+                    if text:
+                        all_text.append(text)
+
+                # 拼接所有文本
+                combined_text = '\n'.join(all_text)
+
+                # 使用 recognize_with_classification 处理合并后的文本
+                # 注意：这里传入的是文本而不是图像，需要修改方法
+                ocr_result = self.ocr_engine.recognize_with_classification_from_lines(line_images, mode)
 
                 if not ocr_result["success"]:
                     # 检查是否是手动停止导致的识别失败
@@ -196,6 +236,7 @@ class RepoCleaner:
                         # 正常运行中的识别失败，输出错误信息
                         log("OCR识别失败（重试3次后仍未识别到任何词条），停止清理", "ERROR")
                         log("可能原因：不在遗物界面或界面显示异常", "ERROR")
+                        self.is_running = False  # 标记为意外停止
                     else:
                         # 手动停止导致的识别失败，不输出错误
                         log("检测到停止信号，结束清理", "INFO")
@@ -207,15 +248,54 @@ class RepoCleaner:
 
                 # 检测是否卡住（连续两次识别到相同遗物）
                 if last_relic_hash is not None and current_relic_hash == last_relic_hash:
-                    log("检测到重复遗物，上一个遗物无法出售（很可能是官方遗物），跳过", "WARNING")
-                    # 减去重复计数（因为这是同一个遗物）
-                    self.stats["total_detected"] -= 1
-                    # 按右方向键跳过
-                    pydirectinput.press('right')
-                    time.sleep(1.0)  # 等待跳过完成
-                    # 重置哈希，避免连续检测
-                    last_relic_hash = None
-                    continue
+                    log("检测到重复遗物，等待1秒后重新检测...", "WARNING")
+                    # 等待1秒，让界面有时间跳转
+                    for _ in range(10):
+                        if not self.is_running:
+                            return
+                        time.sleep(0.1)
+
+                    # 重新OCR识别（使用6行单行ROI）
+                    line_images_retry = self.repository_filter.capture_line_rois()
+                    ocr_result_retry = self.ocr_engine.recognize_with_classification_from_lines(line_images_retry, mode)
+
+                    if ocr_result_retry["success"]:
+                        affix_texts_retry = [affix["cleaned_text"] for affix in ocr_result_retry["affixes"]]
+                        retry_hash = hash(tuple(sorted(affix_texts_retry)))
+
+                        if retry_hash == current_relic_hash:
+                            # 确认是真的卡住了
+                            log("确认重复遗物，上一个遗物无法出售（很可能是官方遗物），跳过", "WARNING")
+                            # 减去重复计数（因为这是同一个遗物）
+                            self.stats["total_detected"] -= 1
+                            # 按右方向键跳过
+                            pydirectinput.press('right')
+                            self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
+                            for _ in range(10):  # 1秒，等待界面切换
+                                if not self.is_running:
+                                    return
+                                time.sleep(0.1)
+                            # 重置哈希，避免连续检测
+                            last_relic_hash = None
+                            continue
+                        else:
+                            # 界面已经跳转了，减去计数（因为当前计数是重复的），然后continue到下一次循环
+                            log("界面已跳转到新遗物，重新开始检测", "INFO")
+                            self.stats["total_detected"] -= 1
+                            last_relic_hash = None  # 重置哈希
+                            continue
+                    else:
+                        # 重试OCR失败，跳过
+                        log("重新识别失败，跳过", "ERROR")
+                        self.stats["total_detected"] -= 1
+                        pydirectinput.press('right')
+                        self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
+                        for _ in range(5):
+                            if not self.is_running:
+                                return
+                            time.sleep(0.1)
+                        last_relic_hash = None
+                        continue
 
                 # 更新上一个遗物哈希
                 last_relic_hash = current_relic_hash
@@ -239,15 +319,6 @@ class RepoCleaner:
                 if match_result["qualified"]:
                     log(f"合格遗物 ({match_result['reason']})", "SUCCESS")
                     self.stats["qualified"] += 1
-
-                    # 保存合格遗物词条
-                    qualified_relic_info = {
-                        "index": self.stats["total_detected"],
-                        "state": relic_state,
-                        "affixes": ocr_result["affixes"],
-                        "match_result": match_result
-                    }
-                    self.qualified_relics.append(qualified_relic_info)
                 else:
                     log(f"不合格遗物 ({match_result['reason']})", "INFO")
                     self.stats["unqualified"] += 1
@@ -255,23 +326,64 @@ class RepoCleaner:
                 # 操作执行
                 need_move_right = self._execute_action(relic_state, match_result["qualified"], cleaning_mode, log)
 
+                # 根据清理模式和操作结果，记录遗物
+                # 注意：售出模式下，只有在最后确认售出后才会记录，这里不记录
+                if cleaning_mode == "favorite":
+                    # 收藏模式：只记录合格的（被收藏的）遗物（仅LIGHT状态会被实际收藏）
+                    if match_result["qualified"] and relic_state == RELIC_STATE_LIGHT:
+                        qualified_relic_info = {
+                            "index": self.stats["total_detected"],
+                            "affixes": ocr_result["affixes"]
+                        }
+                        self.qualified_relics.append(qualified_relic_info)
+                elif cleaning_mode == "sell":
+                    # 售出模式：暂存待售出的遗物信息，等确认售出后再记录
+                    if not match_result["qualified"] and relic_state in [RELIC_STATE_LIGHT, RELIC_STATE_DARK_F]:
+                        pending_relic_info = {
+                            "index": self.stats["total_detected"],
+                            "affixes": ocr_result["affixes"]
+                        }
+                        # 暂存到待售出列表
+                        if not hasattr(self, 'pending_sell_relics'):
+                            self.pending_sell_relics = []
+                        self.pending_sell_relics.append(pending_relic_info)
+
                 # 移动到下一遗物（如果需要）
                 if need_move_right:
                     pydirectinput.press('right')
-                    time.sleep(0.5)
+                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
+                    for _ in range(5):  # 0.5秒，可中断
+                        if not self.is_running:
+                            return
+                        time.sleep(0.1)
 
             # 清理完成
-            log("清理完成", "SUCCESS")
-            self._print_stats(log)
+            if self.is_running:
+                # 正常完成
+                log("清理完成", "SUCCESS")
+                self._print_stats(log)
+            else:
+                # 手动停止
+                log("清理已停止", "INFO")
+                self._print_stats(log)
 
             # 自动完成售出操作（仅在正常停止时执行）
             if self.normal_stop and cleaning_mode == "sell" and self.pending_sell_count > 0:
                 log(f"执行售出操作 ({self.pending_sell_count}个遗物)...", "INFO")
                 pydirectinput.press('3')  # 打开售出界面
+                self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                 time.sleep(0.5)
                 pydirectinput.press('f')  # 确认售出
+                self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                 time.sleep(0.5)
                 log("售出完成", "SUCCESS")
+
+                # 确认售出后，将待售出的遗物转移到已售出列表
+                if hasattr(self, 'pending_sell_relics') and self.pending_sell_relics:
+                    self.qualified_relics.extend(self.pending_sell_relics)
+                    log(f"已记录 {len(self.pending_sell_relics)} 个售出遗物到仪表盘", "INFO")
+                    self.pending_sell_relics = []
+
                 self.pending_sell_count = 0
 
         except Exception as e:
@@ -313,6 +425,8 @@ class RepoCleaner:
             "favorited": 0,
             "unfavorited": 0
         }
+        # 重置待售出遗物列表
+        self.pending_sell_relics = []
 
     def _find_game_window(self) -> Optional[gw.Win32Window]:
         """
@@ -331,31 +445,6 @@ class RepoCleaner:
             print(f"[警告] 查找游戏窗口失败: {e}")
             return None
 
-    def _capture_game_window(self) -> Optional[np.ndarray]:
-        """
-        截取游戏窗口图像
-
-        Returns:
-            BGR格式的numpy数组，如果失败则返回None
-        """
-        try:
-            if self.game_window:
-                # 截取游戏窗口区域
-                screenshot = pyautogui.screenshot(region=(
-                    self.game_window.left,
-                    self.game_window.top,
-                    self.game_window.width,
-                    self.game_window.height
-                ))
-            else:
-                # 回退到全屏截图
-                screenshot = pyautogui.screenshot()
-
-            return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-        except Exception as e:
-            print(f"[错误] 截图失败: {e}")
-            return None
-
     def _should_skip_relic(self, relic_state: str, cleaning_mode: str, allow_favorited: bool) -> bool:
         """
         决定是否跳过该遗物
@@ -366,21 +455,25 @@ class RepoCleaner:
         """
         if cleaning_mode == "sell":
             if relic_state == RELIC_STATE_LIGHT:
-                return False
-            elif relic_state in [RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE]:
-                return not allow_favorited
-            else:  # E, O
+                return False  # 自由状态，可售出
+            elif relic_state == RELIC_STATE_DARK_F:
+                return not allow_favorited  # 仅收藏，根据设置决定
+            elif relic_state == RELIC_STATE_DARK_E:
+                return True  # 已装备，无法售出
+            elif relic_state == RELIC_STATE_DARK_FE:
+                return True  # 已装备且收藏，无法售出（装备的遗物无法售出）
+            else:  # O (官方遗物)
                 return True
 
         elif cleaning_mode == "favorite":
             if relic_state == RELIC_STATE_LIGHT:
-                return False
+                return False  # 自由状态，可收藏
             elif relic_state == RELIC_STATE_DARK_F:
-                return not allow_favorited  # 只有在不允许操作被收藏遗物时才跳过
+                return not allow_favorited  # 已收藏，根据设置决定是否可取消
             elif relic_state == RELIC_STATE_DARK_FE:
-                return not allow_favorited
+                return not allow_favorited  # 已装备且收藏，根据设置决定是否可取消
             else:  # E, O
-                return False
+                return False  # 已装备或官方遗物，可收藏
 
         return True
 
@@ -509,19 +602,31 @@ class RepoCleaner:
                 if relic_state == RELIC_STATE_LIGHT:
                     log("标记售出", "INFO")
                     pydirectinput.press('f')
+                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["sold"] += 1
                     self.pending_sell_count += 1
-                    time.sleep(0.2)
+                    for _ in range(5):  # 0.5秒，等待界面跳转
+                        if not self.is_running:
+                            return False
+                        time.sleep(0.1)
                     return False  # 按f后会自动跳转，不需要按右方向键
                 elif relic_state == RELIC_STATE_DARK_F:
                     log("取消收藏后标记售出", "INFO")
                     pydirectinput.press('2')  # 取消收藏
-                    time.sleep(0.3)
+                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
+                    for _ in range(3):  # 0.3秒，等待取消收藏
+                        if not self.is_running:
+                            return False
+                        time.sleep(0.1)
                     pydirectinput.press('f')  # 标记售出
+                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["unfavorited"] += 1
                     self.stats["sold"] += 1
                     self.pending_sell_count += 1
-                    time.sleep(0.2)
+                    for _ in range(3):  # 0.3秒，等待界面跳转
+                        if not self.is_running:
+                            return False
+                        time.sleep(0.1)
                     return False  # 按f后会自动跳转，不需要按右方向键
 
         elif cleaning_mode == "favorite":
@@ -530,8 +635,12 @@ class RepoCleaner:
                 if relic_state == RELIC_STATE_LIGHT:
                     log("收藏遗物", "INFO")
                     pydirectinput.press('2')
+                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["favorited"] += 1
-                    time.sleep(0.3)
+                    for _ in range(3):  # 0.3秒，可中断
+                        if not self.is_running:
+                            return False
+                        time.sleep(0.1)
                 elif relic_state == RELIC_STATE_DARK_F:
                     log("已收藏，跳过", "INFO")
             else:
@@ -539,8 +648,12 @@ class RepoCleaner:
                 if relic_state == RELIC_STATE_DARK_F:
                     log("取消收藏", "INFO")
                     pydirectinput.press('2')
+                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["unfavorited"] += 1
-                    time.sleep(0.3)
+                    for _ in range(3):  # 0.3秒，可中断
+                        if not self.is_running:
+                            return False
+                        time.sleep(0.1)
 
         return True  # 默认需要按右方向键
 

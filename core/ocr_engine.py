@@ -114,6 +114,9 @@ def postprocess_text(text: str) -> str:
     # 0. 全角数字 → 半角数字
     text = text.translate(str.maketrans('０１２３４５６７８９', '0123456789'))
 
+    # 0.5. 罗马数字1 → 阿拉伯数字1（因为图形相似导致的误识别）
+    text = text.replace('Ⅰ', '1').replace('ⅰ', '1')
+
     # 1. 加号标准化：十、＋(全角)、⁺(上标) → +(半角)
     text = text.replace('十', '+').replace('＋', '+')
 
@@ -122,9 +125,9 @@ def postprocess_text(text: str) -> str:
     text = text.replace('(', '【').replace(')', '】')
     text = text.replace('{', '【').replace('}', '】')
 
-    # 3. 删除引号："“”
+    # 3. 删除引号："""
     text = text.replace('"', '')
-    text = text.replace('“', '').replace('”', '')
+    text = text.replace('"', '').replace('"', '')
 
     # 4. 删除所有空格
     text = text.replace(' ', '').replace('　', '')
@@ -337,7 +340,7 @@ class OCREngine:
 
         print("正在加载OCR模型...")
         try:
-            # 使用默认配置初始化CnOcr引擎
+            # 使用默认模型
             self.engine = CnOcr()
             print("OCR模型加载完成")
         except Exception as e:
@@ -444,6 +447,34 @@ class OCREngine:
                 "success": False
             }
 
+    def recognize_single_line(self, image: np.ndarray) -> tuple:
+        """
+        执行单行OCR识别（使用ocr_for_single_line）
+
+        Args:
+            image: numpy 图像数组
+
+        Returns:
+            (text, score) - 识别文本和置信度
+        """
+        try:
+            result = self.engine.ocr_for_single_line(image)
+            if result is None:
+                return "", 0.0
+
+            text = result.get('text', '')
+            score = result.get('score', 0.0)
+
+            # 清洗单字符"一"（空词条"-"的误识别）
+            text = text.strip()
+            if text == "一":
+                return "", 0.0
+
+            return text, score
+        except Exception as e:
+            print(f"[错误] 单行OCR识别失败: {e}")
+            return "", 0.0
+
     def recognize_with_classification(self, image: np.ndarray, mode: str = "normal") -> dict:
         """
         执行OCR识别并分类词条（正面/负面）
@@ -483,22 +514,151 @@ class OCREngine:
             start_time = time.time()
 
             try:
-                result = self.engine.ocr(image)
-                if result is None:
+                # 使用单行识别方法
+                text, _ = self.recognize_single_line(image)  # 忽略置信度
+                if not text:
                     if retry < max_retry - 1:
-                        print(f"[重试 {retry + 1}/{max_retry}] OCR返回None，重试中...")
+                        print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到文字，重试中...")
                         time.sleep(0.3)
                         continue
                     return self._empty_classification_result()
 
-                # 收集所有文本
+                # 处理文本（符号标准化、分割词条）
+                raw_entries = split_entries(text)
+
+                # 先进行断行合并和纠错，获取详细信息
+                corrected_info = []
+                if self.corrector and CORRECTION_CONFIG["enabled"]:
+                    corrected_info = correct_entries_with_info(raw_entries, self.corrector)
+                else:
+                    # 如果没有纠错器，直接使用原始词条
+                    for entry in raw_entries:
+                        corrected_info.append({
+                            "text": entry,
+                            "similarity": 0.0,
+                            "is_corrected": False
+                        })
+
+                # 然后对纠错后的词条进行分类
+                affixes = []
+                positive_count = 0
+                negative_count = 0
+
+                for info in corrected_info:
+                    # 只添加匹配到词条库的词条（is_corrected=True 表示相似度 >= 0.9）
+                    if info["is_corrected"]:
+                        is_positive = self._is_positive_affix(info["text"], mode)
+
+                        affixes.append({
+                            "text": info["text"],
+                            "cleaned_text": info["text"],
+                            "is_positive": is_positive,
+                            "is_unknown": False,
+                            "similarity": info["similarity"]
+                        })
+
+                        if is_positive:
+                            positive_count += 1
+                        else:
+                            negative_count += 1
+
+                recognition_time = (time.time() - start_time) * 1000  # 转换为毫秒
+
+                # 检查是否识别到任何词条库内的词条
+                if len(affixes) == 0:
+                    if retry < max_retry - 1:
+                        # 区分两种情况：完全没识别到文字 vs 识别到了但都是未知词条
+                        if len(raw_entries) == 0:
+                            print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到任何文字，重试中...")
+                        else:
+                            print(f"[重试 {retry + 1}/{max_retry}] 识别到{len(raw_entries)}条文本，但都不匹配词条库（全未知词条），重试中...")
+                        time.sleep(0.3)
+                        continue
+                    else:
+                        if len(raw_entries) == 0:
+                            print(f"[失败] 重试{max_retry}次后仍未识别到任何文字")
+                        else:
+                            print(f"[失败] 重试{max_retry}次后仍未识别到任何词条库内的词条（识别到{len(raw_entries)}条未知文本）")
+                        return {
+                            "affixes": [],
+                            "positive_count": 0,
+                            "negative_count": 0,
+                            "recognition_time": recognition_time,
+                            "success": False,
+                            "retry_count": retry + 1
+                        }
+
+                return {
+                    "affixes": affixes,
+                    "positive_count": positive_count,
+                    "negative_count": negative_count,
+                    "recognition_time": recognition_time,
+                    "success": True,
+                    "retry_count": retry + 1
+                }
+
+            except Exception as e:
+                if retry < max_retry - 1:
+                    print(f"[重试 {retry + 1}/{max_retry}] OCR识别失败: {e}，重试中...")
+                    time.sleep(0.3)
+                    continue
+                else:
+                    print(f"[错误] OCR识别失败: {e}")
+                    return self._empty_classification_result()
+
+        return self._empty_classification_result()
+
+    def _empty_classification_result(self) -> dict:
+        """返回空的分类结果"""
+        return {
+            "affixes": [],
+            "positive_count": 0,
+            "negative_count": 0,
+            "recognition_time": 0.0,
+            "success": False
+        }
+
+    def recognize_with_classification_from_lines(self, line_images: list, mode: str = "normal") -> dict:
+        """
+        从6行图像执行OCR识别并分类词条（正面/负面）
+        支持重试机制：如果识别不到任何词条库内的词条，最多重试3次
+
+        Args:
+            line_images: 6个单行图像的列表
+            mode: 模式 ("normal" 或 "deepnight")
+
+        Returns:
+            与 recognize_with_classification 相同的格式
+        """
+        # 检查是否需要重新加载词条库
+        if self.current_mode != mode:
+            print(f"[词条库切换] {self.current_mode} -> {mode}")
+            self.load_vocabulary(mode)
+
+        max_retry = CORRECTION_CONFIG.get("max_retry", 3)
+
+        for retry in range(max_retry):
+            start_time = time.time()
+
+            try:
+                # 对每行进行单行识别
                 all_text = []
-                for item in result:
-                    text = item.get('text', '') if isinstance(item, dict) else item['text']
-                    if text.strip():
+                for line_image in line_images:
+                    text, _ = self.recognize_single_line(line_image)
+                    if text:
                         all_text.append(text)
 
+                if not all_text:
+                    if retry < max_retry - 1:
+                        print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到任何文字，重试中...")
+                        time.sleep(0.3)
+                        continue
+                    return self._empty_classification_result()
+
+                # 拼接所有文本
                 combined_text = '\n'.join(all_text)
+
+                # 处理文本（符号标准化、分割词条）
                 raw_entries = split_entries(combined_text)
 
                 # 先进行断行合并和纠错，获取详细信息
@@ -542,11 +702,18 @@ class OCREngine:
                 # 检查是否识别到任何词条库内的词条
                 if len(affixes) == 0:
                     if retry < max_retry - 1:
-                        print(f"[重试 {retry + 1}/{max_retry}] 未识别到任何词条库内的词条，重试中...")
+                        # 区分两种情况：完全没识别到文字 vs 识别到了但都是未知词条
+                        if len(raw_entries) == 0:
+                            print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到任何文字，重试中...")
+                        else:
+                            print(f"[重试 {retry + 1}/{max_retry}] 识别到{len(raw_entries)}条文本，但都不匹配词条库（全未知词条），重试中...")
                         time.sleep(0.3)
                         continue
                     else:
-                        print(f"[失败] 重试{max_retry}次后仍未识别到任何词条库内的词条")
+                        if len(raw_entries) == 0:
+                            print(f"[失败] 重试{max_retry}次后仍未识别到任何文字")
+                        else:
+                            print(f"[失败] 重试{max_retry}次后仍未识别到任何词条库内的词条（识别到{len(raw_entries)}条未知文本）")
                         return {
                             "affixes": [],
                             "positive_count": 0,
@@ -575,16 +742,6 @@ class OCREngine:
                     return self._empty_classification_result()
 
         return self._empty_classification_result()
-
-    def _empty_classification_result(self) -> dict:
-        """返回空的分类结果"""
-        return {
-            "affixes": [],
-            "positive_count": 0,
-            "negative_count": 0,
-            "recognition_time": 0.0,
-            "success": False
-        }
 
     def _correct_and_classify(self, entry: str, mode: str) -> dict:
         """
