@@ -263,17 +263,20 @@ class RepositoryFilter:
     def capture_line_rois(self) -> list:
         """
         截取6行单行ROI区域（用于单行OCR识别）
+        优化：只截图一次，然后从同一张图裁剪6个区域
 
         Returns:
             6个单行图像的列表，每个图像是numpy数组
         """
+        window_image = self._capture_game_window()
+        if window_image is None:
+            return [np.zeros((100, 100, 3), dtype=np.uint8) for _ in self.LINE_ROI_COORDS]
+
         line_images = []
         for y_start, y_end in self.LINE_ROI_COORDS:
-            # 构建完整的ROI坐标 (x1, y1, x2, y2)
             region = (self.LINE_ROI_X_START, y_start, self.LINE_ROI_X_END, y_end)
-            # 使用 _capture_region() 方法获取单行ROI（自动处理缩放）
-            line_roi = self._capture_region(region)
-            line_images.append(line_roi)
+            x1, y1, x2, y2 = self._scale_region(region)
+            line_images.append(window_image[y1:y2, x1:x2])
 
         return line_images
 

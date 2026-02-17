@@ -121,19 +121,19 @@ class SettingsPage(QWidget):
         favorited_layout.addStretch()
         card_layout.addLayout(favorited_layout)
 
-        # 双有效/三有效模式
+        # 三有效模式
         valid_layout = QHBoxLayout()
-        valid_label = QLabel("双有效模式:")
+        valid_label = QLabel("三有效模式:")
         valid_label.setFixedWidth(150)
         self.require_double_switch = SwitchButton()
-        self.require_double_switch.setChecked(self.settings.get("require_double_valid", True))
+        self.require_double_switch.setChecked(not self.settings.get("require_double_valid", True))
         self.require_double_switch.checkedChanged.connect(self._auto_save_settings)
         valid_layout.addWidget(valid_label)
         valid_layout.addWidget(self.require_double_switch)
         valid_layout.addStretch()
 
         # 说明文本
-        valid_desc = QLabel("开启: 2条词条匹配即合格 | 关闭: 3条词条匹配才合格")
+        valid_desc = QLabel("开启: 3条词条匹配才合格 | 关闭: 2条词条匹配即合格")
         valid_desc.setFont(QFont("Segoe UI", 8))
         valid_desc.setStyleSheet("color: gray;")
         card_layout.addLayout(valid_layout)
@@ -315,7 +315,7 @@ class SettingsPage(QWidget):
         self.settings = {
             "game_window_title": self.window_title_input.text(),
             "allow_operate_favorited": self.allow_favorited_switch.isChecked(),
-            "require_double_valid": self.require_double_switch.isChecked()
+            "require_double_valid": not self.require_double_switch.isChecked()
         }
 
         try:
@@ -334,7 +334,7 @@ class SettingsPage(QWidget):
         self.settings = {
             "game_window_title": self.window_title_input.text(),
             "allow_operate_favorited": self.allow_favorited_switch.isChecked(),
-            "require_double_valid": self.require_double_switch.isChecked()
+            "require_double_valid": not self.require_double_switch.isChecked()
         }
 
         try:

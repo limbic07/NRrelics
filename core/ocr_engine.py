@@ -341,7 +341,7 @@ class OCREngine:
         print("正在加载OCR模型...")
         try:
             # 使用默认模型
-            self.engine = CnOcr()
+            self.engine = CnOcr(det_model_name='naive_det')
             print("OCR模型加载完成")
         except Exception as e:
             print(f"[错误] OCR模型加载失败: {e}")

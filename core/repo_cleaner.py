@@ -10,7 +10,6 @@ import pyautogui
 import pydirectinput
 import pygetwindow as gw
 from typing import Dict, List, Optional
-from rapidfuzz import fuzz
 
 from core.preset_manager import PresetManager
 from core.ocr_engine import OCREngine
@@ -91,7 +90,6 @@ class RepoCleaner:
         self.normal_stop = False  # 重置正常停止标志
         self._reset_stats()
         self.qualified_relics = []
-        self.relic_detector.frame_buffer.clear()  # 清空帧缓冲区，开始新的检测
 
         # 日志函数
         def log(message: str, level: str = "INFO"):
@@ -163,40 +161,31 @@ class RepoCleaner:
                     time.sleep(0.1)
                     continue
 
+                t_relic_start = time.time()
+
                 # 检查数量限制
                 if max_relics > 0 and self.stats["total_detected"] >= max_relics:
                     log(f"已达到最大检测数量: {max_relics}", "SUCCESS")
                     self.normal_stop = True  # 正常停止
                     break
 
-                # 截图积累帧缓冲区（快速截图N次填满buffer，捕捉光标呼吸灯效果）
-                for frame_i in range(self.relic_detector.temporal_frame_count):
-                    if not self.is_running:
-                        return
-                    image = self.repository_filter._capture_game_window()
-                    if image is None:
-                        continue
-                    # 前N-1帧只积累buffer，不做检测
-                    if frame_i < self.relic_detector.temporal_frame_count - 1:
-                        self.relic_detector.detect_cursor(image, self.repository_filter.scale_x, self.repository_filter.scale_y)
-                        time.sleep(0.03)  # 30ms间隔，5帧共约150ms
-
+                # 截图（使用 RepositoryFilter 的截图方法，确保截取客户区）
+                t_start = time.time()
+                image = self.repository_filter._capture_game_window()
+                t_capture = time.time() - t_start
                 if image is None:
                     log("截图失败，跳过", "ERROR")
                     pydirectinput.press('right')
-                    self.relic_detector.frame_buffer.clear()
-                    for _ in range(5):  # 0.5秒，可中断
-                        if not self.is_running:
-                            return
-                        time.sleep(0.1)
                     continue
 
-                # 状态检测（最后一帧同时做检测）
+                # 状态检测
+                t_start = time.time()
                 relic_state = self.relic_detector.detect_state(image, 1.0, self.repository_filter.scale_x, self.repository_filter.scale_y)
+                t_detect = time.time() - t_start
                 self.stats["total_detected"] += 1
 
                 state_name = RELIC_STATE_NAMES.get(relic_state, relic_state)
-                log(f"[{self.stats['total_detected']}] 遗物状态: {state_name}", "INFO")
+                log(f"[{self.stats['total_detected']}] 遗物状态: {state_name} (截图:{t_capture:.3f}s 检测:{t_detect:.3f}s)", "INFO")
 
                 # 跳过决策
                 should_skip = self._should_skip_relic(relic_state, cleaning_mode, allow_operate_favorited)
@@ -205,18 +194,15 @@ class RepoCleaner:
                     log("跳过该遗物", "INFO")
                     self.stats["skipped"] += 1
                     pydirectinput.press('right')
-                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
-                    for _ in range(5):  # 0.5秒，可中断
-                        if not self.is_running:
-                            return
-                        time.sleep(0.1)
                     continue
 
                 # OCR识别（使用6行单行ROI）
-                log("识别词条中...", "INFO")
+                t_start = time.time()
                 line_images = self.repository_filter.capture_line_rois()
+                t_roi = time.time() - t_start
 
                 # 对6行图像分别进行单行识别
+                t_start = time.time()
                 all_text = []
                 for line_image in line_images:
                     text, _ = self.ocr_engine.recognize_single_line(line_image)
@@ -229,6 +215,8 @@ class RepoCleaner:
                 # 使用 recognize_with_classification 处理合并后的文本
                 # 注意：这里传入的是文本而不是图像，需要修改方法
                 ocr_result = self.ocr_engine.recognize_with_classification_from_lines(line_images, mode)
+                t_ocr = time.time() - t_start
+                log(f"识别词条完成 (截取ROI:{t_roi:.3f}s OCR:{t_ocr:.3f}s)", "INFO")
 
                 if not ocr_result["success"]:
                     # 检查是否是手动停止导致的识别失败
@@ -248,14 +236,16 @@ class RepoCleaner:
 
                 # 检测是否卡住（连续两次识别到相同遗物）
                 if last_relic_hash is not None and current_relic_hash == last_relic_hash:
-                    log("检测到重复遗物，等待1秒后重新检测...", "WARNING")
-                    # 等待1秒，让界面有时间跳转
-                    for _ in range(10):
+                    log("检测到重复遗物，再次尝试按F售出...", "WARNING")
+                    pydirectinput.press('f')
+
+                    # 超时等待，给游戏时间响应
+                    for _ in range(10):  # 1秒
                         if not self.is_running:
                             return
                         time.sleep(0.1)
 
-                    # 重新OCR识别（使用6行单行ROI）
+                    # 重新OCR识别确认
                     line_images_retry = self.repository_filter.capture_line_rois()
                     ocr_result_retry = self.ocr_engine.recognize_with_classification_from_lines(line_images_retry, mode)
 
@@ -264,36 +254,23 @@ class RepoCleaner:
                         retry_hash = hash(tuple(sorted(affix_texts_retry)))
 
                         if retry_hash == current_relic_hash:
-                            # 确认是真的卡住了
-                            log("确认重复遗物，上一个遗物无法出售（很可能是官方遗物），跳过", "WARNING")
-                            # 减去重复计数（因为这是同一个遗物）
+                            # 按F后仍然是同一个遗物，确认是官方遗物
+                            log("确认为官方遗物（无法售出），按右方向键跳过", "WARNING")
                             self.stats["total_detected"] -= 1
-                            # 按右方向键跳过
                             pydirectinput.press('right')
-                            self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
-                            for _ in range(10):  # 1秒，等待界面切换
-                                if not self.is_running:
-                                    return
-                                time.sleep(0.1)
-                            # 重置哈希，避免连续检测
                             last_relic_hash = None
                             continue
                         else:
-                            # 界面已经跳转了，减去计数（因为当前计数是重复的），然后continue到下一次循环
-                            log("界面已跳转到新遗物，重新开始检测", "INFO")
+                            # 按F成功，界面已跳转到新遗物
+                            log("售出成功，界面已跳转到新遗物", "INFO")
                             self.stats["total_detected"] -= 1
-                            last_relic_hash = None  # 重置哈希
+                            last_relic_hash = None
                             continue
                     else:
                         # 重试OCR失败，跳过
                         log("重新识别失败，跳过", "ERROR")
                         self.stats["total_detected"] -= 1
                         pydirectinput.press('right')
-                        self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
-                        for _ in range(5):
-                            if not self.is_running:
-                                return
-                            time.sleep(0.1)
                         last_relic_hash = None
                         continue
 
@@ -308,6 +285,7 @@ class RepoCleaner:
                     log(f"  [{affix_type}] {affix['cleaned_text']} (相似度: {affix.get('similarity', 0):.2f})", "INFO")
 
                 # 词条匹配
+                t_start = time.time()
                 match_result = self._match_affixes(
                     ocr_result,
                     general_preset,
@@ -315,16 +293,19 @@ class RepoCleaner:
                     blacklist_preset,
                     require_double
                 )
+                t_match = time.time() - t_start
 
                 if match_result["qualified"]:
-                    log(f"合格遗物 ({match_result['reason']})", "SUCCESS")
+                    log(f"合格遗物 ({match_result['reason']}) (匹配:{t_match:.3f}s)", "SUCCESS")
                     self.stats["qualified"] += 1
                 else:
                     log(f"不合格遗物 ({match_result['reason']})", "INFO")
                     self.stats["unqualified"] += 1
 
                 # 操作执行
+                t_start = time.time()
                 need_move_right = self._execute_action(relic_state, match_result["qualified"], cleaning_mode, log)
+                t_action = time.time() - t_start
 
                 # 根据清理模式和操作结果，记录遗物
                 # 注意：售出模式下，只有在最后确认售出后才会记录，这里不记录
@@ -351,11 +332,9 @@ class RepoCleaner:
                 # 移动到下一遗物（如果需要）
                 if need_move_right:
                     pydirectinput.press('right')
-                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
-                    for _ in range(5):  # 0.5秒，可中断
-                        if not self.is_running:
-                            return
-                        time.sleep(0.1)
+
+                t_relic_total = time.time() - t_relic_start
+                log(f"[耗时] 总计:{t_relic_total:.3f}s | 截图:{t_capture:.3f}s 检测:{t_detect:.3f}s ROI:{t_roi:.3f}s OCR:{t_ocr:.3f}s 匹配:{t_match:.3f}s 操作:{t_action:.3f}s", "DEBUG")
 
             # 清理完成
             if self.is_running:
@@ -371,10 +350,8 @@ class RepoCleaner:
             if self.normal_stop and cleaning_mode == "sell" and self.pending_sell_count > 0:
                 log(f"执行售出操作 ({self.pending_sell_count}个遗物)...", "INFO")
                 pydirectinput.press('3')  # 打开售出界面
-                self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                 time.sleep(0.5)
                 pydirectinput.press('f')  # 确认售出
-                self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                 time.sleep(0.5)
                 log("售出完成", "SUCCESS")
 
@@ -508,13 +485,10 @@ class RepoCleaner:
         # 2. 黑名单匹配（深夜模式）
         if blacklist_preset:
             neg_matched_count = 0
+            blacklist_set = set(blacklist_preset["affixes"])
             for neg in neg_affixes:
-                for vocab in blacklist_preset["affixes"]:
-                    similarity = fuzz.ratio(neg["cleaned_text"], vocab) / 100.0
-                    if similarity > 0.9:
-                        neg_matched_count += 1
-                        break
-                if neg_matched_count > 0:
+                if neg["cleaned_text"] in blacklist_set:
+                    neg_matched_count += 1
                     break
 
             if neg_matched_count > 0:
@@ -572,16 +546,13 @@ class RepoCleaner:
         details = []
 
         for affix in pos_affixes:
-            for vocab in vocab_set:
-                similarity = fuzz.ratio(affix["cleaned_text"], vocab) / 100.0
-                if similarity > 0.9:
-                    count += 1
-                    details.append({
-                        "affix": affix["cleaned_text"],
-                        "matched_vocab": vocab,
-                        "similarity": similarity
-                    })
-                    break  # 每条词条只匹配一次
+            if affix["cleaned_text"] in vocab_set:
+                count += 1
+                details.append({
+                    "affix": affix["cleaned_text"],
+                    "matched_vocab": affix["cleaned_text"],
+                    "similarity": 1.0
+                })
 
         return count, details
 
@@ -602,31 +573,16 @@ class RepoCleaner:
                 if relic_state == RELIC_STATE_LIGHT:
                     log("标记售出", "INFO")
                     pydirectinput.press('f')
-                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["sold"] += 1
                     self.pending_sell_count += 1
-                    for _ in range(5):  # 0.5秒，等待界面跳转
-                        if not self.is_running:
-                            return False
-                        time.sleep(0.1)
                     return False  # 按f后会自动跳转，不需要按右方向键
                 elif relic_state == RELIC_STATE_DARK_F:
                     log("取消收藏后标记售出", "INFO")
                     pydirectinput.press('2')  # 取消收藏
-                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
-                    for _ in range(3):  # 0.3秒，等待取消收藏
-                        if not self.is_running:
-                            return False
-                        time.sleep(0.1)
                     pydirectinput.press('f')  # 标记售出
-                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["unfavorited"] += 1
                     self.stats["sold"] += 1
                     self.pending_sell_count += 1
-                    for _ in range(3):  # 0.3秒，等待界面跳转
-                        if not self.is_running:
-                            return False
-                        time.sleep(0.1)
                     return False  # 按f后会自动跳转，不需要按右方向键
 
         elif cleaning_mode == "favorite":
@@ -635,12 +591,7 @@ class RepoCleaner:
                 if relic_state == RELIC_STATE_LIGHT:
                     log("收藏遗物", "INFO")
                     pydirectinput.press('2')
-                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["favorited"] += 1
-                    for _ in range(3):  # 0.3秒，可中断
-                        if not self.is_running:
-                            return False
-                        time.sleep(0.1)
                 elif relic_state == RELIC_STATE_DARK_F:
                     log("已收藏，跳过", "INFO")
             else:
@@ -648,12 +599,7 @@ class RepoCleaner:
                 if relic_state == RELIC_STATE_DARK_F:
                     log("取消收藏", "INFO")
                     pydirectinput.press('2')
-                    self.relic_detector.frame_buffer.clear()  # 按键后清空帧缓冲区
                     self.stats["unfavorited"] += 1
-                    for _ in range(3):  # 0.3秒，可中断
-                        if not self.is_running:
-                            return False
-                        time.sleep(0.1)
 
         return True  # 默认需要按右方向键
 
