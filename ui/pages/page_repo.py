@@ -177,12 +177,15 @@ class PresetCard(CardWidget):
 class RepoPage(QWidget):
     """仓库清理页面"""
 
-    def __init__(self, log_manager=None):
+    # 预设修改信号
+    presets_modified = Signal()
+
+    def __init__(self, log_manager=None, preset_manager=None):
         super().__init__()
         self.setObjectName("RepoPage")
 
         # 初始化组件
-        self.preset_manager = PresetManager()
+        self.preset_manager = preset_manager if preset_manager else PresetManager()
         self.ocr_engine = None  # 延迟加载，初始为 None
         self.relic_detector = None  # 延迟加载
         self.repo_cleaner = None  # 延迟加载
@@ -496,6 +499,10 @@ class RepoPage(QWidget):
 
         self.preset_layout.addStretch()
 
+    def refresh_presets_ui(self):
+        """外部调用：刷新预设UI（当其他页面修改预设时）"""
+        self._refresh_presets()
+
     def _on_mode_changed(self):
         """模式切换"""
         self.current_mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
@@ -524,6 +531,7 @@ class RepoPage(QWidget):
         """保存通用预设"""
         self.preset_manager.update_general_preset(mode, affixes)
         self._refresh_presets()
+        self.presets_modified.emit()  # 发出预设修改信号
         InfoBar.success("保存成功", "通用预设已更新", parent=self)
 
     def _create_dedicated_preset(self):
@@ -552,6 +560,7 @@ class RepoPage(QWidget):
         try:
             self.preset_manager.create_dedicated_preset(mode, name, affixes)
             self._refresh_presets()
+            self.presets_modified.emit()  # 发出预设修改信号
             InfoBar.success("创建成功", f"预设 '{name}' 已创建", parent=self)
         except Exception as e:
             MessageBox("错误", f"创建预设失败: {e}", self).exec()
@@ -580,6 +589,7 @@ class RepoPage(QWidget):
         """更新预设"""
         self.preset_manager.update_dedicated_preset(mode, preset_id, name, affixes)
         self._refresh_presets()
+        self.presets_modified.emit()  # 发出预设修改信号
         InfoBar.success("保存成功", f"预设 '{name}' 已更新", parent=self)
 
     def _delete_preset(self, preset_id: str):
@@ -592,6 +602,7 @@ class RepoPage(QWidget):
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         self.preset_manager.delete_dedicated_preset(mode, preset_id)
         self._refresh_presets()
+        self.presets_modified.emit()  # 发出预设修改信号
         InfoBar.success("删除成功", "预设已删除", parent=self)
 
     def _toggle_preset(self, preset_id: str):
@@ -647,6 +658,10 @@ class RepoPage(QWidget):
         # 更新 repo_cleaner 的设置
         if self.repo_cleaner:
             self.repo_cleaner.settings = self.settings
+
+        # 更新亮度阈值
+        if self.relic_detector:
+            self.relic_detector.brightness_threshold = self.settings.get("brightness_threshold", 45)
 
         # 从设置获取参数
         allow_favorited = self.settings.get("allow_operate_favorited", False)

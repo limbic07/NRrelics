@@ -2,6 +2,7 @@
 
 from PySide6.QtWidgets import QTextEdit
 from PySide6.QtCore import Qt
+import html
 
 
 class LoggerWidget(QTextEdit):
@@ -36,8 +37,9 @@ class LoggerWidget(QTextEdit):
         color = color_map.get(level, "#333333")
         timestamp = self._get_timestamp()
 
-        # 使用 HTML 格式化日志
-        formatted_msg = f'<span style="color: {color}; font-weight: 500;">[{timestamp}]</span> <span style="color: {color};">[{level}]</span> <span style="color: #333333;">{message}</span>'
+        # 使用 HTML 格式化日志（转义message中的特殊字符防止被当作HTML标签）
+        safe_message = html.escape(message)
+        formatted_msg = f'<span style="color: {color}; font-weight: 500;">[{timestamp}]</span> <span style="color: {color};">[{level}]</span> <span style="color: #333333;">{safe_message}</span>'
         self.append(formatted_msg)
 
     def _get_timestamp(self) -> str:

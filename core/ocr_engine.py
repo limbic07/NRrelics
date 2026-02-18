@@ -30,7 +30,7 @@ LINE_BREAK_DICT = {
 # 词条纠错配置
 CORRECTION_CONFIG = {
     "enabled": True,
-    "similarity_threshold": 0.9,
+    "similarity_threshold": 0.7,
     "max_retry": 3,
     "data_dir": "data",
 }

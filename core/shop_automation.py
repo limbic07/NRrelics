@@ -99,7 +99,9 @@ class ShopAutomation:
             print("[警告] 遗物模板图片不存在: data/template_relic.jpg")
 
     def start_shopping(self, mode: str, version: str, stop_currency: int,
-                      require_double: bool, log_callback=None, stats_callback=None):
+                      require_double: bool, log_callback=None, stats_callback=None,
+                      sl_mode_enabled=False, sl_qualified_target=0,
+                      save_manager=None, steam_id="", backup_path=""):
         """
         开始购买流程
 
@@ -110,10 +112,22 @@ class ShopAutomation:
             require_double: 是否需要双有效（True=双有效，False=三有效）
             log_callback: 日志回调函数
             stats_callback: 统计回调函数
+            sl_mode_enabled: 是否启用合格遗物数量停止模式
+            sl_qualified_target: 目标合格遗物数量
+            save_manager: SaveManager实例（SL模式需要）
+            steam_id: Steam用户ID（SL模式需要）
+            backup_path: 存档备份路径（SL模式需要）
         """
         self.is_running = True
         self.stats = {"total_purchased": 0, "qualified": 0, "unqualified": 0, "sold": 0}
         self.qualified_relics.clear()
+
+        # SL模式相关
+        self.sl_mode_enabled = sl_mode_enabled
+        self.sl_qualified_target = sl_qualified_target
+        self.save_manager = save_manager
+        self.steam_id = steam_id
+        self.backup_path = backup_path
 
         def log(message, level="INFO"):
             if log_callback:
@@ -147,17 +161,41 @@ class ShopAutomation:
             # 3. 循环购买
             first_purchase = True
             while self.is_running:
-                # 检查停止条件
-                if stop_currency > 0 and self.stats["total_purchased"] >= stop_currency:
-                    log(f"已达到停止条件（购买{self.stats['total_purchased']}次）", "SUCCESS")
-                    break
-
-                # 检测暗痕数量
-                current_currency = self._detect_currency(log)
-                if current_currency >= 0 and stop_currency > 0:
-                    if current_currency < stop_currency:
-                        log(f"暗痕不足（当前{current_currency} < 停止值{stop_currency}），停止购买", "WARNING")
+                # SL模式：检查合格遗物数量是否达标
+                if self.sl_mode_enabled and self.sl_qualified_target > 0:
+                    if self.stats["qualified"] >= self.sl_qualified_target:
+                        log(f"已达到目标合格遗物数量 ({self.stats['qualified']}/{self.sl_qualified_target})", "SUCCESS")
                         break
+
+                    # 购买前检测暗痕，不足则执行存档恢复
+                    current_currency = self._detect_currency(log)
+                    if current_currency >= 0 and current_currency < 10000:
+                        log(f"暗痕不足 ({current_currency} < 10000)，合格遗物 {self.stats['qualified']}/{self.sl_qualified_target}，执行存档恢复...", "WARNING")
+                        if not self._execute_sl_operation(log):
+                            log("存档恢复操作失败，停止购买", "ERROR")
+                            break
+                        # SL后重置购买统计（保留合格遗物数）
+                        self.stats["total_purchased"] = 0
+                        self.stats["unqualified"] = 0
+                        self.stats["sold"] = 0
+                        if stats_callback:
+                            stats_callback(self.stats.copy())
+                        # 重新进入商人界面
+                        if not self._enter_merchant_interface(log):
+                            log("SL后无法进入商人界面", "ERROR")
+                            break
+                        if not self._find_relic(log):
+                            log("SL后无法找到遗物", "ERROR")
+                            break
+                        first_purchase = True
+                        continue
+                else:
+                    # 原有停止条件：检测暗痕数量
+                    if stop_currency > 0:
+                        current_currency = self._detect_currency(log)
+                        if current_currency >= 0 and current_currency < stop_currency:
+                            log(f"暗痕不足（当前{current_currency} < 停止值{stop_currency}），停止购买", "WARNING")
+                            break
 
                 # 4. 执行购买
                 if first_purchase:
@@ -215,7 +253,7 @@ class ShopAutomation:
         screen_y = offset_y + y
         pyautogui.moveTo(screen_x, screen_y)
         time.sleep(0.1)
-        pyautogui.click()
+        pydirectinput.press('f')
 
     def _enter_merchant_interface(self, log) -> bool:
         """检测并进入商人界面"""
@@ -508,3 +546,95 @@ class ShopAutomation:
         pydirectinput.press('q')
         time.sleep(0.5)
         log("关闭购买界面", "INFO")
+
+    def _execute_sl_operation(self, log) -> bool:
+        """
+        执行存档恢复操作：退出到标题画面 → 恢复存档 → 重新进入游戏
+
+        Returns:
+            True=成功，False=失败
+        """
+        if not self.save_manager or not self.steam_id or not self.backup_path:
+            log("存档恢复参数缺失", "ERROR")
+            return False
+
+        log("开始退出到标题画面...", "INFO")
+
+        # 1. 退出商人界面
+        pydirectinput.press('q')
+        time.sleep(0.5)
+
+        # 2. 打开菜单
+        pydirectinput.press('escape')
+        time.sleep(0.5)
+
+        # 3. 导航到返回首页
+        pydirectinput.press('f1')
+        time.sleep(0.3)
+        pydirectinput.press('up')
+        time.sleep(0.3)
+        pydirectinput.press('f')  # 切换页面
+        time.sleep(0.3)
+        pydirectinput.press('f')
+        time.sleep(0.3)
+        pydirectinput.press('left')
+        time.sleep(0.3)
+        pydirectinput.press('f')  # 确认返回首页
+
+        # 4. 等待返回首页画面
+        log("等待返回首页画面...", "INFO")
+        for _ in range(50):
+            if not self.is_running:
+                return False
+            time.sleep(0.1)
+
+        # 5. 恢复存档
+        log("恢复存档...", "INFO")
+        success, msg = self.save_manager.restore_save(self.steam_id, self.backup_path)
+        if not success:
+            log(f"存档恢复失败: {msg}", "ERROR")
+            return False
+        log("存档恢复成功", "SUCCESS")
+
+        # 6. 不断按f并检测是否进入游戏界面
+        # 检测区域：(1780, 1000, 1870, 1025) 基于1080p，出现数字则判定已进入游戏
+        GAME_DETECT_REGION = (1780, 1000, 1870, 1025)
+        log("读取存档并等待进入游戏...", "INFO")
+
+        import re as _re
+        max_attempts = 120  # 最多尝试120次（约60秒）
+        entered_game = False
+
+        for attempt in range(max_attempts):
+            if not self.is_running:
+                return False
+
+            pydirectinput.press('f')
+            time.sleep(0.5)
+
+            # 截取检测区域并OCR
+            try:
+                detect_image = self.repo_filter._capture_region(GAME_DETECT_REGION)
+                if detect_image is not None and detect_image.size > 0:
+                    result = self.ocr_engine.recognize_raw(detect_image)
+                    if result.get("success") and result.get("entries"):
+                        text = result["entries"][0]
+                        if _re.search(r'\d', text) and '.' not in text:
+                            log(f"检测到游戏界面（识别到: {text}）", "SUCCESS")
+                            entered_game = True
+                            break
+            except Exception as e:
+                pass  # 截图或OCR失败时继续尝试
+
+        if not entered_game:
+            log("等待进入游戏超时", "ERROR")
+            return False
+
+        # 7. 等待游戏界面稳定
+        for _ in range(20):
+            if not self.is_running:
+                return False
+            time.sleep(0.1)
+
+        log("已重新进入游戏，继续购买", "SUCCESS")
+        return True

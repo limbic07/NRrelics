@@ -28,13 +28,20 @@ class ShopThread(QThread):
     qualified_relic_signal = Signal(dict)  # 合格遗物信息
     stats_signal = Signal(dict)  # 统计信息
 
-    def __init__(self, shop_automation, mode, version, stop_currency, require_double):
+    def __init__(self, shop_automation, mode, version, stop_currency, require_double,
+                 sl_mode_enabled=False, sl_qualified_target=0,
+                 save_manager=None, steam_id="", backup_path=""):
         super().__init__()
         self.shop_automation = shop_automation
         self.mode = mode
         self.version = version
         self.stop_currency = stop_currency
         self.require_double = require_double
+        self.sl_mode_enabled = sl_mode_enabled
+        self.sl_qualified_target = sl_qualified_target
+        self.save_manager = save_manager
+        self.steam_id = steam_id
+        self.backup_path = backup_path
 
     def run(self):
         """运行商店购买"""
@@ -45,7 +52,12 @@ class ShopThread(QThread):
                 self.stop_currency,
                 self.require_double,
                 log_callback=self.log_signal.emit,
-                stats_callback=self.stats_signal.emit
+                stats_callback=self.stats_signal.emit,
+                sl_mode_enabled=self.sl_mode_enabled,
+                sl_qualified_target=self.sl_qualified_target,
+                save_manager=self.save_manager,
+                steam_id=self.steam_id,
+                backup_path=self.backup_path
             )
 
             # 购买完成后，发送所有合格遗物信息
@@ -65,13 +77,14 @@ from ui.pages.page_repo import PresetCard
 class PageShop(QWidget):
     """商店筛选页面"""
     settings_changed = Signal()
+    presets_modified = Signal()  # 预设修改信号
 
-    def __init__(self, log_manager=None):
+    def __init__(self, log_manager=None, preset_manager=None):
         super().__init__()
         self.setObjectName("PageShop")
 
         # 初始化组件
-        self.preset_manager = PresetManager()
+        self.preset_manager = preset_manager if preset_manager else PresetManager()
         self.ocr_engine = None  # 延迟加载，初始为 None
 
         # 商店自动化实例（延迟初始化）
@@ -117,6 +130,21 @@ class PageShop(QWidget):
             with open(settings_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {}
+
+    def update_settings(self, settings: dict):
+        """外部更新设置（由设置页面信号触发）"""
+        self.settings = settings
+        self._update_stop_condition_ui()
+
+    def _update_stop_condition_ui(self):
+        """根据SL模式设置切换停止条件UI"""
+        sl_enabled = self.settings.get("sl_mode_enabled", False)
+        # 停止暗痕
+        self.currency_label.setVisible(not sl_enabled)
+        self.currency_input.setVisible(not sl_enabled)
+        # 停止合格遗物数量
+        self.sl_target_label.setVisible(sl_enabled)
+        self.sl_target_input.setVisible(sl_enabled)
 
     def _init_ui(self):
         """初始化UI"""
@@ -184,9 +212,9 @@ class PageShop(QWidget):
 
         layout.addSpacing(10)
 
-        # 停止购买暗痕
-        currency_label = QLabel("停止暗痕:")
-        layout.addWidget(currency_label)
+        # 停止条件（根据设置动态切换）
+        self.currency_label = QLabel("停止暗痕:")
+        layout.addWidget(self.currency_label)
 
         self.currency_input = QLineEdit()
         self.currency_input.setText("0")
@@ -196,6 +224,24 @@ class PageShop(QWidget):
         self.currency_input.setValidator(validator)
         self.currency_input.setPlaceholderText("输入暗痕数量")
         layout.addWidget(self.currency_input)
+
+        # SL模式：停止合格遗物数量（默认隐藏）
+        self.sl_target_label = QLabel("停止合格遗物数量:")
+        self.sl_target_label.setVisible(False)
+        layout.addWidget(self.sl_target_label)
+
+        self.sl_target_input = QLineEdit()
+        self.sl_target_input.setText("1")
+        self.sl_target_input.setFixedWidth(120)
+        self.sl_target_input.setFixedHeight(33)
+        sl_validator = QIntValidator(1, 999, self)
+        self.sl_target_input.setValidator(sl_validator)
+        self.sl_target_input.setPlaceholderText("合格遗物数")
+        self.sl_target_input.setVisible(False)
+        layout.addWidget(self.sl_target_input)
+
+        # 根据设置切换显示
+        self._update_stop_condition_ui()
 
         layout.addStretch()
 
@@ -384,6 +430,10 @@ class PageShop(QWidget):
 
         self.preset_layout.addStretch()
 
+    def refresh_presets_ui(self):
+        """外部调用：刷新预设UI（当其他页面修改预设时）"""
+        self._refresh_presets()
+
     def _on_mode_changed(self):
         """模式切换"""
         self.current_mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
@@ -408,6 +458,7 @@ class PageShop(QWidget):
         """保存通用预设"""
         self.preset_manager.update_general_preset(mode, affixes)
         self._refresh_presets()
+        self.presets_modified.emit()  # 发出预设修改信号
         InfoBar.success("保存成功", "通用预设已更新", parent=self)
 
     def _create_dedicated_preset(self):
@@ -435,6 +486,7 @@ class PageShop(QWidget):
         """保存专用预设"""
         self.preset_manager.create_dedicated_preset(mode, name, affixes)
         self._refresh_presets()
+        self.presets_modified.emit()  # 发出预设修改信号
         InfoBar.success("创建成功", f"专用预设 \"{name}\" 已创建", parent=self)
 
     def _edit_dedicated_preset(self, preset_id: str):
@@ -442,37 +494,46 @@ class PageShop(QWidget):
         from ui.dialogs.preset_edit_dialog import PresetEditDialog
 
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
-        preset = self.preset_manager.get_preset_by_id(preset_id)
+        presets = self.preset_manager.get_dedicated_presets(mode)
+        preset = presets.get(preset_id)
+        if not preset:
+            return
+
         vocab = self.preset_manager.load_vocabulary(
             PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST,
             for_editing=True
         )
 
         dialog = PresetEditDialog(vocab, preset, is_general=False, parent=self)
-        dialog.preset_saved.connect(lambda pid, name, affixes: self._update_dedicated_preset(pid, name, affixes))
+        dialog.preset_saved.connect(lambda pid, name, affixes: self._update_dedicated_preset(mode, pid, name, affixes))
         dialog.exec()
 
-    def _update_dedicated_preset(self, preset_id: str, name: str, affixes: list):
+    def _update_dedicated_preset(self, mode: str, preset_id: str, name: str, affixes: list):
         """更新专用预设"""
-        self.preset_manager.update_dedicated_preset(preset_id, name, affixes)
+        self.preset_manager.update_dedicated_preset(mode, preset_id, name, affixes)
         self._refresh_presets()
+        self.presets_modified.emit()  # 发出预设修改信号
         InfoBar.success("保存成功", f"专用预设 \"{name}\" 已更新", parent=self)
 
     def _delete_preset(self, preset_id: str):
         """删除预设"""
-        preset = self.preset_manager.get_preset_by_id(preset_id)
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        presets = self.preset_manager.get_dedicated_presets(mode)
+        preset = presets.get(preset_id)
         if not preset:
             return
 
         msg_box = MessageBox("确认删除", f"确定要删除预设 \"{preset['name']}\" 吗？", self)
         if msg_box.exec():
-            self.preset_manager.delete_preset(preset_id)
+            self.preset_manager.delete_dedicated_preset(mode, preset_id)
             self._refresh_presets()
+            self.presets_modified.emit()  # 发出预设修改信号
             InfoBar.success("删除成功", f"预设 \"{preset['name']}\" 已删除", parent=self)
 
     def _toggle_preset(self, preset_id: str):
         """切换预设启用状态"""
-        self.preset_manager.toggle_preset(preset_id)
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        self.preset_manager.toggle_preset_active(mode, preset_id)
         self._refresh_presets()
 
     def _edit_blacklist_preset(self, preset_id: str):
@@ -524,13 +585,44 @@ class PageShop(QWidget):
         version = "new" if self.version_combo.currentIndex() == 0 else "old"
         stop_currency = int(self.currency_input.text() or "0")
 
-        # 获取三有效设置
+        # 获取商店三有效设置
         settings_file = "data/settings.json"
         require_double = True  # 默认双有效
         if os.path.exists(settings_file):
             with open(settings_file, "r", encoding="utf-8") as f:
                 settings = json.load(f)
-                require_double = settings.get("require_double_valid", True)
+                require_double = settings.get("shop_require_double_valid", True)
+
+        # SL 模式参数
+        sl_mode_enabled = self.settings.get("sl_mode_enabled", False)
+        sl_qualified_target = int(self.sl_target_input.text() or "0") if sl_mode_enabled else 0
+        save_manager = None
+        steam_id = ""
+        backup_path = ""
+
+        # SL 模式：备份存档
+        if sl_mode_enabled and sl_qualified_target > 0:
+            from core.save_manager import SaveManager
+            steam_path = self.settings.get("steam_path", "")
+            save_manager = SaveManager(steam_path)
+            steam_id = save_manager.get_most_recent_user()
+
+            if not steam_id:
+                InfoBar.error("错误", "未检测到Steam用户，无法使用合格遗物数量停止功能", parent=self)
+                return
+
+            # 备份存档
+            backup_dir = os.path.join(save_manager.BACKUP_DIR, steam_id)
+            existing_path = os.path.join(backup_dir, "sl_auto_backup.sl2")
+            if os.path.exists(existing_path):
+                # 已有自动备份，覆盖更新
+                os.remove(existing_path)
+
+            success, msg = save_manager.backup_save(steam_id, "sl_auto_backup")
+            if not success:
+                InfoBar.error("错误", f"存档备份失败: {msg}", parent=self)
+                return
+            backup_path = existing_path
 
         # 清空日志和统计
         self.logger.clear()
@@ -557,7 +649,12 @@ class PageShop(QWidget):
             mode,
             version,
             stop_currency,
-            require_double
+            require_double,
+            sl_mode_enabled=sl_mode_enabled,
+            sl_qualified_target=sl_qualified_target,
+            save_manager=save_manager,
+            steam_id=steam_id,
+            backup_path=backup_path
         )
         self.shop_thread.log_signal.connect(self._on_log)
         self.shop_thread.qualified_relic_signal.connect(self._add_qualified_relic)
@@ -569,10 +666,15 @@ class PageShop(QWidget):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
 
-        if self.log_manager:
-            self.log_manager.log("开始购买遗物...", "INFO")
+        if sl_mode_enabled and sl_qualified_target > 0:
+            log_msg = f"开始购买遗物（目标: {sl_qualified_target}个合格遗物）..."
         else:
-            self.logger.log("开始购买遗物...", "INFO")
+            log_msg = "开始购买遗物..."
+
+        if self.log_manager:
+            self.log_manager.log(log_msg, "INFO")
+        else:
+            self.logger.log(log_msg, "INFO")
 
     def _on_log(self, message: str, level: str):
         """处理日志信号"""

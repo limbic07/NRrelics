@@ -1,5 +1,11 @@
 {
-  "game_window_title": "NIGHTREIGN",
   "allow_operate_favorited": true,
-  "require_double_valid": true
+  "require_double_valid": true,
+  "shop_require_double_valid": false,
+  "steam_path": "",
+  "ocr_debug": false,
+  "template_threshold": 0.7,
+  "brightness_threshold": 45,
+  "sl_mode_enabled": true,
+  "developer_mode": true
 }

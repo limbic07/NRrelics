@@ -3,7 +3,7 @@
 # 不在顶层导入，避免启动时加载所有页面
 # 页面将在 MainWindow._init_pages() 中按需导入
 
-__all__ = ['ShopPage', 'RepoPage', 'SavePage', 'SettingsPage']
+__all__ = ['ShopPage', 'RepoPage', 'SavePage', 'SettingsPage', 'AboutPage']
 
 def __getattr__(name):
     """延迟导入页面类"""
@@ -19,4 +19,7 @@ def __getattr__(name):
     elif name == 'SettingsPage':
         from .page_settings import SettingsPage
         return SettingsPage
+    elif name == 'AboutPage':
+        from .page_about import AboutPage
+        return AboutPage
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
