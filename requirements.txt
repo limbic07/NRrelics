@@ -14,3 +14,7 @@ keyboard>=0.13.5
 
 # 文本处理
 rapidfuzz>=2.0.0
+
+# Windows 系统接口
+pywin32>=305
+pygetwindow>=0.0.9
