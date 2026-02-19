@@ -1,6 +1,6 @@
 """
 NRrelic Bot v2.0.0 - 主程序入口
-简洁框架 - 异步初始化 OCR (使用 QThread)
+ - 异步初始化 OCR (使用 QThread)
 """
 
 import sys
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Signal, QObject, QThread
 from PySide6.QtGui import QFont
 from ui import MainWindow
+from ui.dialogs.welcome_dialog import WelcomeDialog
 
 
 class OCRWorker(QObject):
@@ -113,10 +114,39 @@ class Application:
         """OCR 初始化失败"""
         pass
 
+    def _show_welcome_if_needed(self):
+        """首次启动时显示使用须知"""
+        settings_path = Path("data/settings.json")
+        try:
+            if settings_path.exists():
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                if settings.get("welcome_shown", False):
+                    return
+        except Exception:
+            pass
+
+        dlg = WelcomeDialog(self.window)
+        dlg.exec()
+
+        if dlg.should_hide_forever():
+            try:
+                if settings_path.exists():
+                    with open(settings_path, 'r', encoding='utf-8') as f:
+                        settings = json.load(f)
+                else:
+                    settings = {}
+                settings["welcome_shown"] = True
+                with open(settings_path, 'w', encoding='utf-8') as f:
+                    json.dump(settings, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+
     def run(self):
         """运行应用"""
         self.initialize()
         self.window.show()
+        self._show_welcome_if_needed()
         return self.app.exec()
 
 
