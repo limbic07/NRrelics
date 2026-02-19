@@ -1,5 +1,5 @@
 # OCR 和图像处理
-cnocr>=2.3.0
+rapidocr>=2.0.0
 opencv-python>=4.5.0
 numpy>=1.21.0
 

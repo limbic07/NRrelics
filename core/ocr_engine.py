@@ -6,7 +6,8 @@ OCR 引擎封装模块
 import time
 import re
 import os
-from cnocr import CnOcr
+import cv2
+from rapidocr import RapidOCR
 from rapidfuzz import fuzz
 import numpy as np
 
@@ -322,6 +323,29 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
     return result
 
 
+# ==================== 快速空行检测 ====================
+
+def is_blank_line(image: np.ndarray, variance_threshold: float = 80.0) -> bool:
+    """
+    用像素方差快速判断图像是否为空行（无文字）
+
+    游戏界面暗底亮字：空行近乎纯色，方差极低；有文字的行方差明显更高。
+
+    Args:
+        image: BGR 或灰度图
+        variance_threshold: 方差阈值，低于此值视为空行（默认80）
+
+    Returns:
+        True: 空行（跳过OCR）
+        False: 有内容
+    """
+    if image is None or image.size == 0:
+        return True
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+    variance = float(np.var(gray))
+    return variance < variance_threshold
+
+
 # ==================== OCR 引擎（单例模式） ====================
 
 class OCREngine:
@@ -341,7 +365,7 @@ class OCREngine:
         print("正在加载OCR模型...")
         try:
             # 使用默认模型
-            self.engine = CnOcr(det_model_name='naive_det')
+            self.engine = RapidOCR()
             print("OCR模型加载完成")
         except Exception as e:
             print(f"[错误] OCR模型加载失败: {e}")
@@ -404,8 +428,10 @@ class OCREngine:
             }
         """
         try:
-            result = self.engine.ocr(image)
-            if result is None:
+            _t0 = time.time()
+            result = self.engine(image, use_det=False, use_cls=False)
+            print(f"[OCR耗时] recognize: {(time.time() - _t0) * 1000:.1f}ms")
+            if not result or not result.txts:
                 return {
                     "entries": [],
                     "raw_entries": [],
@@ -413,12 +439,8 @@ class OCREngine:
                     "success": False
                 }
 
-            # 收集所有文本
-            all_text = []
-            for item in result:
-                text = item.get('text', '') if isinstance(item, dict) else item['text']
-                if text.strip():
-                    all_text.append(text)
+            # rapidocr v3.x 返回 TextRecOutput，通过 .txts 获取文本列表
+            all_text = [t for t in result.txts if t and t.strip()]
 
             combined_text = '\n'.join(all_text)
             raw_entries = split_entries(combined_text)
@@ -458,18 +480,26 @@ class OCREngine:
             (text, score) - 识别文本和置信度
         """
         try:
-            result = self.engine.ocr_for_single_line(image)
-            if result is None:
+            if is_blank_line(image):
+                print(f"[单行OCR] 检测到空行（方差过低），跳过")
                 return "", 0.0
 
-            text = result.get('text', '')
-            score = result.get('score', 0.0)
+            _t0 = time.time()
+            result = self.engine(image, use_det=False, use_cls=False)
+            print(f"[OCR耗时] recognize_single_line: {(time.time() - _t0) * 1000:.1f}ms")
+            if not result or not result.txts:
+                return "", 0.0
+
+            # rapidocr v3.x: txts=('text1','text2',...), scores=(0.99,...)
+            text = ''.join(result.txts).strip()
+            score = result.scores[0] if result.scores else 0.0
 
             # 清洗单字符"一"（空词条"-"的误识别）
-            text = text.strip()
             if text == "一":
+                print(f"[单行OCR] 识别到噪声'一'，返回空")
                 return "", 0.0
 
+            print(f"[单行OCR] 识别结果: '{text}' (置信度: {score:.4f})")
             return text, score
         except Exception as e:
             print(f"[错误] 单行OCR识别失败: {e}")
@@ -816,22 +846,25 @@ class OCREngine:
             }
         """
         try:
-            # 使用单行识别方法
-            result = self.engine.ocr_for_single_line(image)
-            if result is None or not result:
+            _t0 = time.time()
+            result = self.engine(image, use_det=False, use_cls=False)
+            print(f"[OCR耗时] recognize_raw: {(time.time() - _t0) * 1000:.1f}ms")
+            if not result or not result.txts:
                 return {
                     "entries": [],
                     "success": False
                 }
 
-            # 提取文本
-            text = result.get('text', '') if isinstance(result, dict) else result
-            if text and text.strip():
+            # rapidocr v3.x: txts=('text1','text2',...), scores 分开
+            text = ''.join(result.txts).strip()
+            if text:
+                print(f"[原始OCR] 识别结果: '{text}'")
                 return {
-                    "entries": [text.strip()],
+                    "entries": [text],
                     "success": True
                 }
             else:
+                print(f"[原始OCR] 识别结果为空")
                 return {
                     "entries": [],
                     "success": False
@@ -846,16 +879,14 @@ class OCREngine:
 
     def ocr(self, image) -> tuple:
         """执行OCR，返回处理后的词条列表和纠错时间"""
-        result = self.engine.ocr(image)
-        if result is None:
+        _t0 = time.time()
+        result = self.engine(image, use_det=False, use_cls=False)
+        print(f"[OCR耗时] ocr: {(time.time() - _t0) * 1000:.1f}ms")
+        if not result or not result.txts:
             return [], 0.0
 
-        # 第一步：收集所有 items 的文本，拼接成一段完整的长文本
-        all_text = []
-        for item in result:
-            text = item.get('text', '') if isinstance(item, dict) else item['text']
-            if text.strip():
-                all_text.append(text)
+        # rapidocr v3.x: txts=('text1','text2',...) 纯字符串 tuple
+        all_text = [t for t in result.txts if t and t.strip()]
 
         # 用换行符拼接所有文本
         combined_text = '\n'.join(all_text)

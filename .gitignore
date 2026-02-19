@@ -1,6 +1,8 @@
 #自行添加
 debug_ocr/
 debug/
+data/save_backups/
+CLAUDE.md
 
 # --- Python 核心 ---
 __pycache__/
