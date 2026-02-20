@@ -1,6 +1,6 @@
 # NRrelic Bot v2.0.0
 
-一款用于《艾尔登法环：黑夜边缘》（Elden Ring Nightreign）的遗物自动化管理工具。
+一款用于《艾尔登法环：黑夜君临》（Elden Ring Nightreign）的遗物自动化管理工具。
 
 ## 功能概览
 
