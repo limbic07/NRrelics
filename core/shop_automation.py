@@ -12,6 +12,8 @@ from datetime import datetime
 from typing import Optional
 
 from core.preset_manager import PresetManager
+from core.utils import get_resource_path
+
 
 
 class ShopAutomation:
@@ -91,12 +93,13 @@ class ShopAutomation:
         self.qualified_relics = []
 
         # 加载遗物模板
-        self.relic_template = cv2.imread("data/template_relic.jpg")
+        template_path = get_resource_path("data/template_relic.jpg")
+        self.relic_template = cv2.imread(template_path)
         if self.relic_template is not None:
             self.relic_template_gray = cv2.cvtColor(self.relic_template, cv2.COLOR_BGR2GRAY)
         else:
             self.relic_template_gray = None
-            print("[警告] 遗物模板图片不存在: data/template_relic.jpg")
+            print(f"[警告] 遗物模板图片不存在: {template_path}")
 
     def start_shopping(self, mode: str, version: str, stop_currency: int,
                       require_double: bool, log_callback=None, stats_callback=None,
@@ -437,8 +440,10 @@ class ShopAutomation:
         print(f"[模板匹配] 匹配度: {max_val:.4f}, 阈值: {self.TEMPLATE_MATCH_THRESHOLD}")
 
         # 保存调试图像（仅第一次）
-        cv2.imwrite("debug_shop_region.png", region_image)
-        cv2.imwrite("debug_shop_template_scaled.png", scaled_template)
+        if self.settings.get("ocr_debug", False):
+            cv2.imwrite("debug_shop_region.png", region_image)
+            cv2.imwrite("debug_shop_template_scaled.png", scaled_template)
+
 
         return max_val >= self.TEMPLATE_MATCH_THRESHOLD
 

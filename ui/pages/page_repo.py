@@ -13,13 +13,15 @@ from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
 
 from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
 from ui.components.logger_widget import LoggerWidget
+from core.utils import get_user_data_path
 import json
 import os
 from datetime import datetime
 
 # 持久化数据文件路径
-SOLD_RELICS_FILE = "data/repo_sold_relics.json"
-FAVORITED_RELICS_FILE = "data/repo_favorited_relics.json"
+SOLD_RELICS_FILE = get_user_data_path("data/repo_sold_relics.json")
+FAVORITED_RELICS_FILE = get_user_data_path("data/repo_favorited_relics.json")
+
 
 
 class CleaningThread(QThread):
@@ -796,9 +798,10 @@ class RepoPage(QWidget):
 
     def _load_settings(self) -> dict:
         """加载设置"""
-        settings_file = "data/settings.json"
+        settings_file = get_user_data_path("data/settings.json")
         if not os.path.exists(settings_file):
             return {
+
                 "allow_operate_favorited": False,
                 "require_double_valid": True
             }

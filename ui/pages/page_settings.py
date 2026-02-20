@@ -11,6 +11,8 @@ import json
 import os
 import shutil
 from datetime import datetime
+from core.utils import get_user_data_path
+
 
 
 class SettingsPage(QWidget):
@@ -25,10 +27,11 @@ class SettingsPage(QWidget):
         self.setObjectName("SettingsPage")
 
         # 设置文件路径
-        self.settings_file = "data/settings.json"
+        self.settings_file = get_user_data_path("data/settings.json")
         self.settings = self._load_settings()
 
         self._init_ui()
+
 
     def _init_ui(self):
         """初始化UI"""
@@ -317,10 +320,11 @@ class SettingsPage(QWidget):
 
     def _export_presets(self):
         """导出预设配置文件"""
-        presets_file = "data/presets.json"
+        presets_file = get_user_data_path("data/presets.json")
 
         # 检查预设文件是否存在
         if not os.path.exists(presets_file):
+
             InfoBar.error(
                 title="导出失败",
                 content="预设配置文件不存在",
@@ -374,10 +378,11 @@ class SettingsPage(QWidget):
 
     def _import_presets(self):
         """导入预设配置文件"""
-        presets_file = "data/presets.json"
+        presets_file = get_user_data_path("data/presets.json")
 
         # 打开文件选择对话框
         file_path, _ = QFileDialog.getOpenFileName(
+
             self,
             "导入预设配置",
             "",

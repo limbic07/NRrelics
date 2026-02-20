@@ -7,6 +7,8 @@ import os
 import re
 import shutil
 from datetime import datetime
+from core.utils import get_user_data_path
+
 
 
 class SaveManager:
@@ -26,9 +28,10 @@ class SaveManager:
     SAVE_FILENAME = "NR0000.sl2"
 
     # 备份目录
-    BACKUP_DIR = "data/save_backups"
+    BACKUP_DIR = get_user_data_path("data/save_backups")
 
     def __init__(self, steam_path: str = ""):
+
         self.steam_path = steam_path or self._detect_steam_path()
         self.users = {}
         self._load_steam_users()

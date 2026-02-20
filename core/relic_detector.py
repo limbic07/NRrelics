@@ -7,6 +7,8 @@ import cv2
 import numpy as np
 from pathlib import Path
 from typing import Tuple, Optional, Dict
+from core.utils import get_resource_path
+
 
 
 # 遗物状态常量
@@ -71,11 +73,14 @@ class RelicDetector:
 
     def _load_template(self, path: str) -> Optional[np.ndarray]:
         """加载模板图像"""
-        if not Path(path).exists():
-            print(f"[警告] 模板不存在: {path}")
+        # 处理资源路径
+        abs_path = get_resource_path(path)
+        
+        if not Path(abs_path).exists():
+            print(f"[警告] 模板不存在: {abs_path}")
             return None
 
-        img = cv2.imread(path)
+        img = cv2.imread(abs_path)
         if img is None:
             return None
 

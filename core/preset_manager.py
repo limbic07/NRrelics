@@ -7,6 +7,8 @@ import json
 import os
 import uuid
 from typing import Dict, List, Optional
+from core.utils import get_resource_path, get_user_data_path
+
 
 
 # 预设类型常量
@@ -20,7 +22,8 @@ class PresetManager:
 
     def __init__(self, data_dir: str = "data"):
         self.data_dir = data_dir
-        self.presets_file = os.path.join(data_dir, "presets.json")
+        # presets.json 是用户数据，需读写
+        self.presets_file = get_user_data_path(os.path.join(data_dir, "presets.json"))
 
         # 预设存储结构
         self.normal_general = None
@@ -140,7 +143,8 @@ class PresetManager:
 
         vocabulary = []
         for filename in files:
-            filepath = os.path.join(self.data_dir, filename)
+            # 词条库是静态资源，只读
+            filepath = get_resource_path(os.path.join(self.data_dir, filename))
             if not os.path.exists(filepath):
                 print(f"[警告] 词条库文件不存在: {filepath}")
                 continue

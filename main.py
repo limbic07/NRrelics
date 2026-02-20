@@ -12,6 +12,8 @@ from PySide6.QtCore import Signal, QObject, QThread
 from PySide6.QtGui import QFont
 from ui import MainWindow
 from ui.dialogs.welcome_dialog import WelcomeDialog
+from core.utils import get_user_data_path
+
 
 
 class OCRWorker(QObject):
@@ -66,11 +68,12 @@ class Application:
 
     def _load_config(self) -> dict:
         """加载配置"""
-        config_path = Path("config/settings.json")
+        config_path = Path(get_user_data_path("data/settings.json"))
         if config_path.exists():
             with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
 
     def initialize(self):
         """初始化应用"""
@@ -116,9 +119,10 @@ class Application:
 
     def _show_welcome_if_needed(self):
         """首次启动时显示使用须知"""
-        settings_path = Path("data/settings.json")
+        settings_path = Path(get_user_data_path("data/settings.json"))
         try:
             if settings_path.exists():
+
                 with open(settings_path, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                 if settings.get("welcome_shown", False):

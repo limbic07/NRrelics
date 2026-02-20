@@ -13,12 +13,14 @@ from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
 
 from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
 from ui.components.logger_widget import LoggerWidget
+from core.utils import get_user_data_path
 import json
 import os
 
 
 # 合格遗物数据文件路径
-QUALIFIED_RELICS_FILE = "data/shop_qualified_relics.json"
+QUALIFIED_RELICS_FILE = get_user_data_path("data/shop_qualified_relics.json")
+
 
 
 class ShopThread(QThread):
@@ -125,10 +127,11 @@ class PageShop(QWidget):
 
     def _load_settings(self) -> dict:
         """加载设置"""
-        settings_file = "data/settings.json"
+        settings_file = get_user_data_path("data/settings.json")
         if os.path.exists(settings_file):
             with open(settings_file, "r", encoding="utf-8") as f:
                 return json.load(f)
+
         return {}
 
     def update_settings(self, settings: dict):
@@ -217,8 +220,9 @@ class PageShop(QWidget):
         layout.addWidget(self.currency_label)
 
         self.currency_input = QLineEdit()
-        self.currency_input.setText("0")
+        self.currency_input.setText("5000")
         self.currency_input.setFixedWidth(120)
+
         self.currency_input.setFixedHeight(33)
         validator = QIntValidator(0, 2147483647, self)  # 使用int最大值
         self.currency_input.setValidator(validator)
@@ -586,9 +590,10 @@ class PageShop(QWidget):
         stop_currency = int(self.currency_input.text() or "0")
 
         # 获取商店三有效设置
-        settings_file = "data/settings.json"
+        settings_file = get_user_data_path("data/settings.json")
         require_double = True  # 默认双有效
         if os.path.exists(settings_file):
+
             with open(settings_file, "r", encoding="utf-8") as f:
                 settings = json.load(f)
                 require_double = settings.get("shop_require_double_valid", True)

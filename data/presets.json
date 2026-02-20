@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "normal_general": {
+    "id": "normal_general",
+    "name": "普通通用预设",
+    "type": "normal_whitelist",
+    "affixes": [],
+    "is_general": true,
+    "is_active": true
+  },
+  "deepnight_general": {
+    "id": "deepnight_general",
+    "name": "深夜通用预设",
+    "type": "deepnight_whitelist",
+    "affixes": [],
+    "is_general": true,
+    "is_active": true
+  },
+  "normal_dedicated": {},
+  "deepnight_whitelist_dedicated": {},
+  "deepnight_blacklist": {
+    "id": "deepnight_blacklist",
+    "name": "深夜黑名单",
+    "type": "deepnight_blacklist",
+    "affixes": [],
+    "is_general": false,
+    "is_active": true
+  }
+}

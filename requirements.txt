@@ -1,6 +1,8 @@
 # OCR 和图像处理
 rapidocr>=2.0.0
+onnxruntime>=1.16.0
 opencv-python>=4.5.0
+
 numpy>=1.21.0
 
 # GUI 框架

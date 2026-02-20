@@ -1,6 +1,5 @@
 """
 OCR 引擎封装模块
-将 cnocr_test.py 的核心 OCR 识别逻辑重构为可供 GUI 调用的类
 """
 
 import time
@@ -10,6 +9,8 @@ import cv2
 from rapidocr import RapidOCR
 from rapidfuzz import fuzz
 import numpy as np
+from core.utils import get_resource_path, get_user_data_path
+
 
 
 # ==================== 配置常量 ====================
@@ -57,7 +58,8 @@ class VocabularyLoader:
             raise ValueError(f"Unknown relic type: {self.relic_type}")
 
         for filename in files:
-            filepath = os.path.join(self.data_dir, filename)
+            # 词条库视为静态资源，使用 get_resource_path
+            filepath = get_resource_path(os.path.join(self.data_dir, filename))
             if not os.path.exists(filepath):
                 continue
 
@@ -364,8 +366,26 @@ class OCREngine:
 
         print("正在加载OCR模型...")
         try:
-            # 使用默认模型
-            self.engine = RapidOCR()
+            # 优先使用本地打包的模型，实现离线运行
+            # 这里的路径对应 PyInstaller 打包时的 --add-data "resources/models;resources/models"
+            det_model = get_resource_path("resources/models/ch_PP-OCRv4_det_infer.onnx")
+            cls_model = get_resource_path("resources/models/ch_ppocr_mobile_v2.0_cls_infer.onnx")
+            rec_model = get_resource_path("resources/models/ch_PP-OCRv4_rec_infer.onnx")
+            
+            # 使用 config 参数传入本地模型路径
+            # RapidOCR(config={...})
+            ocr_config = {}
+            if os.path.exists(det_model): ocr_config['Det.model_path'] = det_model
+            if os.path.exists(cls_model): ocr_config['Cls.model_path'] = cls_model
+            if os.path.exists(rec_model): ocr_config['Rec.model_path'] = rec_model
+            
+            if ocr_config:
+                print(f"使用本地模型配置: {ocr_config}")
+                self.engine = RapidOCR(params=ocr_config)
+            else:
+                print("未找到完整本地模型，尝试使用默认配置（可能需要联网下载）")
+                self.engine = RapidOCR()
+                
             print("OCR模型加载完成")
         except Exception as e:
             print(f"[错误] OCR模型加载失败: {e}")
