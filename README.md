@@ -31,24 +31,6 @@
 - 黑名单预设：深夜模式下排除负面词条
 - 词条库支持模糊匹配
 
-## 快速开始
-
-### 环境要求
-- Python 3.9+
-- Windows 操作系统
-- 游戏需以窗口化模式运行
-
-### 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 运行程序
-
-```bash
-python main.py
-```
 
 ## 使用说明
 
