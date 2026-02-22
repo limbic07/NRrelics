@@ -15,7 +15,7 @@ class MainWindow(FluentWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NRrelic Bot v2.0.0")
+        self.setWindowTitle("NRrelic Bot v2.0.2")
 
         # 应用窗口配置
         self.resize(WINDOW_CONFIG["width"], WINDOW_CONFIG["height"])
