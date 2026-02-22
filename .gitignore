@@ -3,6 +3,9 @@ debug_ocr/
 debug/
 data/save_backups/
 CLAUDE.md
+logs/
+*.json
+*.backup
 
 # --- Python 核心 ---
 __pycache__/
@@ -49,3 +52,5 @@ htmlcov/
 # --- 操作系统生成的文件 ---
 .DS_Store
 Thumbs.db
+data/presets.json
+data/presets.json
