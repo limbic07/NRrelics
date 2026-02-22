@@ -75,7 +75,7 @@ class AboutPage(QWidget):
         version_title.setStyleSheet("font-size: 12pt; font-weight: bold;")
         version_layout.addWidget(version_title)
 
-        self.version_label = QLabel("v2.0.0")
+        self.version_label = QLabel("v2.0.2")
         self.version_label.setFont(QFont("Segoe UI", 9))
         self.version_label.setStyleSheet("color: gray;")
         version_layout.addWidget(self.version_label)

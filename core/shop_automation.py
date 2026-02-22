@@ -4,7 +4,6 @@
 """
 
 import time
-import cv2
 import numpy as np
 import pydirectinput
 import pyautogui
@@ -13,7 +12,7 @@ from datetime import datetime
 from typing import Optional
 
 from core.preset_manager import PresetManager
-from core.utils import get_resource_path, DEBUG_ENABLED, debug_timer, affix_recorder, log_debug
+from core.utils import DEBUG_ENABLED, debug_timer, affix_recorder, log_debug
 
 
 
@@ -27,8 +26,8 @@ class ShopAutomation:
     # 商人名称检测区域
     MERCHANT_NAME_REGION = (135, 40, 330, 80)
 
-    # 遗物图标检测区域（需要比模板大，留出匹配余量）
-    RELIC_ICON_REGION = (90, 840, 190, 940)
+    # 遗物价格检测区域（基于1080p，用于OCR识别价格是否为600）
+    RELIC_PRICE_REGION = (155, 942, 195, 964)
 
     # 遗物购买坐标（基于模式）
     RELIC_PURCHASE_COORDS = {
@@ -40,10 +39,6 @@ class ShopAutomation:
 
     # 商人界面入口坐标
     MERCHANT_MENU_COORD = (170, 590)
-
-    # 模板匹配阈值（可调整，默认0.6，如果匹配失败可降低到0.5）
-    # 注意：不同设备的显示效果可能导致匹配度差异，建议范围0.5-0.7
-    TEMPLATE_MATCH_THRESHOLD = 0.6
 
     # 暗痕（货币）检测区域（基于1080p）
     CURRENCY_REGION = (480, 100, 595, 135)
@@ -93,15 +88,6 @@ class ShopAutomation:
 
         # 合格遗物列表
         self.qualified_relics = []
-
-        # 加载遗物模板
-        template_path = get_resource_path("data/template_relic.png")
-        self.relic_template = cv2.imread(template_path)
-        if self.relic_template is not None:
-            self.relic_template_gray = cv2.cvtColor(self.relic_template, cv2.COLOR_BGR2GRAY)
-        else:
-            self.relic_template_gray = None
-            log_debug(f"[警告] 遗物模板图片不存在: {template_path}")
 
     def start_shopping(self, mode: str, version: str, stop_currency: int,
                       require_double: bool, log_callback=None, stats_callback=None,
@@ -226,7 +212,9 @@ class ShopAutomation:
                     blacklist_preset, log, stats_callback
                 )
 
-                # 6. 确认操作（按f）
+                # 6. 确认操作（按f）- 检查是否仍在运行
+                if not self.is_running:
+                    break
                 pydirectinput.press('f')
                 log("已确认操作", "INFO")
 
@@ -392,7 +380,7 @@ class ShopAutomation:
         return line_images
 
     def _find_relic(self, log) -> bool:
-        """滚动寻找遗物"""
+        """滚动寻找遗物（通过OCR识别价格是否为600）"""
         if DEBUG_ENABLED:
             debug_timer.start("寻找遗物")
 
@@ -406,9 +394,9 @@ class ShopAutomation:
             pydirectinput.press('up')
             time.sleep(0.1)
 
-            # 捕获遗物图标区域并模板匹配
-            relic_icon_region = self.repo_filter._capture_region(self.RELIC_ICON_REGION)
-            if relic_icon_region is not None and self._match_relic_template(relic_icon_region):
+            # 捕获价格区域并OCR识别
+            price_region = self.repo_filter._capture_region(self.RELIC_PRICE_REGION)
+            if price_region is not None and self._check_relic_price(price_region):
                 log(f"找到遗物（滚动{i+1}次）", "INFO")
                 if DEBUG_ENABLED:
                     elapsed = debug_timer.end("寻找遗物")
@@ -419,6 +407,30 @@ class ShopAutomation:
         if DEBUG_ENABLED:
             elapsed = debug_timer.end("寻找遗物")
             debug_timer.record("寻找遗物", elapsed)
+        return False
+
+    def _check_relic_price(self, region_image) -> bool:
+        """通过OCR识别价格是否为600"""
+        if region_image is None or region_image.size == 0:
+            log_debug(f"[价格识别] 区域为空")
+            return False
+
+        result = self.ocr_engine.recognize_raw(region_image)
+        if not result["success"] or not result["entries"]:
+            log_debug(f"[价格识别] OCR识别失败")
+            return False
+
+        # 提取数字
+        text = "".join(result["entries"])
+        digits = "".join(c for c in text if c.isdigit())
+
+        log_debug(f"[价格识别] 识别文本: {text}, 提取数字: {digits}")
+
+        # 判断是否为600
+        if digits == "600":
+            log_debug(f"[价格识别] 价格匹配: 600")
+            return True
+
         return False
 
     def _execute_first_purchase(self, mode: str, version: str, log) -> bool:
@@ -442,6 +454,12 @@ class ShopAutomation:
         pyautogui.moveTo(screen_x, screen_y)
         time.sleep(0.1)
 
+        # 检查是否仍在运行
+        if not self.is_running:
+            if DEBUG_ENABLED:
+                debug_timer.end("首次购买")
+            return False
+
         # 按F购买
         pydirectinput.press('f')
         pydirectinput.press('f2')
@@ -460,6 +478,12 @@ class ShopAutomation:
         if DEBUG_ENABLED:
             debug_timer.start("后续购买")
 
+        # 检查是否仍在运行
+        if not self.is_running:
+            if DEBUG_ENABLED:
+                debug_timer.end("后续购买")
+            return False
+
         pydirectinput.press('f')
         pydirectinput.press('f2')
         pydirectinput.press('f')
@@ -472,46 +496,6 @@ class ShopAutomation:
             debug_timer.record("后续购买", elapsed)
         return True
 
-    def _match_relic_template(self, region_image) -> bool:
-        """模板匹配检测遗物图标"""
-        if self.relic_template_gray is None or region_image is None or region_image.size == 0:
-            log_debug(f"[模板匹配] 模板或区域为空")
-            return False
-
-        # 使用 repo_filter 的缩放因子
-        scaled_template = cv2.resize(
-            self.relic_template_gray, None,
-            fx=self.repo_filter.scale_x,
-            fy=self.repo_filter.scale_y,
-            interpolation=cv2.INTER_LINEAR
-        )
-
-        log_debug(f"[模板匹配] 模板原始尺寸: {self.relic_template_gray.shape}, 缩放后: {scaled_template.shape}, 区域尺寸: {region_image.shape}, 缩放因子: ({self.repo_filter.scale_x:.4f}, {self.repo_filter.scale_y:.4f})")
-
-        # 检查模板尺寸是否合法
-        if (scaled_template.shape[0] > region_image.shape[0] or
-            scaled_template.shape[1] > region_image.shape[1]):
-            log_debug(f"[模板匹配] 模板尺寸大于区域，跳过")
-            return False
-
-        # 转灰度匹配
-        if len(region_image.shape) == 3:
-            region_gray = cv2.cvtColor(region_image, cv2.COLOR_BGR2GRAY)
-        else:
-            region_gray = region_image
-
-        result = cv2.matchTemplate(region_gray, scaled_template, cv2.TM_CCOEFF_NORMED)
-        _, max_val, _, _ = cv2.minMaxLoc(result)
-
-        log_debug(f"[模板匹配] 匹配度: {max_val:.4f}, 阈值: {self.TEMPLATE_MATCH_THRESHOLD}")
-
-        # 保存调试图像（仅第一次）
-        if self.settings.get("ocr_debug", False):
-            cv2.imwrite("debug_shop_region.png", region_image)
-            cv2.imwrite("debug_shop_template_scaled.png", scaled_template)
-
-
-        return max_val >= self.TEMPLATE_MATCH_THRESHOLD
 
     def _process_purchased_relics(self, mode, require_double, general_preset,
                                    dedicated_presets, blacklist_preset, log, stats_callback):

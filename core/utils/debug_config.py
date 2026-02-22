@@ -12,7 +12,7 @@ from .path import get_user_data_path
 
 
 # ==================== 全局调试开关 ====================
-DEBUG_ENABLED = False  # 改为False关闭所有调试功能
+DEBUG_ENABLED = True  # 改为False关闭所有调试功能
 
 
 class DebugTimer:

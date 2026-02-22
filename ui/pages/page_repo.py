@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QScrollArea, QFrame, QSplitter, QGroupBox, QCheckBox, QLineEdit)
 from PySide6.QtCore import Qt, Signal, QThread, QMimeData, QPoint
 from PySide6.QtGui import QFont, QIntValidator, QDrag, QPixmap
+import keyboard
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
                            ComboBox, MessageBox, InfoBar, InfoBarPosition)
 
@@ -315,6 +316,9 @@ class RepoPage(QWidget):
 
         layout.addWidget(splitter, 1)
 
+        # 设置快捷键
+        self._setup_shortcuts()
+
     def _create_toolbar(self) -> CardWidget:
         """创建顶部工具栏（紧凑版）"""
         card = CardWidget()
@@ -378,7 +382,7 @@ class RepoPage(QWidget):
         self.start_btn.clicked.connect(self._start_cleaning)
         layout.addWidget(self.start_btn)
 
-        self.stop_btn = PushButton("停止")
+        self.stop_btn = PushButton("停止 (F11)")
         self.stop_btn.setFixedHeight(36)
         self.stop_btn.setFixedWidth(80)
         self.stop_btn.setEnabled(False)
@@ -1032,9 +1036,29 @@ class RepoPage(QWidget):
 
         # 启用开始按钮
         self.start_btn.setEnabled(True)
-        self.start_btn.setText("开始清理")
+        self.start_btn.setText("开始清理(F10)")
         # 输出成功日志
         if self.log_manager:
             self.log_manager.log("OCR 引擎异步加载完成", "SUCCESS")
         else:
             self.logger.log("OCR 引擎异步加载完成", "SUCCESS")
+
+    def _setup_shortcuts(self):
+        """设置全局快捷键"""
+        # F10 开始清理
+        keyboard.add_hotkey('F10', self._on_start_shortcut, suppress=False)
+        # F11 停止清理
+        keyboard.add_hotkey('F11', self._on_stop_shortcut, suppress=False)
+
+    def _on_start_shortcut(self):
+        """F10 快捷键触发开始"""
+        if self.isVisible() and self.start_btn.isEnabled():
+            # 使用 QMetaObject.invokeMethod 确保在主线程执行
+            from PySide6.QtCore import QMetaObject, Qt as QtCore_Qt
+            QMetaObject.invokeMethod(self, "_start_cleaning", QtCore_Qt.QueuedConnection)
+
+    def _on_stop_shortcut(self):
+        """F11 快捷键触发停止"""
+        if self.isVisible() and self.stop_btn.isEnabled():
+            from PySide6.QtCore import QMetaObject, Qt as QtCore_Qt
+            QMetaObject.invokeMethod(self, "_stop_cleaning", QtCore_Qt.QueuedConnection)
