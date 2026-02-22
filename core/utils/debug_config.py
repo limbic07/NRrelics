@@ -12,7 +12,7 @@ from .path import get_user_data_path
 
 
 # ==================== 全局调试开关 ====================
-DEBUG_ENABLED = True  # 改为False关闭所有调试功能
+DEBUG_ENABLED = False  # 改为False关闭所有调试功能
 
 
 class DebugTimer:
@@ -166,13 +166,16 @@ class AffixRecorder:
     """词条记录工具"""
 
     def __init__(self):
-        self.correction_failed = defaultdict(lambda: {"count": 0, "is_positive": None})  # 纠错失败
+        self.correction_failed = defaultdict(lambda: {"count": 0, "is_positive": None, "raw_text": None})  # 纠错失败
         self.correction_success = defaultdict(lambda: {"count": 0, "is_positive": None})  # 纠错成功
 
-    def record_failed(self, text: str, is_positive: bool):
+    def record_failed(self, text: str, is_positive: bool, raw_text: str = None):
         """记录纠错失败的词条"""
         self.correction_failed[text]["count"] += 1
         self.correction_failed[text]["is_positive"] = is_positive
+        # 保存原始OCR文本（第一次出现时保存）
+        if self.correction_failed[text]["raw_text"] is None and raw_text:
+            self.correction_failed[text]["raw_text"] = raw_text
 
     def record_success(self, text: str, is_positive: bool):
         """记录纠错成功的词条"""
@@ -211,7 +214,8 @@ class AffixRecorder:
                 for text in sorted(self.correction_failed.keys()):
                     info = self.correction_failed[text]
                     affix_type = "正面" if info["is_positive"] else "负面"
-                    f.write(f"[纠错失败] [{affix_type}] {text} (出现{info['count']}次)\n")
+                    raw_text_str = f" (原始OCR: {info['raw_text']})" if info["raw_text"] else ""
+                    f.write(f"[纠错失败] [{affix_type}] {text}{raw_text_str} (出现{info['count']}次)\n")
                 f.write("\n")
 
             f.write("="*80 + "\n")

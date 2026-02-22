@@ -41,8 +41,9 @@ class ShopAutomation:
     # 商人界面入口坐标
     MERCHANT_MENU_COORD = (170, 590)
 
-    # 模板匹配阈值
-    TEMPLATE_MATCH_THRESHOLD = 0.7
+    # 模板匹配阈值（可调整，默认0.6，如果匹配失败可降低到0.5）
+    # 注意：不同设备的显示效果可能导致匹配度差异，建议范围0.5-0.7
+    TEMPLATE_MATCH_THRESHOLD = 0.6
 
     # 暗痕（货币）检测区域（基于1080p）
     CURRENCY_REGION = (480, 100, 595, 135)
@@ -94,7 +95,7 @@ class ShopAutomation:
         self.qualified_relics = []
 
         # 加载遗物模板
-        template_path = get_resource_path("data/template_relic.jpg")
+        template_path = get_resource_path("data/template_relic.png")
         self.relic_template = cv2.imread(template_path)
         if self.relic_template is not None:
             self.relic_template_gray = cv2.cvtColor(self.relic_template, cv2.COLOR_BGR2GRAY)
@@ -309,15 +310,15 @@ class ShopAutomation:
         # 不在商人界面，尝试进入
         log("不在商人界面，尝试进入...", "INFO")
         pydirectinput.press('m')
-        for _ in range(30):
+        for _ in range(10):
             if not self.is_running:
-                return
+                return False
             time.sleep(0.1)
 
         self._click_scaled_coord(self.MERCHANT_MENU_COORD)
-        for _ in range(30):
+        for _ in range(10):
             if not self.is_running:
-                return
+                return False
             time.sleep(0.1)
 
         # 验证是否进入
@@ -395,7 +396,7 @@ class ShopAutomation:
         if DEBUG_ENABLED:
             debug_timer.start("寻找遗物")
 
-        max_scroll_attempts = 20
+        max_scroll_attempts = 40
         for i in range(max_scroll_attempts):
             if not self.is_running:
                 if DEBUG_ENABLED:
@@ -558,10 +559,12 @@ class ShopAutomation:
                 for affix in ocr_result["affixes"]:
                     affix_recorder.record_success(affix['cleaned_text'], affix["is_positive"])
 
-                # 记录纠错失败的词条
+                # 记录纠错失败的词条（包含原始OCR文本）
                 for failed_affix in ocr_result.get("correction_failed_affixes", []):
                     is_positive = self.ocr_engine._is_positive_affix(failed_affix["text"], mode)
-                    affix_recorder.record_failed(failed_affix["text"], is_positive)
+                    # 获取原始OCR文本（仅在DEBUG_ENABLED时）
+                    raw_text = failed_affix.get("raw_text") if DEBUG_ENABLED else None
+                    affix_recorder.record_failed(failed_affix["text"], is_positive, raw_text)
 
             # 输出词条信息
             for affix in ocr_result["affixes"]:

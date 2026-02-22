@@ -19,7 +19,7 @@ from core.utils import get_resource_path, get_user_data_path, log_debug, DEBUG_E
 # 词条纠错配置
 CORRECTION_CONFIG = {
     "enabled": True,
-    "similarity_threshold": 0.7,
+    "similarity_threshold": 0.85, 
     "max_retry": 3,
     "data_dir": "data",
 }
@@ -69,13 +69,27 @@ class VocabularyLoader:
 
 class EntryCorrector:
     """词条纠错器，使用模糊匹配修正OCR错误"""
-    def __init__(self, vocabulary: list, threshold: float = 0.9):
+    def __init__(self, vocabulary: list, threshold: float = 0.8):
         self.vocabulary = vocabulary
         self.threshold = threshold
 
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """计算两个字符串的相似度"""
         return fuzz.token_set_ratio(text1, text2) / 100.0
+
+    def _get_dynamic_threshold(self, text: str) -> float:
+        """
+        根据文本长度动态调整相似度阈值
+        短词条需要更低的阈值（因为一个字错误影响大）
+        长词条需要更高的阈值（避免误匹配）
+        """
+        text_len = len(text)
+        if text_len <= 5:
+            return 0.60  # 短词条：宽松
+        elif text_len <= 10:
+            return 0.80  # 中等词条
+        else:
+            return 0.85  # 长词条：严格
 
     def correct_entry(self, ocr_text: str) -> tuple:
         """
@@ -91,7 +105,9 @@ class EntryCorrector:
                 best_similarity = similarity
                 best_match = vocab_entry
 
-        if best_similarity >= self.threshold:
+        # 使用动态阈值
+        dynamic_threshold = self._get_dynamic_threshold(ocr_text)
+        if best_similarity >= dynamic_threshold:
             return (best_match, best_similarity, True)
         else:
             return (ocr_text, best_similarity, False)
@@ -107,17 +123,29 @@ def postprocess_text(text: str) -> str:
     # 0.5. 罗马数字1 → 阿拉伯数字1（因为图形相似导致的误识别）
     text = text.replace('Ⅰ', '1').replace('ⅰ', '1')
 
+    # 0.7. OCR常见误识别：順 → 1（形状相似）
+    text = text.replace('順', '1')
+
     # 1. 加号标准化：十、＋(全角)、⁺(上标) → +(半角)
     text = text.replace('十', '+').replace('＋', '+')
+
+    # 1.5. 分隔符标准化：「、丨等OCR误识别 → |
+    text = text.replace('「', '|').replace('」', '|')
+    text = text.replace('丨', '|')
 
     # 2. 括号标准化：[](){}  → 【】
     text = text.replace('[', '【').replace(']', '】')
     text = text.replace('(', '【').replace(')', '】')
     text = text.replace('{', '【').replace('}', '】')
 
-    # 3. 删除引号："""
-    text = text.replace('"', '')
-    text = text.replace('"', '').replace('"', '')
+    # 2.5. OCR常见误识别：【气 → 力气（OCR将"力"识别为"【"）
+    text = text.replace('【气', '力气')
+    text = text.replace('澜', '斓')
+
+    # 3. 删除引号：""" 和 ASCII引号 和 中文引号
+    text = text.replace('"', '')  # ASCII双引号
+    text = text.replace('"', '').replace('"', '')  # 花体引号
+    text = text.replace('“', '').replace('”', '')  # 中文引号
 
     # 4. 删除所有空格
     text = text.replace(' ', '').replace('　', '')
@@ -150,11 +178,20 @@ def split_entries(text: str) -> list:
 
     # 处理分行问题：将每一行作为单独的词条
     processed_entries = []
+
+    # 定义需要补充"+1"的不完整词条（通常是多行词条的最后一行）
+    # 有时ocr抽风,只能手动划为+1了
+    INCOMPLETE_KEYWORDS = {'信仰', '智力', '耐力', '气', '感应','灵巧'}
+
     for entry in entries:
         lines = entry.split('\n')
         for line in lines:
             line = line.strip()
             if line:  # 只添加非空行
+                # 检查是否是不完整的词条（仅包含关键词，没有数字后缀）
+                # 例如："信仰" → "信仰+1", "气" → "气+1"
+                if line in INCOMPLETE_KEYWORDS:
+                    line = line + '+1'
                 processed_entries.append(line)
 
     return processed_entries
@@ -165,13 +202,15 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
     对词条列表进行纠错，支持动态断行合并
 
     逻辑：
-    1. 对于未被纠正的词条，尝试与下一行合并
+    1. 对于未被纠正的词条，尝试与下一行合并（仅一次）
     2. 清洗规则：删除下一行的前导噪声（如'万'、'了'、'可'、'"'、空格）
     3. 计算相似度：对比原始行和合并行与词条库的匹配分数
     4. 决策：仅当 Score(合并) > Score(原始) 时才合并
+    5. 防护：已尝试合并的行不会再次尝试与其他行合并
     """
     corrected_entries = []
     skip_next = False
+    merge_attempted = set()  # 记录已尝试合并的行索引
 
     # 定义需要清洗的前导噪声字符
     NOISE_CHARS = {'万', '了', '可', '"', '"', ''', ''', ' ', '　'}
@@ -191,10 +230,11 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
         # 获取当前行的相似度信息
         corrected_text, similarity, is_corrected = corrector.correct_entry(entry)
 
-        # 检查是否需要尝试合并：当前行未被纠正且存在下一行
+        # 检查是否需要尝试合并：当前行未被纠正、存在下一行、且该行未曾尝试过合并
         should_try_merge = (
             not is_corrected and  # 当前行未被纠正
-            i + 1 < len(entries)  # 存在下一行
+            i + 1 < len(entries) and  # 存在下一行
+            i not in merge_attempted  # 该行未曾尝试过合并
         )
 
         if should_try_merge:
@@ -217,7 +257,11 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
                     log_debug(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
                     corrected_entries.append(merged_text)
                     skip_next = True
+                    merge_attempted.add(i)  # 标记该行已尝试合并
                     continue
+
+            # 标记该行已尝试合并（即使合并失败）
+            merge_attempted.add(i)
 
         # 输出纠错结果
         if is_corrected:
@@ -230,7 +274,7 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
     return corrected_entries
 
 
-def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
+def correct_entries_with_info(entries: list, corrector: EntryCorrector, original_text: str = None) -> list:
     """
     对词条列表进行纠错，支持动态断行合并，返回详细信息
 
@@ -238,14 +282,21 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
     [
         {
             "text": str,           # 纠错后的文本
+            "raw_text": str,       # 原始OCR文本（仅在DEBUG_ENABLED时保存，来自original_text）
             "similarity": float,   # 相似度
-            "is_corrected": bool   # 是否纠正（相似度 >= 0.9）
+            "is_corrected": bool   # 是否纠正
         },
         ...
     ]
+
+    防护机制：
+    1. 已尝试合并的行不会再次尝试与其他行合并
+    2. 被成功合并的行会被标记，不会再单独处理
     """
     result = []
     skip_next = False
+    merge_attempted = set()  # 记录已尝试合并的行索引
+    merged_indices = set()   # 记录被成功合并的行索引
 
     # 定义需要清洗的前导噪声字符
     NOISE_CHARS = {'万', '了', '可', '"', '"', ''', ''', ' ', '　'}
@@ -258,6 +309,10 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
         return text[i:]
 
     for i, entry in enumerate(entries):
+        # 如果这一行已经被合并过，跳过它
+        if i in merged_indices:
+            continue
+
         if skip_next:
             skip_next = False
             continue
@@ -265,10 +320,11 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
         # 获取当前行的相似度信息
         corrected_text, similarity, is_corrected = corrector.correct_entry(entry)
 
-        # 检查是否需要尝试合并：当前行未被纠正且存在下一行
+        # 检查是否需要尝试合并：当前行未被纠正、存在下一行、且该行未曾尝试过合并
         should_try_merge = (
             not is_corrected and  # 当前行未被纠正
-            i + 1 < len(entries)  # 存在下一行
+            i + 1 < len(entries) and  # 存在下一行
+            i not in merge_attempted  # 该行未曾尝试过合并
         )
 
         if should_try_merge:
@@ -289,13 +345,22 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
                     log_debug(f"    [动态合并] {entry}")
                     log_debug(f"             + {next_entry}")
                     log_debug(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
-                    result.append({
+                    result_item = {
                         "text": merged_text,
                         "similarity": merged_similarity,
-                        "is_corrected": merged_is_corrected
-                    })
+                        "is_corrected": True  # 合并成功就标记为已纠正，避免再次记录为失败
+                    }
+                    # 仅在DEBUG_ENABLED时保存原始文本
+                    if DEBUG_ENABLED and original_text:
+                        result_item["raw_text"] = original_text  # 保存真正的原始OCR文本
+                    result.append(result_item)
                     skip_next = True
+                    merge_attempted.add(i)  # 标记该行已尝试合并
+                    merged_indices.add(i + 1)  # 标记下一行已被合并，不再单独处理
                     continue
+
+            # 标记该行已尝试合并（即使合并失败）
+            merge_attempted.add(i)
 
         # 输出纠错结果
         if is_corrected:
@@ -303,11 +368,15 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
         else:
             pass  # 保留原文
 
-        result.append({
+        result_item = {
             "text": corrected_text,
             "similarity": similarity,
             "is_corrected": is_corrected
-        })
+        }
+        # 仅在DEBUG_ENABLED时保存原始文本
+        if DEBUG_ENABLED and original_text:
+            result_item["raw_text"] = original_text  # 保存真正的原始OCR文本
+        result.append(result_item)
 
     return result
 
@@ -600,7 +669,7 @@ class OCREngine:
                 # 先进行断行合并和纠错，获取详细信息
                 corrected_info = []
                 if self.corrector and CORRECTION_CONFIG["enabled"]:
-                    corrected_info = correct_entries_with_info(raw_entries, self.corrector)
+                    corrected_info = correct_entries_with_info(raw_entries, self.corrector, text if DEBUG_ENABLED else None)
                 else:
                     # 如果没有纠错器，直接使用原始词条
                     for entry in raw_entries:
@@ -637,6 +706,7 @@ class OCREngine:
                         # 纠错失败的词条
                         correction_failed_affixes.append({
                             "text": info["text"],
+                            "raw_text": info.get("raw_text", info["text"]),  # 保存原始OCR文本
                             "similarity": info["similarity"]
                         })
 
@@ -716,6 +786,13 @@ class OCREngine:
                 # 拼接所有文本
                 combined_text = '\n'.join(all_text)
 
+                # 保存真正的原始OCR文本（在任何清洗之前）
+                # 用 | 分隔各行，便于调试时查看
+                if DEBUG_ENABLED:
+                    original_combined_text = ' | '.join(all_text)
+                else:
+                    original_combined_text = None
+
                 # 处理文本（符号标准化、分割词条）
                 split_start = time.time()
                 raw_entries = split_entries(combined_text)
@@ -725,7 +802,7 @@ class OCREngine:
                 correction_start = time.time()
                 corrected_info = []
                 if self.corrector and CORRECTION_CONFIG["enabled"]:
-                    corrected_info = correct_entries_with_info(raw_entries, self.corrector)
+                    corrected_info = correct_entries_with_info(raw_entries, self.corrector, original_combined_text if DEBUG_ENABLED else None)
                 else:
                     # 如果没有纠错器，直接使用原始词条
                     for entry in raw_entries:
@@ -763,6 +840,7 @@ class OCREngine:
                         # 纠错失败的词条
                         correction_failed_affixes.append({
                             "text": info["text"],
+                            "raw_text": info.get("raw_text", info["text"]),  # 保存原始OCR文本
                             "similarity": info["similarity"]
                         })
 
