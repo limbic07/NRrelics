@@ -15,6 +15,7 @@ from core.preset_manager import PresetManager
 from core.ocr_engine import OCREngine
 from core.relic_detector import RelicDetector, RELIC_STATE_LIGHT, RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE, RELIC_STATE_DARK_E, RELIC_STATE_DARK_O
 from core.automation import RepositoryFilter
+from core.utils import log_debug
 
 # 遗物状态中文名称映射
 RELIC_STATE_NAMES = {
@@ -96,7 +97,7 @@ class RepoCleaner:
             if log_callback:
                 log_callback(message, level)
             else:
-                print(f"[{level}] {message}")
+                log_debug(f"[{level}] {message}")
 
         try:
             # 0. 检测游戏窗口
@@ -419,7 +420,7 @@ class RepoCleaner:
                     return window
             return None
         except Exception as e:
-            print(f"[警告] 查找游戏窗口失败: {e}")
+            log_debug(f"[警告] 查找游戏窗口失败: {e}")
             return None
 
     def _should_skip_relic(self, relic_state: str, cleaning_mode: str, allow_favorited: bool) -> bool:

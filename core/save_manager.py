@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 from datetime import datetime
-from core.utils import get_user_data_path
+from core.utils import get_user_data_path, log_debug
 
 
 
@@ -105,7 +105,7 @@ class SaveManager:
                         "most_recent": info.get("MostRecent", "0") == "1"
                     }
         except Exception as e:
-            print(f"[错误] 解析Steam用户信息失败: {e}")
+            log_debug(f"[错误] 解析Steam用户信息失败: {e}")
 
     def get_users(self) -> dict:
         """获取所有Steam用户"""

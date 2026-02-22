@@ -8,11 +8,12 @@ import cv2
 import numpy as np
 import pydirectinput
 import pyautogui
+import keyboard
 from datetime import datetime
 from typing import Optional
 
 from core.preset_manager import PresetManager
-from core.utils import get_resource_path
+from core.utils import get_resource_path, DEBUG_ENABLED, debug_timer, affix_recorder, log_debug
 
 
 
@@ -99,7 +100,7 @@ class ShopAutomation:
             self.relic_template_gray = cv2.cvtColor(self.relic_template, cv2.COLOR_BGR2GRAY)
         else:
             self.relic_template_gray = None
-            print(f"[警告] 遗物模板图片不存在: {template_path}")
+            log_debug(f"[警告] 遗物模板图片不存在: {template_path}")
 
     def start_shopping(self, mode: str, version: str, stop_currency: int,
                       require_double: bool, log_callback=None, stats_callback=None,
@@ -136,7 +137,14 @@ class ShopAutomation:
             if log_callback:
                 log_callback(message, level)
             else:
-                print(f"[{level}] {message}")
+                log_debug(f"[{level}] {message}")
+
+        # 注册按0停止的快捷键
+        def on_zero_pressed():
+            self.is_running = False
+            log("收到停止信号，正在停止购买...", "WARNING")
+
+        keyboard.add_hotkey('0', on_zero_pressed)
 
         try:
             # 刷新窗口信息
@@ -219,13 +227,30 @@ class ShopAutomation:
 
                 # 6. 确认操作（按f）
                 pydirectinput.press('f')
-                time.sleep(0.5)
                 log("已确认操作", "INFO")
 
         except Exception as e:
             log(f"购买过程出错: {e}", "ERROR")
         finally:
             self.is_running = False
+            try:
+                keyboard.remove_hotkey('0')
+            except:
+                pass
+
+            # 保存调试数据
+            if DEBUG_ENABLED:
+                # 保存词条记录
+                affix_file = affix_recorder.save_to_file()
+
+                # 输出耗时统计到终端
+                summary = debug_timer.get_summary()
+                if summary:
+                    log_debug(summary)
+
+                # 清空调试数据，为下一次运行做准备
+                debug_timer.clear()
+                affix_recorder.clear()
 
     def stop(self):
         """停止购买"""
@@ -260,6 +285,9 @@ class ShopAutomation:
 
     def _enter_merchant_interface(self, log) -> bool:
         """检测并进入商人界面"""
+        if DEBUG_ENABLED:
+            debug_timer.start("进入商人界面")
+
         # 截图检测商人名称
         image = self.repo_filter._capture_game_window()
         if image is None:
@@ -273,15 +301,24 @@ class ShopAutomation:
             text = "".join(result["entries"])
             if "小壶商人巴萨" in text or "商人" in text:
                 log("已在商人界面", "INFO")
+                if DEBUG_ENABLED:
+                    elapsed = debug_timer.end("进入商人界面")
+                    debug_timer.record("进入商人界面", elapsed)
                 return True
 
         # 不在商人界面，尝试进入
         log("不在商人界面，尝试进入...", "INFO")
         pydirectinput.press('m')
-        time.sleep(0.5)
+        for _ in range(30):
+            if not self.is_running:
+                return
+            time.sleep(0.1)
 
         self._click_scaled_coord(self.MERCHANT_MENU_COORD)
-        time.sleep(1.0)
+        for _ in range(30):
+            if not self.is_running:
+                return
+            time.sleep(0.1)
 
         # 验证是否进入
         merchant_region = self.repo_filter._capture_region(self.MERCHANT_NAME_REGION)
@@ -290,9 +327,14 @@ class ShopAutomation:
             text = "".join(result["entries"])
             if "小壶商人巴萨" in text or "商人" in text:
                 log("已进入商人界面", "INFO")
+                if DEBUG_ENABLED:
+                    elapsed = debug_timer.end("进入商人界面")
+                    debug_timer.record("进入商人界面", elapsed)
                 return True
 
         log("无法进入商人界面", "ERROR")
+        if DEBUG_ENABLED:
+            debug_timer.end("进入商人界面")
         return False
 
     def _detect_currency(self, log) -> int:
@@ -350,28 +392,44 @@ class ShopAutomation:
 
     def _find_relic(self, log) -> bool:
         """滚动寻找遗物"""
+        if DEBUG_ENABLED:
+            debug_timer.start("寻找遗物")
+
         max_scroll_attempts = 20
         for i in range(max_scroll_attempts):
             if not self.is_running:
+                if DEBUG_ENABLED:
+                    debug_timer.end("寻找遗物")
                 return False
 
             pydirectinput.press('up')
-            time.sleep(0.2)
+            time.sleep(0.1)
 
             # 捕获遗物图标区域并模板匹配
             relic_icon_region = self.repo_filter._capture_region(self.RELIC_ICON_REGION)
             if relic_icon_region is not None and self._match_relic_template(relic_icon_region):
                 log(f"找到遗物（滚动{i+1}次）", "INFO")
+                if DEBUG_ENABLED:
+                    elapsed = debug_timer.end("寻找遗物")
+                    debug_timer.record("寻找遗物", elapsed)
                 return True
 
         log("未找到遗物", "WARNING")
+        if DEBUG_ENABLED:
+            elapsed = debug_timer.end("寻找遗物")
+            debug_timer.record("寻找遗物", elapsed)
         return False
 
     def _execute_first_purchase(self, mode: str, version: str, log) -> bool:
         """首次购买：移动鼠标到遗物位置 → 按F购买 → F2切换十连 → F确认 → F跳过动画"""
+        if DEBUG_ENABLED:
+            debug_timer.start("首次购买")
+
         purchase_coord = self.RELIC_PURCHASE_COORDS.get((version, mode))
         if purchase_coord is None:
             log(f"未找到购买坐标: version={version}, mode={mode}", "ERROR")
+            if DEBUG_ENABLED:
+                debug_timer.end("首次购买")
             return False
 
         # 移动鼠标到遗物位置
@@ -385,31 +443,38 @@ class ShopAutomation:
 
         # 按F购买
         pydirectinput.press('f')
-        time.sleep(0.3)  # 等待购买界面打开
         pydirectinput.press('f2')
         pydirectinput.press('f')
         pydirectinput.press('f')
 
         self.stats["total_purchased"] += 10
         log(f"十连购买成功，总购买: {self.stats['total_purchased']}", "INFO")
+        if DEBUG_ENABLED:
+            elapsed = debug_timer.end("首次购买")
+            debug_timer.record("首次购买", elapsed)
         return True
 
     def _execute_subsequent_purchase(self, log) -> bool:
         """后续购买：直接按F购买 → F2切换十连 → F确认 → F跳过动画"""
+        if DEBUG_ENABLED:
+            debug_timer.start("后续购买")
+
         pydirectinput.press('f')
-        time.sleep(0.3)  # 等待购买界面打开
         pydirectinput.press('f2')
         pydirectinput.press('f')
         pydirectinput.press('f')
 
         self.stats["total_purchased"] += 10
         log(f"十连购买成功，总购买: {self.stats['total_purchased']}", "INFO")
+        if DEBUG_ENABLED:
+            elapsed = debug_timer.end("后续购买")
+            debug_timer.record("后续购买", elapsed)
         return True
 
     def _match_relic_template(self, region_image) -> bool:
         """模板匹配检测遗物图标"""
         if self.relic_template_gray is None or region_image is None or region_image.size == 0:
-            print(f"[模板匹配] 模板或区域为空")
+            log_debug(f"[模板匹配] 模板或区域为空")
             return False
 
         # 使用 repo_filter 的缩放因子
@@ -420,12 +485,12 @@ class ShopAutomation:
             interpolation=cv2.INTER_LINEAR
         )
 
-        print(f"[模板匹配] 模板原始尺寸: {self.relic_template_gray.shape}, 缩放后: {scaled_template.shape}, 区域尺寸: {region_image.shape}, 缩放因子: ({self.repo_filter.scale_x:.4f}, {self.repo_filter.scale_y:.4f})")
+        log_debug(f"[模板匹配] 模板原始尺寸: {self.relic_template_gray.shape}, 缩放后: {scaled_template.shape}, 区域尺寸: {region_image.shape}, 缩放因子: ({self.repo_filter.scale_x:.4f}, {self.repo_filter.scale_y:.4f})")
 
         # 检查模板尺寸是否合法
         if (scaled_template.shape[0] > region_image.shape[0] or
             scaled_template.shape[1] > region_image.shape[1]):
-            print(f"[模板匹配] 模板尺寸大于区域，跳过")
+            log_debug(f"[模板匹配] 模板尺寸大于区域，跳过")
             return False
 
         # 转灰度匹配
@@ -437,7 +502,7 @@ class ShopAutomation:
         result = cv2.matchTemplate(region_gray, scaled_template, cv2.TM_CCOEFF_NORMED)
         _, max_val, _, _ = cv2.minMaxLoc(result)
 
-        print(f"[模板匹配] 匹配度: {max_val:.4f}, 阈值: {self.TEMPLATE_MATCH_THRESHOLD}")
+        log_debug(f"[模板匹配] 匹配度: {max_val:.4f}, 阈值: {self.TEMPLATE_MATCH_THRESHOLD}")
 
         # 保存调试图像（仅第一次）
         if self.settings.get("ocr_debug", False):
@@ -450,33 +515,73 @@ class ShopAutomation:
     def _process_purchased_relics(self, mode, require_double, general_preset,
                                    dedicated_presets, blacklist_preset, log, stats_callback):
         """处理购买的10个遗物（参考仓库清理流程）"""
+        if DEBUG_ENABLED:
+            debug_timer.start("处理10个遗物总耗时")
+
         for i in range(10):
             if not self.is_running:
                 break
 
             log(f"处理第 {i+1}/10 个遗物", "INFO")
 
-            # 1. OCR识别（使用商店界面专用的6行单行ROI）
+            # 1. 截图
+            if DEBUG_ENABLED:
+                debug_timer.start(f"relic_{i+1}_capture")
+
             line_images = self._capture_shop_line_rois()
+
+            if DEBUG_ENABLED:
+                capture_time = debug_timer.end(f"relic_{i+1}_capture")
+                debug_timer.record(f"第{i+1}个遗物-截图", capture_time)
+
+            # 2. OCR识别（使用商店界面专用的6行单行ROI）
+            if DEBUG_ENABLED:
+                debug_timer.start(f"relic_{i+1}_ocr")
+
             ocr_result = self.ocr_engine.recognize_with_classification_from_lines(line_images, mode)
+
+            if DEBUG_ENABLED:
+                ocr_time = debug_timer.end(f"relic_{i+1}_ocr")
+                debug_timer.record(f"第{i+1}个遗物-OCR总耗时", ocr_time)
+
+                # 从OCR结果中提取细粒度的时间数据（如果有的话）
+                # 这些时间已经在OCR引擎中记录过了
 
             if not ocr_result["success"]:
                 log("OCR识别失败，跳过", "ERROR")
                 pydirectinput.press('right')
                 continue
 
+            # 记录词条到调试工具
+            if DEBUG_ENABLED:
+                # 记录纠错成功的词条
+                for affix in ocr_result["affixes"]:
+                    affix_recorder.record_success(affix['cleaned_text'], affix["is_positive"])
+
+                # 记录纠错失败的词条
+                for failed_affix in ocr_result.get("correction_failed_affixes", []):
+                    is_positive = self.ocr_engine._is_positive_affix(failed_affix["text"], mode)
+                    affix_recorder.record_failed(failed_affix["text"], is_positive)
+
             # 输出词条信息
             for affix in ocr_result["affixes"]:
                 affix_type = "正面" if affix["is_positive"] else "负面"
                 log(f"  [{affix_type}] {affix['cleaned_text']}", "INFO")
 
-            # 2. 词条匹配（与仓库清理逻辑一致）
+            # 3. 词条匹配（与仓库清理逻辑一致）
+            if DEBUG_ENABLED:
+                debug_timer.start(f"relic_{i+1}_match")
+
             is_qualified = self._match_affixes(
                 ocr_result, general_preset, dedicated_presets,
                 blacklist_preset, require_double
             )
 
-            # 3. 执行操作
+            if DEBUG_ENABLED:
+                match_time = debug_timer.end(f"relic_{i+1}_match")
+                debug_timer.record(f"第{i+1}个遗物-词条匹配", match_time)
+
+            # 4. 执行操作
             if is_qualified:
                 self.stats["qualified"] += 1
                 log(f"合格遗物，保留", "SUCCESS")
@@ -501,6 +606,10 @@ class ShopAutomation:
             # 更新统计
             if stats_callback:
                 stats_callback(self.stats.copy())
+
+        if DEBUG_ENABLED:
+            total_time = debug_timer.end("处理10个遗物总耗时")
+            debug_timer.record("处理10个遗物总耗时", total_time)
 
     def _match_affixes(self, ocr_result, general_preset, dedicated_presets,
                        blacklist_preset, require_double) -> bool:
@@ -546,11 +655,6 @@ class ShopAutomation:
 
         return False
 
-    def _close_purchase_interface(self, log):
-        """关闭购买界面"""
-        pydirectinput.press('q')
-        time.sleep(0.5)
-        log("关闭购买界面", "INFO")
 
     def _execute_sl_operation(self, log) -> bool:
         """

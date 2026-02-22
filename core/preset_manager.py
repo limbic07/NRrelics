@@ -7,7 +7,7 @@ import json
 import os
 import uuid
 from typing import Dict, List, Optional
-from core.utils import get_resource_path, get_user_data_path
+from core.utils import get_resource_path, get_user_data_path, log_debug
 
 
 
@@ -57,7 +57,7 @@ class PresetManager:
             self.deepnight_blacklist = data.get("deepnight_blacklist")
 
         except Exception as e:
-            print(f"[错误] 加载预设失败: {e}")
+            log_debug(f"[错误] 加载预设失败: {e}")
             self._initialize_default_presets()
 
     def save_presets(self):
@@ -77,7 +77,7 @@ class PresetManager:
             with open(self.presets_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"[错误] 保存预设失败: {e}")
+            log_debug(f"[错误] 保存预设失败: {e}")
 
     def _initialize_default_presets(self):
         """初始化默认预设"""
@@ -146,7 +146,7 @@ class PresetManager:
             # 词条库是静态资源，只读
             filepath = get_resource_path(os.path.join(self.data_dir, filename))
             if not os.path.exists(filepath):
-                print(f"[警告] 词条库文件不存在: {filepath}")
+                log_debug(f"[警告] 词条库文件不存在: {filepath}")
                 continue
 
             with open(filepath, 'r', encoding='utf-8') as f:

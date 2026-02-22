@@ -11,6 +11,7 @@ import win32con
 import os
 from typing import Tuple, Optional
 from datetime import datetime
+from core.utils import log_debug
 
 
 class AutomationController:
@@ -126,7 +127,7 @@ class RepositoryFilter:
 
             return None
         except Exception as e:
-            print(f"[警告] 查找游戏窗口失败: {e}")
+            log_debug(f"[警告] 查找游戏窗口失败: {e}")
             return None
 
     def _calculate_scale_factors(self) -> Tuple[float, float]:
@@ -139,7 +140,7 @@ class RepositoryFilter:
             _, _, window_width, window_height = client_rect
         else:
             # 如果无法获取客户区信息，使用默认分辨率
-            print("[警告] 无法获取窗口客户区信息，使用默认分辨率 1920x1080")
+            log_debug("[警告] 无法获取窗口客户区信息，使用默认分辨率 1920x1080")
             window_width = 1920
             window_height = 1080
 
@@ -147,13 +148,13 @@ class RepositoryFilter:
         scale_y = window_height / self.BASE_HEIGHT
 
         # 输出缩放因子信息
-        print("=" * 60)
-        print("[分辨率缩放信息]")
-        print(f"  基准分辨率: {self.BASE_WIDTH}x{self.BASE_HEIGHT}")
-        print(f"  检测到的游戏窗口客户区分辨率: {window_width}x{window_height}")
-        print(f"  缩放因子 X: {scale_x:.4f} ({window_width}/{self.BASE_WIDTH})")
-        print(f"  缩放因子 Y: {scale_y:.4f} ({window_height}/{self.BASE_HEIGHT})")
-        print("=" * 60)
+        log_debug("=" * 60)
+        log_debug("[分辨率缩放信息]")
+        log_debug(f"  基准分辨率: {self.BASE_WIDTH}x{self.BASE_HEIGHT}")
+        log_debug(f"  检测到的游戏窗口客户区分辨率: {window_width}x{window_height}")
+        log_debug(f"  缩放因子 X: {scale_x:.4f} ({window_width}/{self.BASE_WIDTH})")
+        log_debug(f"  缩放因子 Y: {scale_y:.4f} ({window_height}/{self.BASE_HEIGHT})")
+        log_debug("=" * 60)
 
         return scale_x, scale_y
 
@@ -181,7 +182,7 @@ class RepositoryFilter:
             # 通过窗口标题查找窗口句柄
             hwnd = win32gui.FindWindow(None, self.game_window.title)
             if not hwnd:
-                print("[警告] 无法获取窗口句柄")
+                log_debug("[警告] 无法获取窗口句柄")
                 return None
 
             # 获取客户区矩形（相对于窗口）
@@ -195,12 +196,10 @@ class RepositoryFilter:
             client_width = client_rect[2] - client_rect[0]
             client_height = client_rect[3] - client_rect[1]
 
-            print(f"[调试] 客户区屏幕坐标: left={client_left}, top={client_top}, width={client_width}, height={client_height}")
-
             return (client_left, client_top, client_width, client_height)
 
         except Exception as e:
-            print(f"[警告] 获取客户区坐标失败: {e}")
+            log_debug(f"[警告] 获取客户区坐标失败: {e}")
             return None
 
     def _capture_game_window(self) -> Optional[np.ndarray]:
@@ -221,7 +220,7 @@ class RepositoryFilter:
                     screenshot = pyautogui.screenshot(region=(left, top, width, height))
                 else:
                     # 回退到使用整个窗口（包括边框）
-                    print("[警告] 无法获取客户区，使用整个窗口截图")
+                    log_debug("[警告] 无法获取客户区，使用整个窗口截图")
                     screenshot = pyautogui.screenshot(region=(
                         self.game_window.left,
                         self.game_window.top,
@@ -234,7 +233,7 @@ class RepositoryFilter:
 
             return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
         except Exception as e:
-            print(f"[错误] 截图失败: {e}")
+            log_debug(f"[错误] 截图失败: {e}")
             return None
 
     def _capture_region(self, region: Tuple[int, int, int, int]) -> np.ndarray:
@@ -288,7 +287,7 @@ class RepositoryFilter:
         filename = f"{name}_{timestamp}.png"
         filepath = os.path.join(self.DEBUG_DIR, filename)
         cv2.imwrite(filepath, image)
-        print(f"  [调试] 保存图像: {filepath}")
+        log_debug(f"  [调试] 保存图像: {filepath}")
 
     def verify_ritual_interface(self) -> bool:
         """
@@ -299,7 +298,7 @@ class RepositoryFilter:
             False: 不在遗物仪式界面
         """
         if self.ocr_engine is None:
-            print("[警告] OCR引擎未初始化，无法验证界面")
+            log_debug("[警告] OCR引擎未初始化，无法验证界面")
             return False
 
         # 截取左上角区域
@@ -325,7 +324,7 @@ class RepositoryFilter:
             int: 检测到的遗物数量，失败返回 0
         """
         if self.ocr_engine is None:
-            print("[警告] OCR引擎未初始化，无法检测遗物数量")
+            log_debug("[警告] OCR引擎未初始化，无法检测遗物数量")
             return 0
 
         # 截取数量显示区域
@@ -337,12 +336,12 @@ class RepositoryFilter:
         # OCR识别（单行数字）
         result = self.ocr_engine.recognize_raw(image)
         if not result['success']:
-            print("[警告] 遗物数量识别失败")
+            log_debug("[警告] 遗物数量识别失败")
             return 0
 
         # 提取数字
         text = ''.join(result['entries']).strip()
-        print(f"[调试] 识别到的文本: '{text}'")
+        log_debug(f"[调试] 识别到的文本: '{text}'")
 
         # 尝试解析数字
         try:
@@ -351,13 +350,13 @@ class RepositoryFilter:
             numbers = re.findall(r'\d+', text)
             if numbers:
                 count = int(numbers[0])
-                print(f"[信息] 检测到遗物数量: {count}")
+                log_debug(f"[信息] 检测到遗物数量: {count}")
                 return count
             else:
-                print("[警告] 未能从文本中提取数字")
+                log_debug("[警告] 未能从文本中提取数字")
                 return 0
         except Exception as e:
-            print(f"[错误] 解析遗物数量失败: {e}")
+            log_debug(f"[错误] 解析遗物数量失败: {e}")
             return 0
 
     def verify_sell_interface(self) -> bool:
@@ -369,7 +368,7 @@ class RepositoryFilter:
             False: 不在卖出界面
         """
         if self.ocr_engine is None:
-            print("[警告] OCR引擎未初始化，无法验证界面")
+            log_debug("[警告] OCR引擎未初始化，无法验证界面")
             return False
 
         # 截取卖出区域
@@ -434,7 +433,7 @@ class RepositoryFilter:
             False: 验证失败
         """
         if self.ocr_engine is None:
-            print("[警告] OCR引擎未初始化，无法验证筛选界面")
+            log_debug("[警告] OCR引擎未初始化，无法验证筛选界面")
             return False
 
         for retry in range(max_retry):
@@ -446,19 +445,19 @@ class RepositoryFilter:
             result = self.ocr_engine.recognize_raw(image)
             if result['success']:
                 text = ''.join(result['entries'])
-                print(f"[调试] 筛选标题区域识别到: '{text}'")
+                log_debug(f"[调试] 筛选标题区域识别到: '{text}'")
 
                 # 检查是否包含"筛选"
                 if '筛选' in text:
-                    print("[信息] 已确认在筛选界面")
+                    log_debug("[信息] 已确认在筛选界面")
                     return True
 
             # 不在筛选界面，按F1切换
-            print(f"[警告] 未检测到筛选界面，按F1切换 (尝试 {retry + 1}/{max_retry})")
+            log_debug(f"[警告] 未检测到筛选界面，按F1切换 (尝试 {retry + 1}/{max_retry})")
             AutomationController.press_key('f1', duration=0.3)
             time.sleep(0.5)
 
-        print("[错误] 无法进入筛选界面")
+        log_debug("[错误] 无法进入筛选界面")
         return False
 
     def reset_filter(self) -> bool:
@@ -493,7 +492,7 @@ class RepositoryFilter:
         self._save_debug_image(deepnight_image, "deepnight_checkbox")
         deepnight_checked = self._is_checkbox_checked(deepnight_image)
 
-        print(f"[调试] 勾选框状态: 遗物={normal_checked}, 深层的遗物={deepnight_checked}")
+        log_debug(f"[调试] 勾选框状态: 遗物={normal_checked}, 深层的遗物={deepnight_checked}")
 
         return normal_checked, deepnight_checked
 
@@ -541,7 +540,7 @@ class RepositoryFilter:
         inner_region = checkbox_region[margin_h:h-margin_h, margin_w:w-margin_w]
 
         if inner_region.size == 0:
-            print("[警告] 勾选框内部区域为空，返回未勾选")
+            log_debug("[警告] 勾选框内部区域为空，返回未勾选")
             return False
 
         # 转换为灰度图
@@ -551,7 +550,7 @@ class RepositoryFilter:
         mean_val = cv2.mean(gray)[0]
 
         # 输出调试信息
-        print(f"[调试] 勾选框尺寸: {w}x{h}, 内部区域尺寸: {inner_region.shape[1]}x{inner_region.shape[0]}, 平均灰度值: {mean_val:.2f}")
+        log_debug(f"[调试] 勾选框尺寸: {w}x{h}, 内部区域尺寸: {inner_region.shape[1]}x{inner_region.shape[0]}, 平均灰度值: {mean_val:.2f}")
 
         # 框内有√：平均灰度值较高（约109）
         # 框内是空的：平均灰度值较低（约58）
@@ -559,7 +558,7 @@ class RepositoryFilter:
         threshold = 85
         is_checked = mean_val > threshold
 
-        print(f"[调试] 判断结果: {'已勾选' if is_checked else '未勾选'} (阈值={threshold})")
+        log_debug(f"[调试] 判断结果: {'已勾选' if is_checked else '未勾选'} (阈值={threshold})")
 
         return is_checked
 
@@ -590,14 +589,14 @@ class RepositoryFilter:
                 client_left, client_top, _, _ = client_coords
                 click_x += client_left
                 click_y += client_top
-                print(f"[调试] 客户区偏移: left={client_left}, top={client_top}")
+                log_debug(f"[调试] 客户区偏移: left={client_left}, top={client_top}")
             else:
                 # 回退到使用窗口坐标
                 click_x += self.game_window.left
                 click_y += self.game_window.top
-                print(f"[调试] 窗口偏移: left={self.game_window.left}, top={self.game_window.top}")
+                log_debug(f"[调试] 窗口偏移: left={self.game_window.left}, top={self.game_window.top}")
 
-        print(f"[调试] 点击 {checkbox_name} 勾选框: 屏幕坐标=({click_x}, {click_y})")
+        log_debug(f"[调试] 点击 {checkbox_name} 勾选框: 屏幕坐标=({click_x}, {click_y})")
 
         AutomationController.click(click_x, click_y)
         time.sleep(0.5)
@@ -613,7 +612,7 @@ class RepositoryFilter:
             True: 调整成功
             False: 调整失败
         """
-        print(f"\n[筛选模式] {mode}")
+        log_debug(f"\n[筛选模式] {mode}")
 
         if mode == "normal":
             # 普通模式：遗物打勾，深层的遗物不打勾
@@ -641,9 +640,9 @@ class RepositoryFilter:
         success = (normal_checked == target_normal and deepnight_checked == target_deepnight)
 
         if success:
-            print("[结果] 筛选成功")
+            log_debug("[结果] 筛选成功")
         else:
-            print("[结果] 筛选失败")
+            log_debug("[结果] 筛选失败")
 
         return success
 
@@ -675,10 +674,10 @@ class RepositoryFilter:
                 screen_x = self.game_window.left + scaled_x
                 screen_y = self.game_window.top + scaled_y
             else:
-                print("[错误] 无法获取游戏窗口位置")
+                log_debug("[错误] 无法获取游戏窗口位置")
                 return
 
-        print(f"[信息] 移动光标到第一个遗物位置: 屏幕坐标=({screen_x}, {screen_y})")
+        log_debug(f"[信息] 移动光标到第一个遗物位置: 屏幕坐标=({screen_x}, {screen_y})")
         AutomationController.move_mouse(screen_x, screen_y)
         time.sleep(0.3)
 

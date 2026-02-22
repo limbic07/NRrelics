@@ -9,25 +9,12 @@ import cv2
 from rapidocr import RapidOCR
 from rapidfuzz import fuzz
 import numpy as np
-from core.utils import get_resource_path, get_user_data_path
+from core.utils import get_resource_path, get_user_data_path, log_debug, DEBUG_ENABLED, debug_timer
 
 
 
 # ==================== 配置常量 ====================
 
-# 断行合并字典
-LINE_BREAK_DICT = {
-    "【追踪者】发动技艺时，轻攻击能使出": "【追踪者】发动技艺时，轻攻击能使出缠绕火焰的追加攻击（仅限大剑）",
-    "【铁之眼】技艺会附加引发异常状态中毒的效果": "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害",
-    "【女爵】短剑连击的最后攻击命中时，": "【女爵】短剑连击的最后攻击命中时，能对着周围的敌人，再次上演最近做过的行动",
-    "【女爵】从背后使出致命一击后": "【女爵】从背后使出致命一击后自己的身影会变得难以辨识，并消除脚步声",
-    "【无赖】在技艺发动期间，受到攻击时": "【无赖】在技艺发动期间，受到攻击时能提升攻击力与精力上限",
-    "【复仇者】发动绝招时，能以自己的血量为代价": "【复仇者】发动绝招时，能以自己的血量为代价完全恢复周围我方人物的血量",
-    "【隐士】发动绝招时": "【隐士】发动绝招时自己陷入异常状态出血，提升攻击力",
-    "【执行者】提升技艺发动期间的攻击力": "【执行者】提升技艺发动期间的攻击力但攻击时会降低减伤率",
-    "【执行者】在技艺发动期间": "【执行者】在技艺发动期间妖刀进入解放状态时，能恢复血量",
-    "【送葬者】使用祷告将辅助效果附加在自己身上时": "【送葬者】使用祷告将辅助效果附加在自己身上时提升物理攻击力",
-}
 
 # 词条纠错配置
 CORRECTION_CONFIG = {
@@ -225,18 +212,18 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
 
                 # 决策：仅当合并后相似度更高时才合并
                 if merged_similarity > similarity:
-                    print(f"    [动态合并] {entry}")
-                    print(f"             + {next_entry}")
-                    print(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
+                    log_debug(f"    [动态合并] {entry}")
+                    log_debug(f"             + {next_entry}")
+                    log_debug(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
                     corrected_entries.append(merged_text)
                     skip_next = True
                     continue
 
         # 输出纠错结果
         if is_corrected:
-            print(f"    [纠正] {entry} -> {corrected_text} (相似度: {similarity:.2%})")
+            pass  # 纠错成功
         else:
-            print(f"    [保留] {entry} (最高相似度: {similarity:.2%})")
+            pass  # 保留原文
 
         corrected_entries.append(corrected_text)
 
@@ -299,9 +286,9 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
 
                 # 决策：仅当合并后相似度更高时才合并
                 if merged_similarity > similarity:
-                    print(f"    [动态合并] {entry}")
-                    print(f"             + {next_entry}")
-                    print(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
+                    log_debug(f"    [动态合并] {entry}")
+                    log_debug(f"             + {next_entry}")
+                    log_debug(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
                     result.append({
                         "text": merged_text,
                         "similarity": merged_similarity,
@@ -312,9 +299,9 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector) -> list:
 
         # 输出纠错结果
         if is_corrected:
-            print(f"    [纠正] {entry} -> {corrected_text} (相似度: {similarity:.2%})")
+            pass  # 纠错成功
         else:
-            print(f"    [保留] {entry} (最高相似度: {similarity:.2%})")
+            pass  # 保留原文
 
         result.append({
             "text": corrected_text,
@@ -364,7 +351,7 @@ class OCREngine:
         if self._initialized:
             return
 
-        print("正在加载OCR模型...")
+        log_debug("正在加载OCR模型...")
         try:
             # 优先使用本地打包的模型，实现离线运行
             # 这里的路径对应 PyInstaller 打包时的 --add-data "resources/models;resources/models"
@@ -380,22 +367,24 @@ class OCREngine:
             if os.path.exists(rec_model): ocr_config['Rec.model_path'] = rec_model
             
             if ocr_config:
-                print(f"使用本地模型配置: {ocr_config}")
+                log_debug(f"使用本地模型配置: {ocr_config}")
                 self.engine = RapidOCR(params=ocr_config)
             else:
-                print("未找到完整本地模型，尝试使用默认配置（可能需要联网下载）")
+                log_debug("未找到完整本地模型，尝试使用默认配置（可能需要联网下载）")
                 self.engine = RapidOCR()
-                
-            print("OCR模型加载完成")
+
+            log_debug("OCR模型加载完成")
         except Exception as e:
-            print(f"[错误] OCR模型加载失败: {e}")
+            log_debug(f"[错误] OCR模型加载失败: {e}")
             raise
 
         # 加载词条库
         self.corrector = None
         self.current_mode = None  # 记录当前加载的词条库模式
+        self.vocabulary_pos = []  # 深夜模式正面词条库
+        self.vocabulary_neg = []  # 深夜模式负面词条库
         if CORRECTION_CONFIG["enabled"]:
-            print("正在加载词条库...")
+            log_debug("正在加载词条库...")
             try:
                 vocab_loader = VocabularyLoader(
                     CORRECTION_CONFIG["data_dir"],
@@ -406,10 +395,10 @@ class OCREngine:
                     CORRECTION_CONFIG["similarity_threshold"]
                 )
                 self.current_mode = "normal"  # 记录当前模式
-                print(f"词条库加载完成 (共{len(vocab_loader.vocabulary)}条)")
+                log_debug(f"词条库加载完成 (共{len(vocab_loader.vocabulary)}条)")
             except Exception as e:
-                print(f"[警告] 词条库加载失败: {e}")
-                print("将继续使用OCR结果，不进行纠错")
+                log_debug(f"[警告] 词条库加载失败: {e}")
+                log_debug("将继续使用OCR结果，不进行纠错")
 
         self._initialized = True
 
@@ -425,10 +414,49 @@ class OCREngine:
                 CORRECTION_CONFIG["similarity_threshold"]
             )
             self.current_mode = relic_type  # 更新当前模式
-            print(f"词条库加载完成 (共{len(vocab_loader.vocabulary)}条)")
+
+            # 深夜模式：分别保存正面和负面词条库用于分类
+            if relic_type == "deepnight":
+                self.vocabulary_pos = []
+                self.vocabulary_neg = []
+
+                # 加载正面词条库
+                pos_filepath = get_resource_path(os.path.join(CORRECTION_CONFIG["data_dir"], "deepnight_pos.txt"))
+                if os.path.exists(pos_filepath):
+                    with open(pos_filepath, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            if '→' in line:
+                                entry = line.split('→', 1)[1].strip()
+                            else:
+                                entry = line
+                            if entry:
+                                self.vocabulary_pos.append(entry)
+
+                # 加载负面词条库
+                neg_filepath = get_resource_path(os.path.join(CORRECTION_CONFIG["data_dir"], "deepnight_neg.txt"))
+                if os.path.exists(neg_filepath):
+                    with open(neg_filepath, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            if '→' in line:
+                                entry = line.split('→', 1)[1].strip()
+                            else:
+                                entry = line
+                            if entry:
+                                self.vocabulary_neg.append(entry)
+
+                log_debug(f"词条库加载完成 (共{len(vocab_loader.vocabulary)}条, 正面{len(self.vocabulary_pos)}条, 负面{len(self.vocabulary_neg)}条)")
+            else:
+                log_debug(f"词条库加载完成 (共{len(vocab_loader.vocabulary)}条)")
+
             return True
         except Exception as e:
-            print(f"[错误] 词条库加载失败: {e}")
+            log_debug(f"[错误] 词条库加载失败: {e}")
             return False
 
     def recognize(self, image: np.ndarray, enable_correction: bool = True) -> dict:
@@ -448,9 +476,7 @@ class OCREngine:
             }
         """
         try:
-            _t0 = time.time()
             result = self.engine(image, use_det=False, use_cls=False)
-            print(f"[OCR耗时] recognize: {(time.time() - _t0) * 1000:.1f}ms")
             if not result or not result.txts:
                 return {
                     "entries": [],
@@ -481,7 +507,7 @@ class OCREngine:
             }
 
         except Exception as e:
-            print(f"[错误] OCR识别失败: {e}")
+            log_debug(f"[错误] OCR识别失败: {e}")
             return {
                 "entries": [],
                 "raw_entries": [],
@@ -501,12 +527,9 @@ class OCREngine:
         """
         try:
             if is_blank_line(image):
-                print(f"[单行OCR] 检测到空行（方差过低），跳过")
                 return "", 0.0
 
-            _t0 = time.time()
             result = self.engine(image, use_det=False, use_cls=False)
-            print(f"[OCR耗时] recognize_single_line: {(time.time() - _t0) * 1000:.1f}ms")
             if not result or not result.txts:
                 return "", 0.0
 
@@ -516,13 +539,11 @@ class OCREngine:
 
             # 清洗单字符"一"（空词条"-"的误识别）
             if text == "一":
-                print(f"[单行OCR] 识别到噪声'一'，返回空")
                 return "", 0.0
 
-            print(f"[单行OCR] 识别结果: '{text}' (置信度: {score:.4f})")
             return text, score
         except Exception as e:
-            print(f"[错误] 单行OCR识别失败: {e}")
+            log_debug(f"[错误] 单行OCR识别失败: {e}")
             return "", 0.0
 
     def recognize_with_classification(self, image: np.ndarray, mode: str = "normal") -> dict:
@@ -555,7 +576,7 @@ class OCREngine:
         """
         # 检查是否需要重新加载词条库
         if self.current_mode != mode:
-            print(f"[词条库切换] {self.current_mode} -> {mode}")
+            log_debug(f"[词条库切换] {self.current_mode} -> {mode}")
             self.load_vocabulary(mode)
 
         max_retry = CORRECTION_CONFIG.get("max_retry", 3)
@@ -568,7 +589,7 @@ class OCREngine:
                 text, _ = self.recognize_single_line(image)  # 忽略置信度
                 if not text:
                     if retry < max_retry - 1:
-                        print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到文字，重试中...")
+                        log_debug(f"[重试 {retry + 1}/{max_retry}] OCR未识别到文字，重试中...")
                         time.sleep(0.3)
                         continue
                     return self._empty_classification_result()
@@ -591,12 +612,13 @@ class OCREngine:
 
                 # 然后对纠错后的词条进行分类
                 affixes = []
+                correction_failed_affixes = []
                 positive_count = 0
                 negative_count = 0
 
                 for info in corrected_info:
-                    # 只添加匹配到词条库的词条（is_corrected=True 表示相似度 >= 0.9）
                     if info["is_corrected"]:
+                        # 纠错成功的词条
                         is_positive = self._is_positive_affix(info["text"], mode)
 
                         affixes.append({
@@ -611,35 +633,18 @@ class OCREngine:
                             positive_count += 1
                         else:
                             negative_count += 1
+                    else:
+                        # 纠错失败的词条
+                        correction_failed_affixes.append({
+                            "text": info["text"],
+                            "similarity": info["similarity"]
+                        })
 
                 recognition_time = (time.time() - start_time) * 1000  # 转换为毫秒
 
-                # 检查是否识别到任何词条库内的词条
-                if len(affixes) == 0:
-                    if retry < max_retry - 1:
-                        # 区分两种情况：完全没识别到文字 vs 识别到了但都是未知词条
-                        if len(raw_entries) == 0:
-                            print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到任何文字，重试中...")
-                        else:
-                            print(f"[重试 {retry + 1}/{max_retry}] 识别到{len(raw_entries)}条文本，但都不匹配词条库（全未知词条），重试中...")
-                        time.sleep(0.3)
-                        continue
-                    else:
-                        if len(raw_entries) == 0:
-                            print(f"[失败] 重试{max_retry}次后仍未识别到任何文字")
-                        else:
-                            print(f"[失败] 重试{max_retry}次后仍未识别到任何词条库内的词条（识别到{len(raw_entries)}条未知文本）")
-                        return {
-                            "affixes": [],
-                            "positive_count": 0,
-                            "negative_count": 0,
-                            "recognition_time": recognition_time,
-                            "success": False,
-                            "retry_count": retry + 1
-                        }
-
                 return {
                     "affixes": affixes,
+                    "correction_failed_affixes": correction_failed_affixes,
                     "positive_count": positive_count,
                     "negative_count": negative_count,
                     "recognition_time": recognition_time,
@@ -649,11 +654,11 @@ class OCREngine:
 
             except Exception as e:
                 if retry < max_retry - 1:
-                    print(f"[重试 {retry + 1}/{max_retry}] OCR识别失败: {e}，重试中...")
+                    log_debug(f"[重试 {retry + 1}/{max_retry}] OCR识别失败: {e}，重试中...")
                     time.sleep(0.3)
                     continue
                 else:
-                    print(f"[错误] OCR识别失败: {e}")
+                    log_debug(f"[错误] OCR识别失败: {e}")
                     return self._empty_classification_result()
 
         return self._empty_classification_result()
@@ -662,6 +667,7 @@ class OCREngine:
         """返回空的分类结果"""
         return {
             "affixes": [],
+            "correction_failed_affixes": [],
             "positive_count": 0,
             "negative_count": 0,
             "recognition_time": 0.0,
@@ -682,7 +688,7 @@ class OCREngine:
         """
         # 检查是否需要重新加载词条库
         if self.current_mode != mode:
-            print(f"[词条库切换] {self.current_mode} -> {mode}")
+            log_debug(f"[词条库切换] {self.current_mode} -> {mode}")
             self.load_vocabulary(mode)
 
         max_retry = CORRECTION_CONFIG.get("max_retry", 3)
@@ -693,14 +699,16 @@ class OCREngine:
             try:
                 # 对每行进行单行识别
                 all_text = []
+                line_ocr_start = time.time()
                 for line_image in line_images:
                     text, _ = self.recognize_single_line(line_image)
                     if text:
                         all_text.append(text)
+                line_ocr_time = (time.time() - line_ocr_start) * 1000
 
                 if not all_text:
                     if retry < max_retry - 1:
-                        print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到任何文字，重试中...")
+                        log_debug(f"[重试 {retry + 1}/{max_retry}] OCR未识别到任何文字，重试中...")
                         time.sleep(0.3)
                         continue
                     return self._empty_classification_result()
@@ -709,9 +717,12 @@ class OCREngine:
                 combined_text = '\n'.join(all_text)
 
                 # 处理文本（符号标准化、分割词条）
+                split_start = time.time()
                 raw_entries = split_entries(combined_text)
+                split_time = (time.time() - split_start) * 1000
 
                 # 先进行断行合并和纠错，获取详细信息
+                correction_start = time.time()
                 corrected_info = []
                 if self.corrector and CORRECTION_CONFIG["enabled"]:
                     corrected_info = correct_entries_with_info(raw_entries, self.corrector)
@@ -723,15 +734,17 @@ class OCREngine:
                             "similarity": 0.0,
                             "is_corrected": False
                         })
+                correction_time = (time.time() - correction_start) * 1000
 
                 # 然后对纠错后的词条进行分类
                 affixes = []
+                correction_failed_affixes = []
                 positive_count = 0
                 negative_count = 0
 
                 for info in corrected_info:
-                    # 只添加匹配到词条库的词条（is_corrected=True 表示相似度 >= 0.9）
                     if info["is_corrected"]:
+                        # 纠错成功的词条
                         is_positive = self._is_positive_affix(info["text"], mode)
 
                         affixes.append({
@@ -746,35 +759,18 @@ class OCREngine:
                             positive_count += 1
                         else:
                             negative_count += 1
+                    else:
+                        # 纠错失败的词条
+                        correction_failed_affixes.append({
+                            "text": info["text"],
+                            "similarity": info["similarity"]
+                        })
 
                 recognition_time = (time.time() - start_time) * 1000  # 转换为毫秒
 
-                # 检查是否识别到任何词条库内的词条
-                if len(affixes) == 0:
-                    if retry < max_retry - 1:
-                        # 区分两种情况：完全没识别到文字 vs 识别到了但都是未知词条
-                        if len(raw_entries) == 0:
-                            print(f"[重试 {retry + 1}/{max_retry}] OCR未识别到任何文字，重试中...")
-                        else:
-                            print(f"[重试 {retry + 1}/{max_retry}] 识别到{len(raw_entries)}条文本，但都不匹配词条库（全未知词条），重试中...")
-                        time.sleep(0.3)
-                        continue
-                    else:
-                        if len(raw_entries) == 0:
-                            print(f"[失败] 重试{max_retry}次后仍未识别到任何文字")
-                        else:
-                            print(f"[失败] 重试{max_retry}次后仍未识别到任何词条库内的词条（识别到{len(raw_entries)}条未知文本）")
-                        return {
-                            "affixes": [],
-                            "positive_count": 0,
-                            "negative_count": 0,
-                            "recognition_time": recognition_time,
-                            "success": False,
-                            "retry_count": retry + 1
-                        }
-
                 return {
                     "affixes": affixes,
+                    "correction_failed_affixes": correction_failed_affixes,
                     "positive_count": positive_count,
                     "negative_count": negative_count,
                     "recognition_time": recognition_time,
@@ -784,11 +780,11 @@ class OCREngine:
 
             except Exception as e:
                 if retry < max_retry - 1:
-                    print(f"[重试 {retry + 1}/{max_retry}] OCR识别失败: {e}，重试中...")
+                    log_debug(f"[重试 {retry + 1}/{max_retry}] OCR识别失败: {e}，重试中...")
                     time.sleep(0.3)
                     continue
                 else:
-                    print(f"[错误] OCR识别失败: {e}")
+                    log_debug(f"[错误] OCR识别失败: {e}")
                     return self._empty_classification_result()
 
         return self._empty_classification_result()
@@ -833,21 +829,26 @@ class OCREngine:
 
         规则：
         - 普通模式：全部为正面
-        - 深夜模式：以"降低"、"减少"、"受到损伤"等开头的为负面
+        - 深夜模式：检查词条是否在正面词条库中
+          - 如果在 deepnight_pos.txt 中 → 正面
+          - 如果在 deepnight_neg.txt 中 → 负面
+          - 其他情况 → 正面（默认）
+
+        注意：此方法仅用于已经通过纠错匹配到词条库的词条
+        不需要再做模糊匹配，因为纠错时已经确定了词条
         """
         if mode == "normal":
             return True
 
-        # 深夜模式：检查负面关键词
-        negative_keywords = [
-            "降低", "减少", "受到损伤", "持续减少", "累积",
-            "闪避后", "连续闪避", "使用圣杯瓶", "血量没有全满", "濒死"
-        ]
-
-        for keyword in negative_keywords:
-            if text.startswith(keyword):
+        # 深夜模式：检查词条是否在正面词条库中
+        # 由于纠错时已经匹配到词条库，这里只需要精确匹配
+        if hasattr(self, 'vocabulary_pos') and hasattr(self, 'vocabulary_neg'):
+            if text in self.vocabulary_pos:
+                return True
+            if text in self.vocabulary_neg:
                 return False
 
+        # 默认为正面
         return True
 
     def recognize_raw(self, image: np.ndarray) -> dict:
@@ -866,9 +867,7 @@ class OCREngine:
             }
         """
         try:
-            _t0 = time.time()
             result = self.engine(image, use_det=False, use_cls=False)
-            print(f"[OCR耗时] recognize_raw: {(time.time() - _t0) * 1000:.1f}ms")
             if not result or not result.txts:
                 return {
                     "entries": [],
@@ -878,20 +877,18 @@ class OCREngine:
             # rapidocr v3.x: txts=('text1','text2',...), scores 分开
             text = ''.join(result.txts).strip()
             if text:
-                print(f"[原始OCR] 识别结果: '{text}'")
                 return {
                     "entries": [text],
                     "success": True
                 }
             else:
-                print(f"[原始OCR] 识别结果为空")
                 return {
                     "entries": [],
                     "success": False
                 }
 
         except Exception as e:
-            print(f"[错误] OCR识别失败: {e}")
+            log_debug(f"[错误] OCR识别失败: {e}")
             return {
                 "entries": [],
                 "success": False
@@ -899,9 +896,7 @@ class OCREngine:
 
     def ocr(self, image) -> tuple:
         """执行OCR，返回处理后的词条列表和纠错时间"""
-        _t0 = time.time()
         result = self.engine(image, use_det=False, use_cls=False)
-        print(f"[OCR耗时] ocr: {(time.time() - _t0) * 1000:.1f}ms")
         if not result or not result.txts:
             return [], 0.0
 
