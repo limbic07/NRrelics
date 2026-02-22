@@ -6,8 +6,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QComboBox, QTabWidget,
                                QScrollArea, QFrame, QSplitter, QGroupBox, QCheckBox, QLineEdit)
-from PySide6.QtCore import Qt, Signal, QThread
-from PySide6.QtGui import QFont, QIntValidator
+from PySide6.QtCore import Qt, Signal, QThread, QMimeData, QPoint
+from PySide6.QtGui import QFont, QIntValidator, QDrag, QPixmap
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
                            ComboBox, MessageBox, InfoBar, InfoBarPosition)
 
@@ -22,6 +22,74 @@ from datetime import datetime
 SOLD_RELICS_FILE = get_user_data_path("data/repo_sold_relics.json")
 FAVORITED_RELICS_FILE = get_user_data_path("data/repo_favorited_relics.json")
 
+
+class DragDropContainer(QWidget):
+    """支持拖放排序的容器"""
+    reorder_requested = Signal(str, str)  # (source_id, target_id)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(8)
+
+    def add_card(self, card):
+        """添加卡片"""
+        if card.is_general:
+            # 通用预设不支持拖放
+            self.layout.addWidget(card)
+            return
+
+        card.setAcceptDrops(True)
+
+        # 使用闭包保存卡片引用
+        def make_mouse_press(c):
+            def handler(event):
+                if event.button() == Qt.LeftButton:
+                    c._drag_start_pos = event.pos()
+                CardWidget.mousePressEvent(c, event)
+            return handler
+
+        def make_mouse_move(c):
+            def handler(event):
+                if (hasattr(c, '_drag_start_pos') and
+                    event.buttons() == Qt.LeftButton):
+                    distance = (event.pos() - c._drag_start_pos).manhattanLength()
+                    if distance > 20:
+                        mime_data = QMimeData()
+                        mime_data.setText(c.preset_data["id"])
+                        drag = QDrag(c)
+                        drag.setMimeData(mime_data)
+                        drag.exec(Qt.MoveAction)
+                CardWidget.mouseMoveEvent(c, event)
+            return handler
+
+        def make_drag_enter(c):
+            def handler(event):
+                if event.mimeData().hasText():
+                    event.acceptProposedAction()
+                else:
+                    event.ignore()
+            return handler
+
+        def make_drop(c):
+            def handler(event):
+                if event.mimeData().hasText():
+                    source_id = event.mimeData().text()
+                    target_id = c.preset_data["id"]
+                    if source_id != target_id:
+                        self.reorder_requested.emit(source_id, target_id)
+                    event.acceptProposedAction()
+                else:
+                    event.ignore()
+            return handler
+
+        card.mousePressEvent = make_mouse_press(card)
+        card.mouseMoveEvent = make_mouse_move(card)
+        card.dragEnterEvent = make_drag_enter(card)
+        card.dropEvent = make_drop(card)
+
+        self.layout.addWidget(card)
 
 
 class CleaningThread(QThread):
@@ -174,7 +242,6 @@ class PresetCard(CardWidget):
         self.is_expanded = not self.is_expanded
         self.expand_btn.setText("▼" if self.is_expanded else "▶")
         self.affixes_widget.setVisible(self.is_expanded)
-
 
 class RepoPage(QWidget):
     """仓库清理页面"""
@@ -476,14 +543,20 @@ class RepoPage(QWidget):
             card.edit_clicked.connect(self._edit_general_preset)
             self.preset_layout.addWidget(card)
 
-        # 专用预设
+        # 创建拖放容器用于专用预设
         dedicated_presets = self.preset_manager.get_dedicated_presets(mode)
-        for preset in dedicated_presets.values():
-            card = PresetCard(preset, is_general=False)
-            card.edit_clicked.connect(self._edit_dedicated_preset)
-            card.delete_clicked.connect(self._delete_preset)
-            card.toggle_clicked.connect(self._toggle_preset)
-            self.preset_layout.addWidget(card)
+        if dedicated_presets:
+            drag_drop_container = DragDropContainer()
+            drag_drop_container.reorder_requested.connect(self._handle_preset_reorder)
+
+            for preset in dedicated_presets.values():
+                card = PresetCard(preset, is_general=False)
+                card.edit_clicked.connect(self._edit_dedicated_preset)
+                card.delete_clicked.connect(self._delete_preset)
+                card.toggle_clicked.connect(self._toggle_preset)
+                drag_drop_container.add_card(card)
+
+            self.preset_layout.addWidget(drag_drop_container)
 
         # 添加按钮（紧凑版）
         add_btn = PrimaryPushButton("+ 创建专用预设")
@@ -500,6 +573,34 @@ class RepoPage(QWidget):
                 self.preset_layout.addWidget(card)
 
         self.preset_layout.addStretch()
+
+    def _handle_preset_reorder(self, source_id: str, target_id: str):
+        """处理预设拖放排序"""
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        presets = self.preset_manager.get_dedicated_presets(mode)
+
+        preset_ids = list(presets.keys())
+        try:
+            source_index = preset_ids.index(source_id)
+            target_index = preset_ids.index(target_id)
+        except ValueError:
+            return
+
+        # 交换位置
+        preset_ids[source_index], preset_ids[target_index] = preset_ids[target_index], preset_ids[source_index]
+
+        # 重建预设字典以保持新的顺序
+        new_presets = {}
+        for pid in preset_ids:
+            new_presets[pid] = presets[pid]
+
+        if mode == "normal":
+            self.preset_manager.normal_dedicated = new_presets
+        elif mode == "deepnight":
+            self.preset_manager.deepnight_whitelist_dedicated = new_presets
+
+        self.preset_manager.save_presets()
+        self._refresh_presets()
 
     def refresh_presets_ui(self):
         """外部调用：刷新预设UI（当其他页面修改预设时）"""

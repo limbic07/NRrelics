@@ -265,6 +265,44 @@ class PresetManager:
             presets[preset_id]["is_active"] = not presets[preset_id].get("is_active", True)
             self.save_presets()
 
+    def move_preset(self, mode: str, preset_id: str, direction: str):
+        """
+        移动预设位置
+
+        Args:
+            mode: 预设模式 ("normal" 或 "deepnight")
+            preset_id: 预设ID
+            direction: 移动方向 ("up" 或 "down")
+        """
+        presets = self.get_dedicated_presets(mode)
+        preset_ids = list(presets.keys())
+
+        if preset_id not in preset_ids:
+            return
+
+        current_index = preset_ids.index(preset_id)
+
+        if direction == "up" and current_index > 0:
+            # 交换位置
+            preset_ids[current_index], preset_ids[current_index - 1] = preset_ids[current_index - 1], preset_ids[current_index]
+        elif direction == "down" and current_index < len(preset_ids) - 1:
+            # 交换位置
+            preset_ids[current_index], preset_ids[current_index + 1] = preset_ids[current_index + 1], preset_ids[current_index]
+        else:
+            return
+
+        # 重建预设字典以保持新的顺序
+        new_presets = {}
+        for pid in preset_ids:
+            new_presets[pid] = presets[pid]
+
+        if mode == "normal":
+            self.normal_dedicated = new_presets
+        elif mode == "deepnight":
+            self.deepnight_whitelist_dedicated = new_presets
+
+        self.save_presets()
+
     # ==================== 黑名单预设操作 ====================
 
     def get_blacklist_preset(self) -> Optional[Dict]:

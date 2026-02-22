@@ -72,8 +72,8 @@ class ShopThread(QThread):
             self.finished_signal.emit()
 
 
-# 导入PresetCard from page_repo
-from ui.pages.page_repo import PresetCard
+# 导入PresetCard和DragDropContainer from page_repo
+from ui.pages.page_repo import PresetCard, DragDropContainer
 
 
 class PageShop(QWidget):
@@ -409,14 +409,20 @@ class PageShop(QWidget):
             card.edit_clicked.connect(self._edit_general_preset)
             self.preset_layout.addWidget(card)
 
-        # 专用预设
+        # 创建拖放容器用于专用预设
         dedicated_presets = self.preset_manager.get_dedicated_presets(mode)
-        for preset in dedicated_presets.values():
-            card = PresetCard(preset, is_general=False)
-            card.edit_clicked.connect(self._edit_dedicated_preset)
-            card.delete_clicked.connect(self._delete_preset)
-            card.toggle_clicked.connect(self._toggle_preset)
-            self.preset_layout.addWidget(card)
+        if dedicated_presets:
+            drag_drop_container = DragDropContainer()
+            drag_drop_container.reorder_requested.connect(self._handle_preset_reorder)
+
+            for preset in dedicated_presets.values():
+                card = PresetCard(preset, is_general=False)
+                card.edit_clicked.connect(self._edit_dedicated_preset)
+                card.delete_clicked.connect(self._delete_preset)
+                card.toggle_clicked.connect(self._toggle_preset)
+                drag_drop_container.add_card(card)
+
+            self.preset_layout.addWidget(drag_drop_container)
 
         # 添加按钮
         add_btn = PrimaryPushButton("+ 创建专用预设")
@@ -433,6 +439,35 @@ class PageShop(QWidget):
                 self.preset_layout.addWidget(card)
 
         self.preset_layout.addStretch()
+
+    def _handle_preset_reorder(self, source_id: str, target_id: str):
+        """处理预设拖放排序"""
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        presets = self.preset_manager.get_dedicated_presets(mode)
+
+        preset_ids = list(presets.keys())
+        try:
+            source_index = preset_ids.index(source_id)
+            target_index = preset_ids.index(target_id)
+        except ValueError:
+            return
+
+        # 交换位置
+        preset_ids[source_index], preset_ids[target_index] = preset_ids[target_index], preset_ids[source_index]
+
+        # 重建预设字典以保持新的顺序
+        new_presets = {}
+        for pid in preset_ids:
+            new_presets[pid] = presets[pid]
+
+        if mode == "normal":
+            self.preset_manager.normal_dedicated = new_presets
+        elif mode == "deepnight":
+            self.preset_manager.deepnight_whitelist_dedicated = new_presets
+
+        self.preset_manager.save_presets()
+        self._refresh_presets()
+        self.presets_modified.emit()  # 发出预设修改信号
 
     def refresh_presets_ui(self):
         """外部调用：刷新预设UI（当其他页面修改预设时）"""

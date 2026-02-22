@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QCheckBox, QMessageBox)
 from PySide6.QtCore import Qt, Signal
 from qfluentwidgets import (LineEdit, PrimaryPushButton, PushButton,
-                           MessageBox, InfoBar, InfoBarPosition)
+                           MessageBox, InfoBar, InfoBarPosition, isDarkTheme)
 
 
 class PresetEditDialog(QDialog):
@@ -102,69 +102,7 @@ class PresetEditDialog(QDialog):
         layout.addWidget(list_label)
 
         self.vocab_list = QListWidget()
-        # === 重新设计的现代化样式表 (使用 Fluent 图标) ===
-        self.vocab_list.setStyleSheet("""
-            QListWidget {
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                background-color: white;
-                outline: none;
-                padding: 4px;
-            }
-            QListWidget::item {
-                height: 38px; /* 稍微增加高度让布局更宽松 */
-                padding-left: 8px;
-                color: #333;
-                border-radius: 4px; /* 让选中项有圆角 */
-                margin-bottom: 2px;
-            }
-            QListWidget::item:hover {
-                background-color: #f5f5f5;
-            }
-            QListWidget::item:selected {
-                background-color: #e3f2fd; /* 选中时的浅蓝背景 */
-                color: #000;
-            }
-
-            /* === 复选框指示器样式 === */
-            QListWidget::indicator {
-                width: 20px;
-                height: 20px;
-                border-radius: 4px;
-                border: 1px solid #c0c0c0; /* 默认浅灰边框 */
-                background-color: white;
-                margin-right: 12px;
-            }
-
-            /* 鼠标悬停 */
-            QListWidget::indicator:hover {
-                border-color: #009faa;
-                background-color: #f0f8ff;
-            }
-
-            /* === 关键修改：勾选状态 (Checked) === */
-            /* 使用蓝色背景 + 内置的白色对钩图标 */
-            QListWidget::indicator:checked {
-                background-color: #009faa; /* Fluent 主题蓝 */
-                border: 1px solid #009faa;
-                /* 引用 QFluentWidgets 库内置的白色对钩资源 */
-                image: url(":/qfluentwidgets/images/check_box_checked_white.png");
-            }
-
-            /* === 关键修改：选中行时的勾选状态 (Checked + Selected) === */
-            /* 保持样式不变，蓝色背景+白勾在浅蓝底色上非常清晰 */
-            QListWidget::indicator:checked:selected {
-                 background-color: #009faa;
-                 border: 1px solid #009faa;
-                 image: url(":/qfluentwidgets/images/check_box_checked_white.png");
-            }
-
-            /* 未勾选时的选中状态 */
-            QListWidget::indicator:unchecked:selected {
-                border: 1px solid #009faa;
-                background-color: white;
-            }
-        """)
+        self._apply_list_stylesheet()
 
         # 添加词条到列表
         for vocab in self.vocabulary:
@@ -196,6 +134,112 @@ class PresetEditDialog(QDialog):
         button_layout.addWidget(self.save_btn)
 
         layout.addLayout(button_layout)
+
+    def _apply_list_stylesheet(self):
+        """根据主题应用列表样式"""
+        if isDarkTheme():
+            # 深色模式
+            stylesheet = """
+                QListWidget {
+                    border: 1px solid #3d3d3d;
+                    border-radius: 6px;
+                    background-color: #1e1e1e;
+                    outline: none;
+                    padding: 4px;
+                }
+                QListWidget::item {
+                    height: 38px;
+                    padding-left: 8px;
+                    color: #e0e0e0;
+                    border-radius: 4px;
+                    margin-bottom: 2px;
+                }
+                QListWidget::item:hover {
+                    background-color: #2d2d2d;
+                }
+                QListWidget::item:selected {
+                    background-color: #1a3a52;
+                    color: #e0e0e0;
+                }
+                QListWidget::indicator {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 4px;
+                    border: 1px solid #555555;
+                    background-color: #2d2d2d;
+                    margin-right: 12px;
+                }
+                QListWidget::indicator:hover {
+                    border-color: #009faa;
+                    background-color: #3d3d3d;
+                }
+                QListWidget::indicator:checked {
+                    background-color: #009faa;
+                    border: 1px solid #009faa;
+                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
+                }
+                QListWidget::indicator:checked:selected {
+                    background-color: #009faa;
+                    border: 1px solid #009faa;
+                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
+                }
+                QListWidget::indicator:unchecked:selected {
+                    border: 1px solid #009faa;
+                    background-color: #2d2d2d;
+                }
+            """
+        else:
+            # 浅色模式
+            stylesheet = """
+                QListWidget {
+                    border: 1px solid #e0e0e0;
+                    border-radius: 6px;
+                    background-color: white;
+                    outline: none;
+                    padding: 4px;
+                }
+                QListWidget::item {
+                    height: 38px;
+                    padding-left: 8px;
+                    color: #333;
+                    border-radius: 4px;
+                    margin-bottom: 2px;
+                }
+                QListWidget::item:hover {
+                    background-color: #f5f5f5;
+                }
+                QListWidget::item:selected {
+                    background-color: #e3f2fd;
+                    color: #000;
+                }
+                QListWidget::indicator {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 4px;
+                    border: 1px solid #c0c0c0;
+                    background-color: white;
+                    margin-right: 12px;
+                }
+                QListWidget::indicator:hover {
+                    border-color: #009faa;
+                    background-color: #f0f8ff;
+                }
+                QListWidget::indicator:checked {
+                    background-color: #009faa;
+                    border: 1px solid #009faa;
+                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
+                }
+                QListWidget::indicator:checked:selected {
+                    background-color: #009faa;
+                    border: 1px solid #009faa;
+                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
+                }
+                QListWidget::indicator:unchecked:selected {
+                    border: 1px solid #009faa;
+                    background-color: white;
+                }
+            """
+        self.vocab_list.setStyleSheet(stylesheet)
 
     def _load_preset_data(self):
         """加载预设数据（编辑模式）"""
@@ -313,16 +357,12 @@ class PresetEditDialog(QDialog):
         else:
             name = "通用预设"
 
-        # 获取选中的词条
+        # 获取选中的词条（允许为空）
         selected_affixes = []
         for i in range(self.vocab_list.count()):
             item = self.vocab_list.item(i)
             if item.checkState() == Qt.Checked:
                 selected_affixes.append(item.text())
-
-        if not selected_affixes:
-            MessageBox("错误", "请至少选择一条词条", self).exec()
-            return
 
         # 发送信号
         preset_id = self.preset_data.get("id", "") if self.preset_data else ""
