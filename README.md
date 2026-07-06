@@ -1,4 +1,4 @@
-# NRrelic Bot v2.0.0
+# NRrelic Bot
 
 一款用于《艾尔登法环：黑夜君临》（Elden Ring Nightreign）的遗物自动化管理工具。<br>
 本软件不涉及任何游戏内数据修改，本质上不进行作弊以及任何违反游戏规则的行为。
