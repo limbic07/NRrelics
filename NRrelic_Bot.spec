@@ -76,7 +76,7 @@ a = Analysis(
         'tkinter', 'tcl', 'tcl8', 'tcl8.6', 'tk8', 'tk8.6',
         'qtpy', 'PyQt5', 'PyQt6',
         'traitlets', 'ipython', 'jupyter', 'notebook',
-        'pytest', 'unittest',
+        'pytest',
         'setuptools', 'distutils', 'pip', 'wheel', 'pkg_resources',
     ],
     win_no_prefer_redirects=False,
