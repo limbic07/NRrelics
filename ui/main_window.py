@@ -25,6 +25,9 @@ class MainWindow(FluentWindow):
         theme = Theme.LIGHT if THEME_CONFIG["theme"] == "light" else Theme.DARK
         setTheme(theme)
 
+        # 禁用亚克力效果，防止背景跟随系统主题变化
+        self.windowEffect.removeBackgroundEffect(self.winId())
+
         # 创建中央日志管理器
         self.log_manager = LogManager()
 
@@ -39,8 +42,8 @@ class MainWindow(FluentWindow):
 
     def _optimize_navigation(self):
         """优化导航栏配置"""
-        # 启用毛玻璃效果
-        self.navigationInterface.setAcrylicEnabled(NAVIGATION_CONFIG["acrylic_enabled"])
+        # 禁用毛玻璃效果，防止跟随系统主题变化
+        self.navigationInterface.setAcrylicEnabled(False)
 
     def _init_pages(self):
         """初始化页面"""

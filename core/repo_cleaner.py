@@ -15,7 +15,7 @@ from core.preset_manager import PresetManager
 from core.ocr_engine import OCREngine
 from core.relic_detector import RelicDetector, RELIC_STATE_LIGHT, RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE, RELIC_STATE_DARK_E, RELIC_STATE_DARK_O
 from core.automation import RepositoryFilter
-from core.utils import log_debug
+from core.utils import log_debug, DEBUG_ENABLED
 
 # 遗物状态中文名称映射
 RELIC_STATE_NAMES = {
@@ -335,7 +335,8 @@ class RepoCleaner:
                     pydirectinput.press('right')
 
                 t_relic_total = time.time() - t_relic_start
-                log(f"[耗时] 总计:{t_relic_total:.3f}s | 截图:{t_capture:.3f}s 检测:{t_detect:.3f}s ROI:{t_roi:.3f}s OCR:{t_ocr:.3f}s 匹配:{t_match:.3f}s 操作:{t_action:.3f}s", "DEBUG")
+                if DEBUG_ENABLED:
+                    log(f"[耗时] 总计:{t_relic_total:.3f}s | 截图:{t_capture:.3f}s 检测:{t_detect:.3f}s ROI:{t_roi:.3f}s OCR:{t_ocr:.3f}s 匹配:{t_match:.3f}s 操作:{t_action:.3f}s", "DEBUG")
 
             # 清理完成
             if self.is_running:

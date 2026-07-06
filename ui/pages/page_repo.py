@@ -10,7 +10,8 @@ from PySide6.QtCore import Qt, Signal, QThread, QMimeData, QPoint
 from PySide6.QtGui import QFont, QIntValidator, QDrag, QPixmap
 import keyboard
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
-                           ComboBox, MessageBox, InfoBar, InfoBarPosition)
+                           ComboBox, MessageBox, InfoBar, InfoBarPosition,
+                           isDarkTheme)
 
 from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
 from ui.components.logger_widget import LoggerWidget
@@ -146,6 +147,9 @@ class PresetCard(CardWidget):
 
     def _init_ui(self):
         """初始化UI"""
+        # 存储需要动态颜色的标签，用于主题切换时刷新
+        self._theme_labels = []
+
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(12, 10, 12, 10)
         main_layout.setSpacing(8)
@@ -157,17 +161,6 @@ class PresetCard(CardWidget):
         # 展开/折叠按钮
         self.expand_btn = QPushButton("▶" if not self.is_expanded else "▼")
         self.expand_btn.setFixedSize(20, 20)
-        self.expand_btn.setStyleSheet("""
-            QPushButton {
-                border: none;
-                background: transparent;
-                font-size: 10pt;
-            }
-            QPushButton:hover {
-                background: #f0f0f0;
-                border-radius: 3px;
-            }
-        """)
         self.expand_btn.clicked.connect(self._toggle_expand)
         top_layout.addWidget(self.expand_btn)
 
@@ -183,9 +176,10 @@ class PresetCard(CardWidget):
         info_layout.addWidget(name_label)
 
         # 词条数量
-        count_label = QLabel(f"{len(self.preset_data['affixes'])} 条词条")
-        count_label.setStyleSheet("color: #888; font-size: 10pt;")
-        info_layout.addWidget(count_label)
+        self._count_label = QLabel(f"{len(self.preset_data['affixes'])} 条词条")
+        self._count_label.setStyleSheet("color: #888; font-size: 10pt;")
+        self._theme_labels.append(self._count_label)
+        info_layout.addWidget(self._count_label)
 
         top_layout.addLayout(info_layout)
         top_layout.addStretch()
@@ -222,21 +216,63 @@ class PresetCard(CardWidget):
         affixes_layout.setSpacing(2)
 
         # 添加词条标签
+        self._affix_labels = []
         for affix in self.preset_data["affixes"][:20]:  # 最多显示20条
             affix_label = QLabel(f"• {affix}")
             affix_label.setFont(QFont("Segoe UI", 9))
             affix_label.setStyleSheet("color: #555;")
             affix_label.setWordWrap(True)
+            self._affix_labels.append(affix_label)
+            self._theme_labels.append(affix_label)
             affixes_layout.addWidget(affix_label)
 
+        self._more_label = None
         if len(self.preset_data["affixes"]) > 20:
-            more_label = QLabel(f"... 还有 {len(self.preset_data['affixes']) - 20} 条")
-            more_label.setFont(QFont("Segoe UI", 9))
-            more_label.setStyleSheet("color: #999; font-style: italic;")
-            affixes_layout.addWidget(more_label)
+            self._more_label = QLabel(f"... 还有 {len(self.preset_data['affixes']) - 20} 条")
+            self._more_label.setFont(QFont("Segoe UI", 9))
+            self._more_label.setStyleSheet("color: #999; font-style: italic;")
+            self._theme_labels.append(self._more_label)
+            affixes_layout.addWidget(self._more_label)
 
         self.affixes_widget.setVisible(False)
         main_layout.addWidget(self.affixes_widget)
+
+        # 应用初始主题颜色
+        self._apply_theme_colors()
+
+    def _apply_theme_colors(self):
+        """根据当前主题更新颜色"""
+        dark = isDarkTheme()
+
+        # 展开按钮
+        btn_hover_bg = "#3d3d3d" if dark else "#f0f0f0"
+        btn_color = "#e0e0e0" if dark else "#333"
+        self.expand_btn.setStyleSheet(f"""
+            QPushButton {{
+                border: none;
+                background: transparent;
+                font-size: 10pt;
+                color: {btn_color};
+            }}
+            QPushButton:hover {{
+                background: {btn_hover_bg};
+                border-radius: 3px;
+            }}
+        """)
+
+        # 词条数量标签
+        count_color = "#aaaaaa" if dark else "#888"
+        self._count_label.setStyleSheet(f"color: {count_color}; font-size: 10pt;")
+
+        # 词条列表项
+        affix_color = "#cccccc" if dark else "#555"
+        for label in self._affix_labels:
+            label.setStyleSheet(f"color: {affix_color};")
+
+        # "...还有 N 条"
+        if self._more_label is not None:
+            more_color = "#888888" if dark else "#999"
+            self._more_label.setStyleSheet(f"color: {more_color}; font-style: italic;")
 
     def _toggle_expand(self):
         """切换展开/折叠"""

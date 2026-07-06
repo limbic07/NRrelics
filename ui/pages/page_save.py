@@ -6,11 +6,13 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from qfluentwidgets import (CardWidget, ComboBox, PrimaryPushButton, PushButton,
-                           InfoBar, InfoBarPosition, LineEdit as FluentLineEdit)
+                           InfoBar, InfoBarPosition, LineEdit as FluentLineEdit,
+                           isDarkTheme)
 import os
 import json
 
 from core.save_manager import SaveManager
+from core.utils import get_user_data_path
 
 
 class SavePage(QWidget):
@@ -21,7 +23,7 @@ class SavePage(QWidget):
         self.setObjectName("SavePage")
 
         # 加载设置中的Steam路径
-        self.settings_file = "data/settings.json"
+        self.settings_file = get_user_data_path("data/settings.json")
         steam_path = self._load_steam_path()
 
         # 初始化存档管理器
@@ -94,7 +96,7 @@ class SavePage(QWidget):
         steam_status = "已检测" if self.save_manager.steam_path else "未检测到，请在设置中配置"
         self.steam_status_label = QLabel(f"Steam路径: {self.save_manager.steam_path or steam_status}")
         self.steam_status_label.setFont(QFont("Segoe UI", 8))
-        self.steam_status_label.setStyleSheet("color: gray;")
+        self._update_steam_status_style()
         card_layout.addWidget(self.steam_status_label)
 
         return card
@@ -243,7 +245,7 @@ class SavePage(QWidget):
 
         if not backups:
             no_backup_label = QLabel("暂无备份")
-            no_backup_label.setStyleSheet("color: gray;")
+            no_backup_label.setStyleSheet(f"color: {'#aaaaaa' if isDarkTheme() else 'gray'};")
             no_backup_label.setAlignment(Qt.AlignCenter)
             self.backup_list_layout.insertWidget(0, no_backup_label)
             return
@@ -255,7 +257,10 @@ class SavePage(QWidget):
     def _create_backup_row(self, backup: dict) -> QWidget:
         """创建备份行"""
         row = QWidget()
-        row.setStyleSheet("QWidget { background-color: #f8f8f8; border-radius: 6px; padding: 4px; }")
+        secondary_color = "#aaaaaa" if isDarkTheme() else "gray"
+        name_color = "#e0e0e0" if isDarkTheme() else "#333333"
+        row_bg = "#2d2d2d" if isDarkTheme() else "#f8f8f8"
+        row.setStyleSheet(f"QWidget {{ background-color: {row_bg}; border-radius: 6px; padding: 4px; }}")
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(12, 8, 12, 8)
         row_layout.setSpacing(12)
@@ -264,19 +269,20 @@ class SavePage(QWidget):
         name_label = QLabel(backup["display_name"])
         name_label.setFont(QFont("Segoe UI", 10))
         name_label.setMinimumWidth(150)
+        name_label.setStyleSheet(f"color: {name_color};")
         row_layout.addWidget(name_label)
 
         # 修改时间
         time_label = QLabel(backup["modified_time"])
         time_label.setFont(QFont("Segoe UI", 8))
-        time_label.setStyleSheet("color: gray;")
+        time_label.setStyleSheet(f"color: {secondary_color};")
         row_layout.addWidget(time_label)
 
         # 文件大小
         size_mb = backup["size"] / (1024 * 1024)
         size_label = QLabel(f"{size_mb:.1f} MB")
         size_label.setFont(QFont("Segoe UI", 8))
-        size_label.setStyleSheet("color: gray;")
+        size_label.setStyleSheet(f"color: {secondary_color};")
         size_label.setFixedWidth(60)
         row_layout.addWidget(size_label)
 
@@ -492,4 +498,11 @@ class SavePage(QWidget):
         self.save_manager.set_steam_path(steam_path)
         self._populate_user_combo()
         self.steam_status_label.setText(f"Steam路径: {self.save_manager.steam_path or '未检测到'}")
+        self._update_steam_status_style()
         self._refresh_all()
+
+    def _update_steam_status_style(self):
+        """根据当前主题更新Steam状态标签颜色"""
+        self.steam_status_label.setStyleSheet(
+            f"color: {'#aaaaaa' if isDarkTheme() else 'gray'};"
+        )
