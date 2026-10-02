@@ -136,6 +136,35 @@ class OcrCaptureSession:
             self.disabled = True
             self.log(f"OCR 自动采集写入失败，已关闭本轮采集: {exc}", "WARNING")
 
+    def record_navigation_check(self, screen, index, action, check):
+        """DEBUG: keep a frame only when navigation remains ambiguous."""
+        if self.disabled:
+            return
+        try:
+            if action == "sale" and self.count:
+                directory = self.path / "samples" / f"{self.count:05d}"
+                stem = "after_f"
+            else:
+                directory = self.path / "navigation"
+                directory.mkdir(exist_ok=True)
+                stem = f"ambiguous_{index:05d}"
+            saved = self._save_png(directory / f"{stem}.png", screen)
+            self._write_json(directory / f"{stem}.json", {
+                "next_index": index,
+                "screen_image": f"{stem}.png" if saved else None,
+                "last_action": action,
+                "expected_box": check.box,
+                "cursor_checked": check.cursor_checked,
+                "detected_cursor": check.detected_box,
+                "detail_change": check.detail_change,
+                "detail_icon_change": check.detail_icon_change,
+                "sale_amount_change": check.sale_change,
+                "card_change": check.card_change,
+                "navigation_confirmed": check.confirmed,
+            })
+        except Exception as exc:
+            self.log(f"OCR 自动采集无法保存导航校验画面: {exc}", "WARNING")
+
     def _record(self, screen, line_images, observation, trace, match, engine,
                 index, context):
         self.count += 1

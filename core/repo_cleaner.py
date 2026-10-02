@@ -12,6 +12,7 @@ import pygetwindow as gw
 from typing import Dict, List, Optional
 
 from core.relic_matcher import match_relic, log_match
+from core.repo_navigation import RepositoryNavigation
 from core.relic_recorder import RelicRecorder
 from core.ocr_diagnostics import create_capture_session  # OCR 自动采集调试代码
 from core.preset_manager import PresetManager
@@ -157,11 +158,13 @@ class RepoCleaner:
             # 2.5. 自动检测遗物数量（如果 max_relics == 0）
             if not self.is_running:
                 return
+            navigation_total = None
             if max_relics == 0:
                 log("正在自动检测遗物数量...", "INFO")
                 detected_count = self.repository_filter.detect_relic_count()
                 if detected_count > 0:
                     max_relics = detected_count
+                    navigation_total = detected_count
                     log(f"检测到遗物数量: {max_relics}", "SUCCESS")
                 else:
                     log("自动检测失败，使用默认值 100", "WARNING")
@@ -177,8 +180,9 @@ class RepoCleaner:
             log(f"通用预设: {len((general_preset or {}).get('affixes', []))}条词条", "INFO")
             log(f"专用预设: {len(dedicated_presets)}个", "INFO")
 
-            # 用于检测卡住的变量
-            last_cursor_box = None
+            navigation = RepositoryNavigation(total_items=navigation_total)
+            if navigation_total is not None:
+                log(f"仓库导航末行适配已启用（库存 {navigation_total} 件）", "INFO")
 
             # 4. 主循环
             while self.is_running:
@@ -204,25 +208,54 @@ class RepoCleaner:
                     self.stop_reason = "error"
                     break
 
-                # Cursor position is navigation evidence; affix text is never identity.
-                # A stationary cursor (including scrolling at a row boundary) is
-                # ambiguous: stop, never retry a sell key based on image noise.
-                cursor_box, _ = self.relic_detector.detect_cursor(
-                    image, self.repository_filter.scale_x, self.repository_filter.scale_y)
-                if last_cursor_box is not None and not self._cursor_advanced(last_cursor_box, cursor_box):
-                    log("无法确认光标已移动到下一遗物，安全停止（不重试售出）", "WARNING")
+                # 光标位置为导航依据；详情文字和大图标仅检查面板是否刷新。
+                check = navigation.check(
+                    image, self.relic_detector,
+                    self.repository_filter.scale_x, self.repository_filter.scale_y)
+                if (navigation.pending_action is not None
+                        and (not check.confirmed
+                             or (check.detail_change < navigation.DETAIL_CHANGE_MIN
+                                 and check.detail_icon_change < navigation.DETAIL_ICON_CHANGE_MIN))):
+                    # 光标呼吸暗帧或两件详情相同/详情尚未刷新时，只补拍一次。
+                    # 不重按 F/右键；相同详情再次确认光标后可继续。
+                    retry_start = time.time()
+                    retry_image = self.repository_filter._capture_game_window()
+                    t_capture += time.time() - retry_start
+                    if retry_image is not None:
+                        image = retry_image
+                        check = navigation.check(
+                            image, self.relic_detector,
+                            self.repository_filter.scale_x, self.repository_filter.scale_y)
+                    else:
+                        check = None
+                if check is None or not check.confirmed:
+                    if check is not None:
+                        self._record_navigation_check(image, navigation, check)
+                    log("无法确认已进入下一遗物，停止清理（不重按 F）；"
+                        + (f"判据={check.evidence}，"
+                           f"详情变化={check.detail_change:.2f}，"
+                           f"详情图标变化={check.detail_icon_change:.2f}，"
+                           f"待售出金额变化={check.sale_change:.2f}，"
+                           f"遗物图标变化={check.card_change:.2f}，"
+                           f"预计位置={check.box}，"
+                           f"检测光标={check.detected_box if check.cursor_checked else '未检测'}"
+                           if check is not None else "补拍截图失败"), "WARNING")
                     self.stop_reason = "error"
                     break
-                last_cursor_box = cursor_box
+
+                cursor_box = check.box
 
                 # 状态检测
                 t_start = time.time()
-                relic_state = self.relic_detector.detect_state(image, 1.0, self.repository_filter.scale_x, self.repository_filter.scale_y)
+                relic_state = self.relic_detector.detect_state(
+                    image, 1.0, self.repository_filter.scale_x,
+                    self.repository_filter.scale_y, cursor_box=cursor_box)
                 t_detect = time.time() - t_start
                 self.stats["total_detected"] += 1
 
                 state_name = RELIC_STATE_NAMES.get(relic_state, relic_state)
                 log(f"[{self.stats['total_detected']}] 遗物状态: {state_name} (截图:{t_capture:.3f}s 检测:{t_detect:.3f}s)", "INFO")
+                has_next = max_relics <= 0 or self.stats["total_detected"] < max_relics
 
                 # 跳过决策
                 should_skip = self._should_skip_relic(relic_state, cleaning_mode, allow_operate_favorited)
@@ -230,17 +263,16 @@ class RepoCleaner:
                 if should_skip:
                     log("跳过该遗物", "INFO")
                     self.stats["skipped"] += 1
-                    pydirectinput.press('right')
+                    if has_next:
+                        pydirectinput.press('right')
+                        navigation.expect_next(image, "right")
                     continue
 
                 # OCR识别（使用6行单行ROI）
                 t_start = time.time()
-                # ===== OCR 自动采集调试代码：采集与 OCR 使用完全相同的一次截图 =====
-                ocr_screen = None
-                if self.ocr_debug_session:
-                    line_images, ocr_screen = self.repository_filter.capture_line_rois(with_screen=True)
-                else:
-                    line_images = self.repository_filter.capture_line_rois()
+                # ===== OCR 自动采集调试代码：状态、导航与六行 OCR 共用本轮截图 =====
+                ocr_screen = image
+                line_images = self.repository_filter.extract_line_rois(image)
                 ocr_trace = {} if self.ocr_debug_session else None
                 # ===== OCR 自动采集调试代码结束 =====
                 t_roi = time.time() - t_start
@@ -312,7 +344,9 @@ class RepoCleaner:
                     break
                 if not match_result.destructive_action_allowed:
                     self.stats["skipped"] += 1
-                    pydirectinput.press('right')
+                    if has_next:
+                        pydirectinput.press('right')
+                        navigation.expect_next(image, "right")
                     continue
 
                 # 操作执行
@@ -344,15 +378,14 @@ class RepoCleaner:
                             self.pending_sell_relics = []
                         self.pending_sell_relics.append(pending_relic_info)
 
-                        # F 仅标记待售出。先观察光标，未移动时才按一次右键；
-                        # 在任何后续遗物识别前确认确实进入了下一格。
-                        if (max_relics <= 0 or self.stats["total_detected"] < max_relics):
-                            if not self._advance_after_sale_selection(cursor_box, log):
-                                break
+                        # 游戏按 F 后自动移到下一件；下轮用详情和金额确认。
+                        if has_next:
+                            navigation.expect_next(image, "sale")
 
                 # 移动到下一遗物（如果需要）
-                if need_move_right and self.is_running:
+                if need_move_right and self.is_running and has_next:
                     pydirectinput.press('right')
+                    navigation.expect_next(image, "right")
 
                 t_relic_total = time.time() - t_relic_start
                 if DEBUG_ENABLED:
@@ -479,52 +512,13 @@ class RepoCleaner:
 
         return True
 
-    @staticmethod
-    def _cursor_advanced(previous, current):
-        if previous is None or current is None:
-            return False
-        px, py, pw, ph = previous
-        x, y, w, h = current
-        # Ignore small edge jitter; require a substantial card-size movement.
-        return abs(x - px) >= max(pw, w) * 0.6 or abs(y - py) >= max(ph, h) * 0.6
-
-    def _advance_after_sale_selection(self, previous_cursor, log) -> bool:
-        """Move once after F if needed, and verify before inspecting another relic."""
-        for _ in range(2):
-            if not self.is_running:
-                return False
-            time.sleep(0.15)
-            image = self.repository_filter._capture_game_window()
-            if image is None:
-                break
-            current, _ = self.relic_detector.detect_cursor(
-                image, self.repository_filter.scale_x, self.repository_filter.scale_y)
-            if self._cursor_advanced(previous_cursor, current):
-                return True
-
-        if image is None or current is None:
-            log("标记售出后无法识别光标，安全停止；未确认售出", "WARNING")
-            self.stop_reason = "error"
-            return False
-
-        if not self.is_running:
-            return False
-        log("标记售出后光标仍在原位，按右键前往下一遗物", "INFO")
-        pydirectinput.press('right')
-        for _ in range(2):
-            if not self.is_running:
-                return False
-            time.sleep(0.15)
-            image = self.repository_filter._capture_game_window()
-            if image is not None:
-                current, _ = self.relic_detector.detect_cursor(
-                    image, self.repository_filter.scale_x, self.repository_filter.scale_y)
-                if self._cursor_advanced(previous_cursor, current):
-                    return True
-
-        log("按右键后仍无法确认光标已移动，安全停止；未确认售出", "WARNING")
-        self.stop_reason = "error"
-        return False
+    def _record_navigation_check(self, image, navigation, check):
+        # ===== OCR 自动采集调试代码：仅导航证据不足时保留画面和判据 =====
+        if self.ocr_debug_session:
+            self.ocr_debug_session.record_navigation_check(
+                image, self.stats["total_detected"] + 1,
+                navigation.pending_action, check)
+        # ===== OCR 自动采集调试代码结束 =====
 
     def _record_match(self, mode, observation, result, log):
         try:
@@ -560,7 +554,7 @@ class RepoCleaner:
                     pydirectinput.press('f')
                     self.stats["sold"] += 1
                     self.pending_sell_count += 1
-                    return False  # 外层会检查 F 后的光标位置，并在必要时按右键
+                    return False  # F 会由游戏自动移到下一件，不补按右键
                 elif relic_state == RELIC_STATE_DARK_F:
                     log("取消收藏后标记售出", "INFO")
                     pydirectinput.press('2')  # 取消收藏
@@ -570,7 +564,7 @@ class RepoCleaner:
                     pydirectinput.press('f')  # 标记售出
                     self.stats["sold"] += 1
                     self.pending_sell_count += 1
-                    return False  # 外层会检查 F 后的光标位置，并在必要时按右键
+                    return False  # F 会由游戏自动移到下一件，不补按右键
 
         elif cleaning_mode == "favorite":
             if is_qualified:

@@ -7,6 +7,7 @@ logs/
 *.json
 !data/affix_catalog.json
 *.backup
+nr.cmd
 
 # --- Python 核心 ---
 __pycache__/

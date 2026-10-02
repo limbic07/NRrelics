@@ -89,8 +89,9 @@ class RelicDetector:
 
     def detect_cursor(self, image: np.ndarray, scale_x: float = 1.0, scale_y: float = 1.0) -> Tuple[Optional[Tuple], Optional[int]]:
         """
-        检测光标位置（从右下角开始寻找，避免误识别已选中的遗物）
-        使用 Canny边缘检测
+        检测光标位置。顺序清理时已选中的方框只在当前光标之前，
+        因此取最下行、同一行最右侧的仓库格子候选。
+        呼吸亮度会改变轮廓面积，面积仅用于同一格内选择外框。
 
         Returns:
             (cursor_box, cursor_width) 或 (None, None)
@@ -118,9 +119,11 @@ class RelicDetector:
         # 查找轮廓
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # 从右下角开始寻找光标（优先考虑下方，然后考虑右方）
+        # 先识别仓库格子，排除列表外的近似方框。
+        # 坐标以 1920x1080 客户区为基准，与仓库导航一致。
         best_cursor = None
-        max_position_score = -1
+        best_score = (-1, -1, -1)
+        unit_x, unit_y = w / 1920, h / 1080
 
         for cnt in contours:
             area = cv2.contourArea(cnt)
@@ -139,18 +142,29 @@ class RelicDetector:
             if not (self.shape_aspect_ratio_min <= asp <= self.shape_aspect_ratio_max):
                 continue
 
-            position_score = y * 10000 + x
+            abs_x, abs_y = x + rx, y + ry
+            column = round((abs_x / unit_x - 928) / 110)
+            row = round((abs_y / unit_y - 209) / 106)
+            if not (0 <= column < 8 and 0 <= row < 5):
+                continue
+            if (abs(abs_x / unit_x - (928 + 110 * column)) > 22
+                    or abs(abs_y / unit_y - (209 + 106 * row)) > 22):
+                continue
 
-            if position_score > max_position_score:
-                max_position_score = position_score
-                best_cursor = (x + rx, y + ry, cw, ch)
+            score = (row, column, area)
+
+            if score > best_score:
+                best_score = score
+                best_cursor = (abs_x, abs_y, cw, ch)
 
         if best_cursor:
             return best_cursor, best_cursor[2]
 
         return None, None
 
-    def detect_state(self, image: np.ndarray, resolution_scale: float = 1.0, scale_x: float = 1.0, scale_y: float = 1.0) -> str:
+    def detect_state(self, image: np.ndarray, resolution_scale: float = 1.0,
+                     scale_x: float = 1.0, scale_y: float = 1.0,
+                     cursor_box: Optional[Tuple] = None) -> str:
         """
         检测遗物状态
 
@@ -166,9 +180,16 @@ class RelicDetector:
         try:
             if image is None or image.size == 0:
                 return RELIC_STATE_UNKNOWN
-            cursor_box, cursor_width = self.detect_cursor(image, scale_x, scale_y)
+            if cursor_box is None:
+                cursor_box, cursor_width = self.detect_cursor(image, scale_x, scale_y)
+            else:
+                cursor_width = cursor_box[2]
             if cursor_box is None or not cursor_width:
                 return RELIC_STATE_UNKNOWN
+            # 特殊官方遗物的详情图标右下角有彩色菱形标记。
+            # 它的图标中心也可能超过普通遗物的亮度阈值，必须先判定。
+            if self._has_official_marker(image):
+                return RELIC_STATE_DARK_O
             if self.template_cup is None or self.template_bookmark is None:
                 return RELIC_STATE_UNKNOWN
             scale_factor = cursor_width / 92.0
@@ -194,6 +215,20 @@ class RelicDetector:
             return RELIC_STATE_DARK_E
         else:
             return RELIC_STATE_DARK_O
+
+    @staticmethod
+    def _has_official_marker(image: np.ndarray) -> bool:
+        """识别详情大图右下角的彩色菱形，避免将特殊遗物误判为可售出。"""
+        h, w = image.shape[:2]
+        x1, x2 = round(1032 * w / 1920), round(1049 * w / 1920)
+        y1, y2 = round(866 * h / 1080), round(882 * h / 1080)
+        patch = image[y1:y2, x1:x2]
+        if patch.size == 0:
+            return False
+        hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+        saturation, value = hsv[:, :, 1], hsv[:, :, 2]
+        marker_pixels = (saturation >= 40) & (value >= np.median(value) + 25)
+        return np.count_nonzero(marker_pixels) >= max(6, round(marker_pixels.size * 0.12))
 
     def _detect_detailed_state(self, image: np.ndarray, cursor_box: Tuple, scale_factor: float) -> Dict:
         """检测详细状态"""

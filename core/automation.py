@@ -286,15 +286,20 @@ class RepositoryFilter:
             empty = [np.zeros((100, 100, 3), dtype=np.uint8) for _ in self.LINE_ROI_COORDS]
             return (empty, None) if with_screen else empty
 
+        line_images = self.extract_line_rois(window_image)
+
+        # ===== OCR 自动采集调试代码：返回与六行 ROI 同一次拍摄的完整截图 =====
+        return (line_images, window_image) if with_screen else line_images
+        # ===== OCR 自动采集调试代码结束 =====
+
+    def extract_line_rois(self, window_image: np.ndarray) -> list:
+        """从已有的游戏截图裁出六行 OCR 区域，不再截屏。"""
         line_images = []
         for y_start, y_end in self.LINE_ROI_COORDS:
             region = (self.LINE_ROI_X_START, y_start, self.LINE_ROI_X_END, y_end)
             x1, y1, x2, y2 = self._scale_region(region)
             line_images.append(window_image[y1:y2, x1:x2])
-
-        # ===== OCR 自动采集调试代码：返回与六行 ROI 同一次拍摄的完整截图 =====
-        return (line_images, window_image) if with_screen else line_images
-        # ===== OCR 自动采集调试代码结束 =====
+        return line_images
 
     def _save_debug_image(self, image: np.ndarray, name: str):
         """保存调试图像"""
