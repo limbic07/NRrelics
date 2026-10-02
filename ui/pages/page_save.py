@@ -2,8 +2,8 @@
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QInputDialog, QMessageBox, QScrollArea,
-                               QDialog, QDialogButtonBox, QFileDialog)
-from PySide6.QtCore import Qt, Signal
+                               QDialog, QDialogButtonBox, QFileDialog, QApplication)
+from PySide6.QtCore import Qt, Signal, QObject, QThread
 from PySide6.QtGui import QFont
 from qfluentwidgets import (CardWidget, ComboBox, PrimaryPushButton, PushButton,
                            InfoBar, InfoBarPosition, LineEdit as FluentLineEdit,
@@ -12,7 +12,24 @@ import os
 import json
 
 from core.save_manager import SaveManager
+from core.affix_catalog import validation_affix_names
+from core.relic_validation import ReadOnlySaveValidator, ValidationReport, ValidationStatus
 from core.utils import get_user_data_path
+
+
+class _ValidationWorker(QObject):
+    finished = Signal(object)
+
+    def __init__(self, path: str):
+        super().__init__()
+        self.path = path
+
+    def run(self):
+        try:
+            report = ReadOnlySaveValidator().validate_path(self.path)
+        except Exception as exc:
+            report = ValidationReport(ValidationStatus.UNKNOWN, reasons=(f"验证失败：{exc}",))
+        self.finished.emit(report)
 
 
 class SavePage(QWidget):
@@ -47,7 +64,13 @@ class SavePage(QWidget):
 
     def _init_ui(self):
         """初始化UI"""
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        self.page_scroll = QScrollArea(self)
+        self.page_scroll.setWidgetResizable(True)
+        self.page_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self.page_content = QWidget()
+        layout = QVBoxLayout(self.page_content)
         layout.setContentsMargins(32, 32, 32, 32)
         layout.setSpacing(16)
 
@@ -64,9 +87,14 @@ class SavePage(QWidget):
         self.save_info_card = self._create_save_info_card()
         layout.addWidget(self.save_info_card)
 
+        self.validation_card = self._create_validation_card()
+        layout.addWidget(self.validation_card)
+
         # 备份列表卡片
         self.backup_card = self._create_backup_card()
         layout.addWidget(self.backup_card, 1)  # stretch=1 填满剩余空间
+        self.page_scroll.setWidget(self.page_content)
+        outer_layout.addWidget(self.page_scroll)
 
     def _create_user_card(self) -> CardWidget:
         """创建用户选择卡片"""
@@ -114,6 +142,195 @@ class SavePage(QWidget):
         card_layout.addLayout(steam_path_layout)
 
         return card
+
+    def _create_validation_card(self) -> CardWidget:
+        """Create the non-mutating save rule validation controls."""
+        card = CardWidget()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(20, 20, 20, 20)
+        card_layout.setSpacing(8)
+
+        title = QLabel("违规遗物检测")
+        title.setStyleSheet("font-size: 16pt; font-weight: bold;")
+        card_layout.addWidget(title)
+        note = QLabel("仅列出违规遗物，包括用CE修改的合法遗物（只读取不修改存档）")
+        note.setWordWrap(True)
+        card_layout.addWidget(note)
+
+        controls = QHBoxLayout()
+        self.validate_current_btn = PushButton("验证当前存档")
+        self.validate_current_btn.clicked.connect(self._validate_current_save)
+        controls.addWidget(self.validate_current_btn)
+        self.validate_file_btn = PushButton("选择存档")
+        self.validate_file_btn.clicked.connect(self._choose_validation_file)
+        controls.addWidget(self.validate_file_btn)
+        controls.addStretch()
+        card_layout.addLayout(controls)
+
+        players = QHBoxLayout()
+        players.addWidget(QLabel("选择角色："))
+        self.validation_player_combo = ComboBox()
+        self.validation_player_combo.addItem("全部角色", userData=None)
+        self.validation_player_combo.setEnabled(False)
+        self.validation_player_combo.currentIndexChanged.connect(self._render_validation_report)
+        players.addWidget(self.validation_player_combo)
+        players.addStretch()
+        card_layout.addLayout(players)
+        self._validation_report = None
+
+        self.validation_status_label = QLabel("尚未验证")
+        self.validation_status_label.setWordWrap(True)
+        card_layout.addWidget(self.validation_status_label)
+        self.validation_scroll = QScrollArea()
+        self.validation_scroll.setWidgetResizable(True)
+        self.validation_scroll.setMinimumHeight(180)
+        self.validation_scroll.setMaximumHeight(360)
+        self.validation_results = QWidget()
+        self.validation_results_layout = QVBoxLayout(self.validation_results)
+        self.validation_results_layout.setContentsMargins(0, 0, 0, 0)
+        self.validation_results_layout.setSpacing(8)
+        self.validation_results_layout.addStretch()
+        self.validation_entries = []
+        self.validation_scroll.setWidget(self.validation_results)
+        card_layout.addWidget(self.validation_scroll)
+        return card
+
+    def _validate_current_save(self):
+        steam_id = self._get_current_steam_id()
+        if steam_id:
+            self._start_validation(self.save_manager.get_save_path(steam_id))
+
+    def _choose_validation_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择存档", "", "Nightreign save (*.sl2 *.co2);;All files (*)")
+        if path:
+            self._start_validation(path)
+
+    def _start_validation(self, path: str):
+        if getattr(self, "_validation_thread", None) is not None:
+            return
+        if not os.path.isfile(path):
+            self._on_validation_finished(ValidationReport(
+                ValidationStatus.UNKNOWN, reasons=("无法验证：文件不存在。",), source=path))
+            return
+        self.validate_current_btn.setEnabled(False)
+        self.validate_file_btn.setEnabled(False)
+        self.validation_player_combo.setEnabled(False)
+        self.validation_status_label.setText("正在只读验证，不会写入或修改存档……")
+        # App ownership keeps a worker alive even if this page is destroyed.
+        self._validation_thread = QThread(QApplication.instance())
+        self._validation_worker = _ValidationWorker(path)
+        self._validation_worker.moveToThread(self._validation_thread)
+        self._validation_thread.started.connect(self._validation_worker.run)
+        self._validation_worker.finished.connect(self._on_validation_finished)
+        self._validation_worker.finished.connect(self._validation_thread.quit, Qt.DirectConnection)
+        self._validation_worker.finished.connect(self._validation_worker.deleteLater)
+        self._validation_thread.finished.connect(self._validation_thread.deleteLater)
+        self._validation_thread.finished.connect(self._validation_done)
+        QApplication.instance().aboutToQuit.connect(self._validation_thread.quit)
+        QApplication.instance().aboutToQuit.connect(self._validation_thread.wait)
+        self._validation_thread.start()
+
+    def closeEvent(self, event):
+        thread = getattr(self, "_validation_thread", None)
+        if thread is not None:
+            thread.quit()
+            thread.wait()
+        super().closeEvent(event)
+
+    def _validation_done(self):
+        self.validate_current_btn.setEnabled(True)
+        self.validate_file_btn.setEnabled(True)
+        self.validation_player_combo.setEnabled(self.validation_player_combo.count() > 1)
+        self._validation_thread = None
+        self._validation_worker = None
+
+    def _on_validation_finished(self, report: ValidationReport):
+        self._validation_report = report
+        self.validation_player_combo.blockSignals(True)
+        self.validation_player_combo.clear()
+        self.validation_player_combo.addItem("全部角色", userData=None)
+        players = {}
+        for item in report.results:
+            players.setdefault(item.relic.slot, item.relic.player_name or "未命名角色")
+        for slot, name in players.items():
+            self.validation_player_combo.addItem(name, userData=slot)
+        self.validation_player_combo.setCurrentIndex(0)
+        self.validation_player_combo.blockSignals(False)
+        self.validation_player_combo.setEnabled(len(players) > 0)
+        self._render_validation_report()
+
+    def _render_validation_report(self, *_):
+        report = self._validation_report
+        if report is None:
+            return
+        slot = self.validation_player_combo.currentData()
+        if slot is not None:
+            results = tuple(item for item in report.results if item.relic.slot == slot)
+            statuses = {item.status for item in results}
+            status = (ValidationStatus.UNKNOWN if report.reasons
+                      else ValidationStatus.VIOLATES if ValidationStatus.VIOLATES in statuses
+                      else ValidationStatus.UNKNOWN if ValidationStatus.UNKNOWN in statuses or not results
+                      else ValidationStatus.CONFORMS)
+            report = ValidationReport(status, results, report.reasons, report.source)
+        labels = {
+            ValidationStatus.CONFORMS: "符合已知规则（不代表官方有效性或无封禁风险）",
+            ValidationStatus.VIOLATES: "违反明确的已知规则",
+            ValidationStatus.UNKNOWN: "未知：无法对该存档或遗物作出安全判断",
+        }
+        detail = "；".join(report.reasons)
+        counts = {status: sum(item.status is status for item in report.results) for status in ValidationStatus}
+        summary = (f"共 {len(report.results)} 个遗物：符合 {counts[ValidationStatus.CONFORMS]}，"
+                   f"违反 {counts[ValidationStatus.VIOLATES]}，无法判定 {counts[ValidationStatus.UNKNOWN]}。")
+        if (report.status is ValidationStatus.CONFORMS and report.results
+                and counts[ValidationStatus.CONFORMS] == len(report.results) and not report.reasons):
+            self.validation_status_label.setText("所有遗物都合法")
+        elif not report.results and report.status is ValidationStatus.CONFORMS:
+            self.validation_status_label.setText("未检测到遗物，无法确认全部合法。")
+        else:
+            self.validation_status_label.setText(summary + labels[report.status] + (f"：{detail}" if detail else ""))
+        while self.validation_results_layout.count() > 1:
+            child = self.validation_results_layout.takeAt(0).widget()
+            if child is not None:
+                child.setParent(None)
+                child.deleteLater()
+        self.validation_entries.clear()
+        names = validation_affix_names()
+        by_slot = {}
+        for item in report.results:
+            if item.status is not ValidationStatus.VIOLATES:
+                continue
+            by_slot.setdefault(item.relic.slot or "未知槽位", []).append(item.relic)
+        color_names = {"Red": "红色", "Blue": "蓝色", "Yellow": "黄色",
+                       "Green": "绿色", "White": "白色"}
+        for slot, relics in by_slot.items():
+            header = QLabel(f"玩家：{relics[0].player_name or '未命名角色'}")
+            header.setTextFormat(Qt.PlainText)
+            header.setStyleSheet("font-size: 10pt; font-weight: bold;")
+            self.validation_results_layout.insertWidget(self.validation_results_layout.count() - 1, header)
+            for relic in relics:
+                entry = CardWidget()
+                entry_layout = QVBoxLayout(entry)
+                entry_layout.setContentsMargins(8, 6, 8, 6)
+                entry_layout.setSpacing(4)
+                title = QLabel(f"{color_names.get(relic.color, '未知颜色')} · "
+                               f"{'已收藏' if relic.favorite else '未收藏'}")
+                title.setStyleSheet("font-size: 10pt; font-weight: bold;")
+                entry_layout.addWidget(title)
+                for index in range(3):
+                    for effect, positive in ((relic.effects[index], True),
+                                             (relic.effects[index + 3], False)):
+                        if effect in ReadOnlySaveValidator.EMPTY_EFFECTS:
+                            continue
+                        text = names.get(effect, f"未知词条（ID: {effect}）")
+                        affix = QLabel(f"[{'正面' if positive else '负面'}] {text}")
+                        affix.setFont(QFont("Segoe UI", 9))
+                        affix.setStyleSheet(f"color: {'#4CAF50' if positive else '#FF5722'};")
+                        affix.setWordWrap(True)
+                        affix.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                        entry_layout.addWidget(affix)
+                self.validation_results_layout.insertWidget(self.validation_results_layout.count() - 1, entry)
+                self.validation_entries.append(entry)
 
     def _create_save_info_card(self) -> CardWidget:
         """创建存档信息卡片"""
@@ -303,6 +520,11 @@ class SavePage(QWidget):
         row_layout.addStretch()
 
         # 操作按钮
+        validate_btn = PushButton("只读验证")
+        validate_btn.setFixedSize(80, 28)
+        validate_btn.clicked.connect(lambda checked, b=backup: self._start_validation(b["path"]))
+        row_layout.addWidget(validate_btn)
+
         restore_btn = PrimaryPushButton("恢复")
         restore_btn.setFixedSize(60, 28)
         restore_btn.clicked.connect(lambda checked, b=backup: self._restore_backup(b))

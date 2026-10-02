@@ -29,6 +29,8 @@ wheels/
 .eggs/
 
 # --- 单元测试与覆盖率 (Unit Test / Coverage) ---
+/tests/
+/docs/
 .tox/
 .nox/
 .coverage

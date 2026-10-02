@@ -120,7 +120,7 @@ class RelicDetector:
 
         # 从右下角开始寻找光标（优先考虑下方，然后考虑右方）
         best_cursor = None
-        max_position_score = -1
+        candidates = []
 
         for cnt in contours:
             area = cv2.contourArea(cnt)
@@ -139,11 +139,17 @@ class RelicDetector:
             if not (self.shape_aspect_ratio_min <= asp <= self.shape_aspect_ratio_max):
                 continue
 
-            position_score = y * 10000 + x
+            candidates.append((x + rx, y + ry, cw, ch))
 
-            if position_score > max_position_score:
-                max_position_score = position_score
-                best_cursor = (x + rx, y + ry, cw, ch)
+        if candidates:
+            # 当前光标外框比待售框大，不能用顶部几像素的差异决定行顺序。
+            # 先按中心定位最下方一行，再取该行最右侧，保持原有遍历方向。
+            bottom = max(candidates, key=lambda box: box[1] + box[3] / 2)
+            bottom_center = bottom[1] + bottom[3] / 2
+            row = [box for box in candidates
+                   if bottom_center - (box[1] + box[3] / 2)
+                   <= min(bottom[3], box[3]) * 0.5]
+            best_cursor = max(row, key=lambda box: box[0] + box[2] / 2)
 
         if best_cursor:
             return best_cursor, best_cursor[2]

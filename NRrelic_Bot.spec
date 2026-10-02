@@ -17,8 +17,16 @@ _static_data = [
     ('data/deepnight_pos.txt', 'data'),
     ('data/deepnight_neg.txt', 'data'),
     ('data/affix_catalog.json', 'data'),
+    ('data/affix_parameters/AttachEffectParam.csv', 'data/affix_parameters'),
+    ('data/affix_parameters/LICENSE', 'data/affix_parameters'),
     ('data/icon_cup.png', 'data'),
     ('data/icon_bookmark.png', 'data'),
+    ('data/relic_validation/EquipParamAntique.csv', 'data/relic_validation'),
+    ('data/relic_validation/AttachEffectParam.csv', 'data/relic_validation'),
+    ('data/relic_validation/AttachEffectTableParam.csv', 'data/relic_validation'),
+    ('data/relic_validation/LICENSE-MIT.txt', 'data/relic_validation'),
+    ('data/relic_validation/AttachEffectName.fmg.xml', 'data/relic_validation'),
+    ('data/relic_validation/AttachEffectName_dlc01.fmg.xml', 'data/relic_validation'),
 ]
 datas = list(_static_data)
 

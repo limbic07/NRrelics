@@ -7,6 +7,30 @@ import json
 import sys
 import unicodedata
 from pathlib import Path
+from functools import lru_cache
+import xml.etree.ElementTree as ET
+
+
+@lru_cache(maxsize=1)
+def validation_affix_names():
+    """Chinese display names only; never used to decide relic legality."""
+    catalog = AffixCatalog()
+    names = {}
+    for effect in catalog.effects:
+        try:
+            names[int(effect["id"])] = effect["name"]
+        except (KeyError, TypeError, ValueError):
+            continue
+    root = catalog.path.parent / "relic_validation"
+    for filename in ("AttachEffectName.fmg.xml", "AttachEffectName_dlc01.fmg.xml"):
+        try:
+            for entry in ET.parse(root / filename).findall("./entries/text"):
+                text = (entry.text or "").strip()
+                if text and text != "%null%":
+                    names.setdefault(int(entry.attrib["id"]), text)
+        except (OSError, ET.ParseError, KeyError, ValueError):
+            continue
+    return names
 
 
 def normalize_name(value):

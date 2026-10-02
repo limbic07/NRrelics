@@ -204,13 +204,28 @@ class RepoCleaner:
                     self.stop_reason = "error"
                     break
 
-                # Cursor position is navigation evidence; affix text is never identity.
-                # A stationary cursor (including scrolling at a row boundary) is
-                # ambiguous: stop, never retry a sell key based on image noise.
+                # 游戏可能尚未完成自动跳转；只重试截图，不重复售出按键。
                 cursor_box, _ = self.relic_detector.detect_cursor(
                     image, self.repository_filter.scale_x, self.repository_filter.scale_y)
+                if last_cursor_box is not None:
+                    for _ in range(10):
+                        if self._cursor_advanced(last_cursor_box, cursor_box):
+                            break
+                        if not self.is_running:
+                            break
+                        time.sleep(0.1)
+                        if not self.is_running:
+                            break
+                        image = self.repository_filter._capture_game_window()
+                        if image is None:
+                            cursor_box = None
+                            continue
+                        cursor_box, _ = self.relic_detector.detect_cursor(
+                            image, self.repository_filter.scale_x, self.repository_filter.scale_y)
+                if not self.is_running:
+                    break
                 if last_cursor_box is not None and not self._cursor_advanced(last_cursor_box, cursor_box):
-                    log("无法确认光标已移动到下一遗物，安全停止（不重试售出）", "WARNING")
+                    log("等待并重新截图后仍无法确认光标已移动到下一遗物，安全停止（不重试售出）", "WARNING")
                     self.stop_reason = "error"
                     break
                 last_cursor_box = cursor_box

@@ -72,12 +72,21 @@
 
 ### 完美遗物与记录
 - 满足专用预设且至少3条有效词条、识别无不确定信息时，标记为完美遗物。
-- 商店提供“发现完美遗物时停止”开关，默认关闭；开启后保留当前遗物并停止购买。仓库清理会继续处理后续遗物。
+- 仅商店提供“发现完美遗物时停止”开关，默认关闭；开启后保留当前遗物并停止购买。仓库清理遇到完美遗物仍按合格规则保留并继续处理后续遗物。
 - 合格匹配立即追加到用户数据目录下的 `data/relic_history.jsonl`。
 - 旧预设无需迁移。普通模式不显示黑名单例外。
 
-通用预设回退、保守停止行为及兼容性说明见 [匹配与安全说明](docs/relic-matching.md)。
-分组必须词条的编辑步骤和可选元数据限制见 [分组说明](docs/grouped-requirements.md)。
+分组必须词条支持组内 OR、组间 AND；旧版程序可能将它们解释为全部必须命中，请勿用旧版执行清理。
+
+### 违规遗物检测
+- 在存档管理中选择存档，读取后可选择角色，仅展示违规遗物的颜色、收藏状态及中文词条。
+- 只读取，不修改存档。无法判定不会视为合法；通过社区规则不代表官方认可或无封禁风险。
+- 无法识别 CE 修改来源，符合规则的修改可能通过检测。固定负面槽位规则的适用性仍有待核实。
+
+### 数据来源与许可
+- 词条目录参数来自 [ip1259/Elden-Ring-Nightreign-Legal-Relic-Generator](https://github.com/ip1259/Elden-Ring-Nightreign-Legal-Relic-Generator)，参考提交 `aee6cba271501f95633fb662a6736cd6de2bae54`。参数快照和 GPLv3 许可保留于 `data/affix_parameters/`。
+- 兼容类别语义参考 [slavone/nighreign_relic_calculator](https://github.com/slavone/nighreign_relic_calculator)，参考提交 `3cc38a5cdfd37865e7888064251d156d5abd5825`。词条目录为编辑辅助，不是完整合法性规则。
+- 存档检测的参数及中文名称来自 [alfizari/Elden-Ring-Nightreign-Save-Editor](https://github.com/alfizari/Elden-Ring-Nightreign-Save-Editor)，参考提交 `0d2ad1494c372098e689c23159656df70ff2d76d`，数据和 MIT 许可保留于 `data/relic_validation/`。不导入其存档编辑或写回功能。
 
 ## 技术特性
 

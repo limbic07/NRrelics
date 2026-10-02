@@ -670,7 +670,7 @@ class OCREngine:
             log_debug(f"[错误] 单行OCR识别失败: {e}")
             return "", 0.0
 
-    def recognize_with_classification(self, image: np.ndarray, mode: str = "normal") -> dict:
+    def recognize_with_classification(self, image: np.ndarray, mode: str = "normal", trace: dict = None) -> dict:
         """
         执行OCR识别并分类词条（正面/负面）
         支持重试机制：如果识别不到任何词条库内的词条，最多重试3次
