@@ -6,7 +6,9 @@ continue to work when the generated catalog is absent or incomplete.
 import json
 import sys
 import unicodedata
+from functools import lru_cache
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 
 def normalize_name(value):
@@ -89,3 +91,25 @@ class AffixCatalog:
                 if all(a is not None and b is not None and a == b for a, b in pairs):
                     warnings.append((index + 1, other_index + 1))
         return warnings
+
+
+@lru_cache(maxsize=1)
+def validation_affix_names():
+    """Return Chinese labels for the read-only save report, not legality rules."""
+    catalog = AffixCatalog()
+    names = {}
+    for effect in catalog.effects:
+        try:
+            names[int(effect["id"])] = effect["name"]
+        except (KeyError, TypeError, ValueError):
+            continue
+    root = catalog.path.parent / "relic_validation"
+    for filename in ("AttachEffectName.fmg.xml", "AttachEffectName_dlc01.fmg.xml"):
+        try:
+            for entry in ET.parse(root / filename).findall("./entries/text"):
+                text = (entry.text or "").strip()
+                if text and text != "%null%":
+                    names.setdefault(int(entry.attrib["id"]), text)
+        except (OSError, ET.ParseError, KeyError, ValueError):
+            continue
+    return names
