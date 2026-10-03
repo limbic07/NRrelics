@@ -259,6 +259,10 @@ class SettingsPage(QWidget):
         hint.setStyleSheet("color: #e67e22;")
         card_layout.addWidget(hint)
 
+        debug_title = QLabel("运行调试")
+        debug_title.setStyleSheet("font-size: 11pt; font-weight: 600;")
+        card_layout.addWidget(debug_title)
+
         # OCR 调试模式
         ocr_debug_layout = QHBoxLayout()
         ocr_debug_label = QLabel("OCR调试模式:")
@@ -280,6 +284,26 @@ class SettingsPage(QWidget):
         ocr_debug_desc.setStyleSheet("color: gray;")
         ocr_debug_desc.setWordWrap(True)
         card_layout.addWidget(ocr_debug_desc)
+
+        # 商店耗时调试模式：与 OCR 采集开关集中管理，彼此独立。
+        timing_debug_layout = QHBoxLayout()
+        timing_debug_label = QLabel("耗时调试模式:")
+        timing_debug_label.setFixedWidth(150)
+        self.timing_debug_switch = SwitchButton()
+        self.timing_debug_switch.setChecked(self.settings.get("timing_debug", False))
+        self.timing_debug_switch.checkedChanged.connect(self._auto_save_settings)
+        timing_debug_layout.addWidget(timing_debug_label)
+        timing_debug_layout.addWidget(self.timing_debug_switch)
+        timing_debug_layout.addStretch()
+        card_layout.addLayout(timing_debug_layout)
+
+        timing_debug_desc = QLabel(
+            "开启后，商店筛选每轮十连输出一次各步骤耗时汇总；中途停止时输出已执行部分。"
+            "包含购买、截图、OCR、匹配、调试采集、结果处理、筛选按键和确认；与 OCR 调试模式独立。")
+        timing_debug_desc.setFont(QFont("Segoe UI", 8))
+        timing_debug_desc.setStyleSheet("color: gray;")
+        timing_debug_desc.setWordWrap(True)
+        card_layout.addWidget(timing_debug_desc)
 
         # 模板匹配阈值
         threshold_layout = QHBoxLayout()
@@ -500,6 +524,7 @@ class SettingsPage(QWidget):
             "shop_stop_on_perfect_relic": False,
             "steam_path": "",
             "ocr_debug": False,
+            "timing_debug": False,
             "template_threshold": 0.7,
             "brightness_threshold": 45,
             "sl_mode_enabled": False,
@@ -518,6 +543,7 @@ class SettingsPage(QWidget):
             "shop_stop_on_perfect_relic": self.shop_stop_on_perfect_switch.isChecked(),
             "steam_path": self.steam_path_input.text(),
             "ocr_debug": self.ocr_debug_switch.isChecked() if hasattr(self, 'ocr_debug_switch') else self.settings.get("ocr_debug", False),
+            "timing_debug": self.timing_debug_switch.isChecked() if hasattr(self, 'timing_debug_switch') else self.settings.get("timing_debug", False),
             "template_threshold": self._get_threshold_value(),
             "brightness_threshold": self._get_brightness_threshold_value(),
             "sl_mode_enabled": self.sl_mode_switch.isChecked() if hasattr(self, 'sl_mode_switch') else self.settings.get("sl_mode_enabled", False),

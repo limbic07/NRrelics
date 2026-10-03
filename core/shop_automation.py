@@ -8,15 +8,55 @@ import numpy as np
 import pydirectinput
 import pyautogui
 import keyboard
+from contextlib import contextmanager, nullcontext
 from datetime import datetime
 from typing import Optional
 
-from core.relic_matcher import match_relic, log_match
+from core.relic_matcher import match_relic, log_match, preset_configuration_errors
 from core.relic_recorder import RelicRecorder
 from core.ocr_diagnostics import create_capture_session  # OCR 自动采集调试代码
 from core.preset_manager import PresetManager
 from core.utils import DEBUG_ENABLED, debug_timer, affix_recorder, log_debug
 
+
+
+class _ShopRoundTiming:
+    """Measure one ten-relic round without adding per-relic log traffic."""
+
+    LABELS = (
+        ("currency", "暗痕检测"), ("purchase", "购买"),
+        ("capture", "截图"), ("ocr", "OCR"), ("match", "匹配"),
+        ("debug", "调试采集"), ("result", "结果记录/日志"),
+        ("action", "筛选按键"), ("confirm", "确认"),
+    )
+
+    def __init__(self, enabled=False):
+        self.enabled = enabled
+        self.started = time.perf_counter() if enabled else None
+        self.parts = {}
+        self.items = 0
+
+    def measure(self, name):
+        return self._measure(name) if self.enabled else nullcontext()
+
+    @contextmanager
+    def _measure(self, name):
+        started = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.parts[name] = self.parts.get(name, 0.0) + time.perf_counter() - started
+
+    def summary(self, batch_end, complete):
+        total = time.perf_counter() - self.started
+        accounted = sum(self.parts.values())
+        breakdown = "、".join(
+            f"{label} {self.parts.get(name, 0.0):.2f}s"
+            for name, label in self.LABELS
+        )
+        status = "完成" if complete else f"中断，已处理 {self.items}/10"
+        return (f"[性能] 第 {batch_end - 9}-{batch_end} 个遗物（{status}）："
+                f"总计 {total:.2f}s；{breakdown}、其他 {max(0.0, total - accounted):.2f}s")
 
 
 class ShopAutomation:
@@ -62,6 +102,20 @@ class ShopAutomation:
         (740, 764),   # 第 5 行
         (764, 786),   # 第 6 行
     ]
+
+    # 仅用于商店逐件筛选。沿用 v2.0.3 的 100ms 按住时间，缩短松开后的等待。
+    RELIC_ACTION_HOLD_SECONDS = 0.1
+    RELIC_ACTION_SETTLE_SECONDS = 0.08
+
+    @staticmethod
+    def _press_relic_action(key):
+        """Advance one relic; purchase and batch confirmation keep their old timing."""
+        pydirectinput.keyDown(key, _pause=False)
+        try:
+            time.sleep(ShopAutomation.RELIC_ACTION_HOLD_SECONDS)
+        finally:
+            pydirectinput.keyUp(key, _pause=False)
+        time.sleep(ShopAutomation.RELIC_ACTION_SETTLE_SECONDS)
 
     def __init__(self, ocr_engine, preset_manager, repo_filter, settings: dict):
         """
@@ -139,16 +193,24 @@ class ShopAutomation:
             self.stop()
             log("收到停止信号，正在停止购买...", "WARNING")
 
+        round_timing = None
         try:
+            general_preset, dedicated_presets, blacklist_preset = self._load_presets(mode)
+            errors = preset_configuration_errors(
+                general_preset, dedicated_presets, blacklist_preset)
+            if errors:
+                for error in errors:
+                    log(error, "ERROR")
+                log("预设配置无效，已停止购买；请修正上述预设后重试。", "ERROR")
+                self.stop_reason = "error"
+                return
+
             # ===== OCR 自动采集调试代码：每次购买建立独立会话；删除时移除此块及下方标记块 =====
             self.ocr_debug_session = create_capture_session(self.settings, "shop", mode, log)
             # ===== OCR 自动采集调试代码结束 =====
             keyboard.add_hotkey('0', on_zero_pressed)
             # 刷新窗口信息
             self.repo_filter.refresh_window_info()
-
-            # 加载预设
-            general_preset, dedicated_presets, blacklist_preset = self._load_presets(mode)
 
             # 等待3秒，给用户时间切换到游戏界面
             log("等待3秒，请切换到游戏商人界面...", "INFO")
@@ -175,6 +237,7 @@ class ShopAutomation:
             # 3. 循环购买
             first_purchase = True
             while self.is_running:
+                round_timing = _ShopRoundTiming(self.settings.get("timing_debug", False))
                 # SL模式：检查合格遗物数量是否达标
                 if self.sl_mode_enabled and self.sl_qualified_target > 0:
                     if self.stats["qualified"] >= self.sl_qualified_target:
@@ -183,8 +246,10 @@ class ShopAutomation:
                         break
 
                     # 购买前检测暗痕，不足则执行存档恢复
-                    current_currency = self._detect_currency(log)
+                    with round_timing.measure("currency"):
+                        current_currency = self._detect_currency(log)
                     if current_currency >= 0 and current_currency < 10000:
+                        round_timing = None  # 存档恢复不属于十连购买计时
                         log(f"暗痕不足 ({current_currency} < 10000)，合格遗物 {self.stats['qualified']}/{self.sl_qualified_target}，执行存档恢复...", "WARNING")
                         if not self._execute_sl_operation(log):
                             log("存档恢复操作失败，停止购买", "ERROR")
@@ -210,42 +275,52 @@ class ShopAutomation:
                 else:
                     # 原有停止条件：检测暗痕数量
                     if stop_currency > 0:
-                        current_currency = self._detect_currency(log)
+                        with round_timing.measure("currency"):
+                            current_currency = self._detect_currency(log)
                         if current_currency >= 0 and current_currency < stop_currency:
                             log(f"暗痕不足（当前{current_currency} < 停止值{stop_currency}），停止购买", "WARNING")
                             self.stop_reason = "completed"
                             break
 
                 # 4. 执行购买
-                if first_purchase:
-                    # 首次购买：点击遗物坐标
-                    if not self._execute_first_purchase(mode, version, log):
-                        self.stop_reason = self.stop_reason or "error"
-                        break
-                    first_purchase = False
-                else:
-                    # 后续购买：直接按F购买
-                    if not self._execute_subsequent_purchase(log):
-                        self.stop_reason = self.stop_reason or "error"
-                        break
+                with round_timing.measure("purchase"):
+                    if first_purchase:
+                        # 首次购买：点击遗物坐标
+                        purchased = self._execute_first_purchase(mode, version, log)
+                        if purchased:
+                            first_purchase = False
+                    else:
+                        # 后续购买：直接按F购买
+                        purchased = self._execute_subsequent_purchase(log)
+                if not purchased:
+                    self.stop_reason = self.stop_reason or "error"
+                    break
 
                 # 5. 处理购买的10个遗物
                 self._process_purchased_relics(
                     mode, require_double, general_preset, dedicated_presets,
-                    blacklist_preset, log, stats_callback
+                    blacklist_preset, log, stats_callback, round_timing
                 )
 
                 # 6. 确认操作（按f）- 检查是否仍在运行
                 if not self.is_running:
                     break
-                pydirectinput.press('f')
-                log("已确认操作", "INFO")
+                with round_timing.measure("confirm"):
+                    pydirectinput.press('f')
+                    log("已确认操作", "INFO")
+                if round_timing.enabled:
+                    log(round_timing.summary(self.stats["total_purchased"],
+                                             round_timing.items == 10), "INFO")
+                round_timing = None
 
         except Exception as e:
             if self.stop_reason != "perfect_relic":
                 self.stop_reason = "error"
             log(f"购买过程出错: {e}", "ERROR")
         finally:
+            if (round_timing is not None and round_timing.enabled and
+                    (round_timing.items or "purchase" in round_timing.parts)):
+                log(round_timing.summary(self.stats["total_purchased"], False), "INFO")
             if self.stop_reason is None:
                 self.stop_reason = "manual" if not self.is_running else "error"
             self.is_running = False
@@ -530,8 +605,10 @@ class ShopAutomation:
 
 
     def _process_purchased_relics(self, mode, require_double, general_preset,
-                                   dedicated_presets, blacklist_preset, log, stats_callback):
+                                   dedicated_presets, blacklist_preset, log, stats_callback,
+                                   timing=None):
         """处理购买的10个遗物（参考仓库清理流程）"""
+        timing = timing if timing is not None else _ShopRoundTiming()
         if DEBUG_ENABLED:
             debug_timer.start("处理10个遗物总耗时")
 
@@ -539,6 +616,7 @@ class ShopAutomation:
             if not self.is_running:
                 break
 
+            timing.items += 1
             log(f"处理第 {i+1}/10 个遗物", "INFO")
 
             # 1. 截图
@@ -546,12 +624,13 @@ class ShopAutomation:
                 debug_timer.start(f"relic_{i+1}_capture")
 
             # ===== OCR 自动采集调试代码：采集与 OCR 使用完全相同的一次截图 =====
-            ocr_screen = None
-            if self.ocr_debug_session:
-                line_images, ocr_screen = self._capture_shop_line_rois(with_screen=True)
-            else:
-                line_images = self._capture_shop_line_rois()
-            ocr_trace = {} if self.ocr_debug_session else None
+            with timing.measure("capture"):
+                ocr_screen = None
+                if self.ocr_debug_session:
+                    line_images, ocr_screen = self._capture_shop_line_rois(with_screen=True)
+                else:
+                    line_images = self._capture_shop_line_rois()
+                ocr_trace = {} if self.ocr_debug_session else None
             # ===== OCR 自动采集调试代码结束 =====
 
             if DEBUG_ENABLED:
@@ -562,8 +641,9 @@ class ShopAutomation:
             if DEBUG_ENABLED:
                 debug_timer.start(f"relic_{i+1}_ocr")
 
-            ocr_result = self.ocr_engine.recognize_with_classification_from_lines(
-                line_images, mode, trace=ocr_trace)
+            with timing.measure("ocr"):
+                ocr_result = self.ocr_engine.recognize_with_classification_from_lines(
+                    line_images, mode, trace=ocr_trace)
 
             if DEBUG_ENABLED:
                 ocr_time = debug_timer.end(f"relic_{i+1}_ocr")
@@ -575,23 +655,27 @@ class ShopAutomation:
             if not self.is_running:
                 # ===== OCR 自动采集调试代码：停止发生在 OCR 期间时也保存本次样本 =====
                 if self.ocr_debug_session:
-                    self.ocr_debug_session.record(
-                        ocr_screen, line_images, ocr_result, ocr_trace, None,
-                        self.ocr_engine, self.stats["total_purchased"] - 10 + i + 1,
-                        {"batch_position": i + 1, "batch_end": self.stats["total_purchased"],
-                         "stopped_before_matching": True})
+                    with timing.measure("debug"):
+                        self.ocr_debug_session.record(
+                            ocr_screen, line_images, ocr_result, ocr_trace, None,
+                            self.ocr_engine, self.stats["total_purchased"] - 10 + i + 1,
+                            {"batch_position": i + 1, "batch_end": self.stats["total_purchased"],
+                             "stopped_before_matching": True})
                 # ===== OCR 自动采集调试代码结束 =====
                 return
             if not ocr_result["success"]:
                 # ===== OCR 自动采集调试代码：失败样本也保留 =====
                 if self.ocr_debug_session:
-                    self.ocr_debug_session.record(
-                        ocr_screen, line_images, ocr_result, ocr_trace, None,
-                        self.ocr_engine, self.stats["total_purchased"] - 10 + i + 1,
-                        {"batch_position": i + 1, "batch_end": self.stats["total_purchased"]})
+                    with timing.measure("debug"):
+                        self.ocr_debug_session.record(
+                            ocr_screen, line_images, ocr_result, ocr_trace, None,
+                            self.ocr_engine, self.stats["total_purchased"] - 10 + i + 1,
+                            {"batch_position": i + 1, "batch_end": self.stats["total_purchased"]})
                 # ===== OCR 自动采集调试代码结束 =====
-                log("OCR识别失败，跳过", "ERROR")
-                pydirectinput.press('right')
+                with timing.measure("result"):
+                    log("OCR识别失败，跳过", "ERROR")
+                with timing.measure("action"):
+                    self._press_relic_action('right')
                 continue
 
             # 记录词条到调试工具
@@ -608,77 +692,81 @@ class ShopAutomation:
                     affix_recorder.record_failed(failed_affix["text"], is_positive, raw_text)
 
             # 输出词条信息
-            for affix in ocr_result["affixes"]:
-                affix_type = "正面" if affix["is_positive"] else "负面"
-                log(f"  [{affix_type}] {affix['cleaned_text']}", "INFO")
+            with timing.measure("result"):
+                for affix in ocr_result["affixes"]:
+                    affix_type = "正面" if affix["is_positive"] else "负面"
+                    log(f"  [{affix_type}] {affix['cleaned_text']}", "INFO")
 
             # 3. 词条匹配（与仓库清理逻辑一致）
             if DEBUG_ENABLED:
                 debug_timer.start(f"relic_{i+1}_match")
 
-            match_result = self._match_affixes(
-                ocr_result, general_preset, dedicated_presets,
-                blacklist_preset, require_double
-            )
-
-            # ===== OCR 自动采集调试代码：在任何售出/保留按键前写入完整证据和实际匹配结果 =====
-            if self.ocr_debug_session:
-                self.ocr_debug_session.record(
-                    ocr_screen, line_images, ocr_result, ocr_trace, match_result,
-                    self.ocr_engine, self.stats["total_purchased"] - 10 + i + 1,
-                    {"batch_position": i + 1, "batch_end": self.stats["total_purchased"],
-                     "required_effective_count": 2 if require_double else 3})
-            # ===== OCR 自动采集调试代码结束 =====
+            with timing.measure("match"):
+                match_result = self._match_affixes(
+                    ocr_result, general_preset, dedicated_presets,
+                    blacklist_preset, require_double
+                )
 
             if DEBUG_ENABLED:
                 match_time = debug_timer.end(f"relic_{i+1}_match")
                 debug_timer.record(f"第{i+1}个遗物-词条匹配", match_time)
 
+            # ===== OCR 自动采集调试代码：在任何售出/保留按键前写入完整证据和实际匹配结果 =====
+            if self.ocr_debug_session:
+                with timing.measure("debug"):
+                    self.ocr_debug_session.record(
+                        ocr_screen, line_images, ocr_result, ocr_trace, match_result,
+                        self.ocr_engine, self.stats["total_purchased"] - 10 + i + 1,
+                        {"batch_position": i + 1, "batch_end": self.stats["total_purchased"],
+                         "required_effective_count": 2 if require_double else 3})
+            # ===== OCR 自动采集调试代码结束 =====
+
             if not self.is_running:
                 break
 
             # 4. 执行操作
-            if match_result.qualified:
-                self.stats["qualified"] += 1
-                log(f"合格遗物，保留", "SUCCESS")
+            with timing.measure("result"):
+                if match_result.qualified:
+                    self.stats["qualified"] += 1
+                    log("合格遗物，保留", "SUCCESS")
 
-                # 记录合格遗物
-                relic_info = {
-                    "index": self.stats["total_purchased"] - 10 + i + 1,
-                    "affixes": ocr_result["affixes"]
-                }
-                self.qualified_relics.append(relic_info)
-                try:
-                    if not self.recorder.record("shop", mode, relic_info["index"], ocr_result, match_result):
-                        log(f"匹配记录写入失败，仍保留遗物: {self.recorder.last_error}", "WARNING")
-                except Exception as exc:
-                    log(f"匹配记录写入失败，仍保留遗物: {exc}", "WARNING")
-                log_match(match_result, relic_info["index"], log)
-                if match_result.perfect and self.settings.get("shop_stop_on_perfect_relic", False):
-                    self.stop_reason = "perfect_relic"
-                    self.is_running = False
-                    if stats_callback:
-                        stats_callback(self.stats.copy())
-                    return
-                if not self.is_running:
-                    return
+                    # 记录合格遗物
+                    relic_info = {
+                        "index": self.stats["total_purchased"] - 10 + i + 1,
+                        "affixes": ocr_result["affixes"]
+                    }
+                    self.qualified_relics.append(relic_info)
+                    try:
+                        if not self.recorder.record("shop", mode, relic_info["index"], ocr_result, match_result):
+                            log(f"匹配记录写入失败，仍保留遗物: {self.recorder.last_error}", "WARNING")
+                    except Exception as exc:
+                        log(f"匹配记录写入失败，仍保留遗物: {exc}", "WARNING")
+                    log_match(match_result, relic_info["index"], log)
+                    if match_result.perfect and self.settings.get("shop_stop_on_perfect_relic", False):
+                        self.stop_reason = "perfect_relic"
+                        self.is_running = False
+                        if stats_callback:
+                            stats_callback(self.stats.copy())
+                        return
+                    if not self.is_running:
+                        return
+                    action_key = 'right'  # 保留后前往下一遗物
+                elif not match_result.destructive_action_allowed:
+                    log_match(match_result, self.stats["total_purchased"] - 10 + i + 1, log)
+                    action_key = 'right'
+                else:
+                    self.stats["unqualified"] += 1
+                    self.stats["sold"] += 1
+                    log("不合格遗物，出售", "INFO")
+                    action_key = '3'
 
-                # 按右方向键跳过（保留）
-                pydirectinput.press('right')
-            elif not match_result.destructive_action_allowed:
-                log_match(match_result, self.stats["total_purchased"] - 10 + i + 1, log)
-                pydirectinput.press('right')
-            else:
-                self.stats["unqualified"] += 1
-                self.stats["sold"] += 1
-                log(f"不合格遗物，出售", "INFO")
-
-                # 按3出售
-                pydirectinput.press('3')
+            with timing.measure("action"):
+                self._press_relic_action(action_key)
 
             # 更新统计
             if stats_callback:
-                stats_callback(self.stats.copy())
+                with timing.measure("result"):
+                    stats_callback(self.stats.copy())
 
         if DEBUG_ENABLED:
             total_time = debug_timer.end("处理10个遗物总耗时")

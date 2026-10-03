@@ -19,6 +19,7 @@ _static_data = [
     ('data/affix_catalog.json', 'data'),
     ('data/icon_cup.png', 'data'),
     ('data/icon_bookmark.png', 'data'),
+    ('resources/models/PP-OCRv6_rec_small.onnx', 'resources/models'),
 ]
 datas = list(_static_data)
 
@@ -54,7 +55,11 @@ hiddenimports = [
 ]
 
 tmp_ret = collect_all('rapidocr')
-datas += tmp_ret[0]
+# 模型统一取 resources/models，避免把 RapidOCR 包内副本再打包一遍。
+datas += [
+    (source, dest) for source, dest in tmp_ret[0]
+    if _pl.PurePosixPath(dest.replace('\\', '/')).parts[:2] != ('rapidocr', 'models')
+]
 binaries += tmp_ret[1]
 hiddenimports += tmp_ret[2]
 

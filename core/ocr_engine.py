@@ -5,8 +5,11 @@ OCR 引擎封装模块
 import time
 import re
 import os
+from pathlib import Path
 import cv2
 from rapidocr import RapidOCR
+from rapidocr.ch_ppocr_rec import TextRecognizer
+from rapidocr.utils.load_image import LoadImage
 from rapidfuzz import fuzz
 import numpy as np
 from core.utils import get_resource_path, get_user_data_path, log_debug, DEBUG_ENABLED, debug_timer
@@ -23,6 +26,50 @@ CORRECTION_CONFIG = {
     "max_retry": 3,
     "data_dir": "data",
 }
+
+# Bundled OCR models. Keep these paths in sync with NRrelic_Bot.spec.
+# Only the recognizer is initialized; detection and orientation are not used
+# for the fixed six-line OCR flow.
+OCR_MODEL_FILES = {
+    "Rec.model_path": "PP-OCRv6_rec_small.onnx",
+}
+
+
+def bundled_ocr_model_params() -> dict:
+    model_dir = Path(get_resource_path("resources/models"))
+    params = {key: str(model_dir / filename)
+              for key, filename in OCR_MODEL_FILES.items()}
+    missing = [path for path in params.values() if not Path(path).is_file()]
+    if missing:
+        raise FileNotFoundError("缺少本地 OCR 模型文件: " + ", ".join(missing))
+    return params
+
+
+class LineOnlyRapidOCR(RapidOCR):
+    """Initialize RapidOCR's recognition path without unused DET/CLS models.
+
+    The application always supplies one cropped text line and calls with
+    use_det=False, use_cls=False. RapidOCR 3.9.2 otherwise loads all three
+    models at construction even when those flags are disabled at inference.
+    """
+
+    def _initialize(self, cfg):
+        if cfg.Global.use_det or cfg.Global.use_cls:
+            raise ValueError("LineOnlyRapidOCR requires DET and CLS disabled")
+        cfg.Rec.engine_cfg = cfg.EngineConfig[cfg.Rec.engine_type.value]
+        cfg.Rec.font_path = cfg.Global.font_path
+        cfg.Rec.model_root_dir = cfg.Global.model_root_dir
+        self.text_rec = TextRecognizer(cfg.Rec)
+        self.load_img = LoadImage()
+        self.use_det = False
+        self.use_cls = False
+        self.use_rec = True
+        self.text_score = cfg.Global.text_score
+        self.min_side_len = cfg.Global.min_side_len
+        self.max_side_len = cfg.Global.max_side_len
+        self.return_word_box = cfg.Global.return_word_box
+        self.return_single_char_box = cfg.Global.return_single_char_box
+        self.cfg = cfg
 
 
 # ==================== 词条库加载器 ====================
@@ -494,10 +541,12 @@ class OCREngine:
 
         log_debug("正在加载OCR模型...")
         try:
-            # 使用 rapidocr 内置的 PP-OCRv6-small 模型
-            # v6 比本地 v4 模型快约10%，准确率高3-5%
-            self.engine = RapidOCR()
-            log_debug("OCR模型加载完成 (PP-OCRv6-small)")
+            self.engine = LineOnlyRapidOCR(params={
+                **bundled_ocr_model_params(),
+                "Global.use_det": False,
+                "Global.use_cls": False,
+            })
+            log_debug("OCR模型加载完成 (本地 PP-OCRv6-small 单行识别)")
         except Exception as e:
             log_debug(f"[错误] OCR模型加载失败: {e}")
             raise

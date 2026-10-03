@@ -62,6 +62,39 @@ def _required_groups(preset):
     return ([[a] for a in flat], flat, True)
 
 
+def preset_configuration_errors(general_preset, dedicated_presets, blacklist_preset=None):
+    """Explain invalid active rules without depending on an OCR observation."""
+    errors = []
+
+    def strings(preset, key, label):
+        value = preset.get(key, [])
+        if not _strings(value):
+            errors.append(f'预设「{preset.get("name", preset.get("id", "未命名"))}」：{label}格式无效')
+            return set()
+        return set(value)
+
+    general = set()
+    if general_preset and general_preset.get('is_active', True):
+        general = strings(general_preset, 'affixes', '有效词条')
+    if blacklist_preset and blacklist_preset.get('is_active', True):
+        strings(blacklist_preset, 'affixes', '黑名单词条')
+    candidates = (dedicated_presets.values() if isinstance(dedicated_presets, dict)
+                  else dedicated_presets or [])
+    for preset in candidates:
+        if not preset.get('is_active', True):
+            continue
+        name = preset.get('name', preset.get('id', '未命名'))
+        available = strings(preset, 'affixes', '有效词条') | general
+        strings(preset, 'blacklist_exceptions', '黑名单例外')
+        _, required, valid = _required_groups(preset)
+        if not valid:
+            errors.append(f'预设「{name}」：必须词条组格式无效')
+        elif set(required) - available:
+            errors.append(f'预设「{name}」：必须词条未包含在专用或已启用通用预设的有效词条中：'
+                          + '、'.join(sorted(set(required) - available)))
+    return errors
+
+
 def match_relic(observation, general_preset, dedicated_presets, blacklist_preset=None,
                 threshold=2, general_fallback='no_active') -> MatchResult:
     """Fallback: repository=no_active; shop=always (only if no dedicated qualifies).
@@ -145,7 +178,8 @@ def match_relic(observation, general_preset, dedicated_presets, blacklist_preset
             and (general_fallback == 'always' or (general_fallback == 'no_active' and not active))):
         matches.append(evaluate(general_preset, False))
     if invalid_config:
-        reasons.append('预设配置无效，请检查必须词条和例外')
+        reasons.extend(preset_configuration_errors(
+            general_preset, dedicated_presets, blacklist_preset))
     qualified = [m for m in matches if m.qualified]
     best = max(qualified, key=lambda m: m.effective_count, default=None)
     return MatchResult(bool(qualified), any(m.perfect for m in qualified), best, matches,

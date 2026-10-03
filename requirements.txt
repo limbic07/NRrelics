@@ -1,5 +1,5 @@
 # OCR 和图像处理
-rapidocr>=2.0.0
+rapidocr==3.9.2
 onnxruntime>=1.16.0
 opencv-python>=4.5.0
 Pillow>=6.2.0
