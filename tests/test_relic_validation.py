@@ -148,7 +148,7 @@ class RelicValidationTests(unittest.TestCase):
     def test_public_wrong_id_example_and_matching_template(self):
         # Upstream issue #55: same effects can fit a different item ID, while
         # 2003202 has no curse slots. The save itself is never rewritten.
-        validator = ReadOnlySaveValidator()
+        validator = ReadOnlySaveValidator(check_id_consistency=True)
         effects = (7044100, 6610400, 6610802, 0xFFFFFFFF, 6820200, 6850900)
         wrong = RelicRecord(0, 2003202, effects, 'Yellow', 'deep', False, False)
         valid = RelicRecord(0, 2001202, effects, 'Yellow', 'deep', False, False)
@@ -176,13 +176,46 @@ class RelicValidationTests(unittest.TestCase):
         self.assertTrue(any('第 3 条正面词条' in reason for reason in result.reasons))
 
     def test_missing_configured_curse_is_not_optional(self):
-        validator = ReadOnlySaveValidator()
+        validator = ReadOnlySaveValidator(check_id_consistency=True)
         relic = RelicRecord(0, 2001102,
                             (6500000, 6631900, 6610400, 0, 0, 6820000),
                             'Blue', 'deep', False, False)
         result = validator._validate_relic(relic)
         self.assertIs(result.status, ValidationStatus.VIOLATES)
         self.assertIn('应为 2 条，实际 1 条', result.reasons[0])
+
+    def test_default_accepts_legal_combination_and_strict_checks_original_id(self):
+        effects = (6633100, 7044500, 6610802, 0, 0, 6820000)
+        relic = RelicRecord(0, 2003002, effects, 'Red', 'deep', False, False)
+        self.assertIs(ReadOnlySaveValidator()._validate_relic(relic).status,
+                      ValidationStatus.CONFORMS)
+        strict = ReadOnlySaveValidator(check_id_consistency=True)._validate_relic(relic)
+        self.assertIs(strict.status, ValidationStatus.VIOLATES)
+        self.assertIn('应为 0 条，实际 1 条', strict.reasons[0])
+        self.assertEqual(relic.relic_id, 2003002)
+
+    def test_combination_mode_preserves_size_type_and_fixed_relic(self):
+        validator = ReadOnlySaveValidator()
+        effects = (6633100, 7044500, 6610802, 0, 0, 6820000)
+        for relic_id in (2003000, 1000002, 1000):
+            with self.subTest(relic_id=relic_id):
+                relic = RelicRecord(0, relic_id, effects, 'Red', 'test', False, False)
+                self.assertIs(validator._validate_relic(relic).status, ValidationStatus.VIOLATES)
+
+    def test_combination_mode_does_not_merge_incompatible_templates(self):
+        rules = RuleData(
+            relics={2003002: {'color': 'Red', 'is_deep': True,
+                             'slots': (2100000, 2100000, 2100000, -1, -1, -1)},
+                    2013002: {'color': 'Red', 'is_deep': True,
+                             'slots': (2200000, 2200000, 2200000, -1, -1, -1)},
+                    2013202: {'color': 'Yellow', 'is_deep': True,
+                             'slots': (2100000, 2100000, 2200000, -1, -1, -1)}},
+            effects={i: {'conflict': -1, 'sort': i} for i in (1, 2, 3)},
+            pools={2100000: {1, 2}, 2200000: {3}}, pool_ids={2100000, 2200000},
+        )
+        relic = RelicRecord(0, 2003002, (1, 2, 3, 0, 0, 0), 'Red', 'test', False, False)
+        self.assertIs(ReadOnlySaveValidator(rules)._validate_relic(relic).status,
+                      ValidationStatus.UNKNOWN)
 
     def test_exact_pool_check_uses_same_effect_curse_permutation(self):
         rules = RuleData(

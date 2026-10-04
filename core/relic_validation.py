@@ -77,6 +77,7 @@ class RuleData:
             data.relics[relic_id] = {
                 "name": row.get("Name", "") or f"Relic {relic_id}",
                 "color": _color_name(row.get("relicColor")),
+                "is_deep": row.get("isDeepRelic") == "1",
                 "slots": tuple(_int(row.get(key), -1) for key in (
                     "attachEffectTableId_1", "attachEffectTableId_2",
                     "attachEffectTableId_3", "attachEffectTableId_curse1",
@@ -126,8 +127,28 @@ class ReadOnlySaveValidator:
     KNOWN_RANGE = range(100, 2013323)
     UNIQUE_RANGES = (range(1000, 2101), range(10000, 20000))
 
-    def __init__(self, rule_data: RuleData | None = None):
+    def __init__(self, rule_data: RuleData | None = None, *, check_id_consistency: bool = False):
         self.rule_data = rule_data or RuleData.load()
+        self.check_id_consistency = check_id_consistency
+        self._combination_groups: dict[tuple, set[tuple[int, ...]]] = {}
+        for meta in self.rule_data.relics.values():
+            key = self._random_template_key(meta)
+            if key is not None:
+                self._combination_groups.setdefault(key, set()).add(meta["slots"])
+
+    def _random_template_key(self, meta: dict) -> tuple | None:
+        """Only group known random templates; fixed/special effects stay exact."""
+        slots = meta["slots"]
+        pools = {pool for pool in slots[:3] if pool != -1}
+        normal_pools = {100, 110, 200, 210, 300, 310} | {
+            1000000 + tier * 1000 + slot for tier in range(10) for slot in range(3)
+        }
+        if not pools or "color" not in meta or "is_deep" not in meta:
+            return None
+        allowed = self.DEEP_POOLS if meta["is_deep"] else normal_pools
+        if not pools.issubset(allowed):
+            return None
+        return meta["color"], meta["is_deep"], sum(p != -1 for p in slots[:3])
 
     def validate_path(self, path: str | Path) -> ValidationReport:
         source = str(path)
@@ -257,6 +278,31 @@ class ReadOnlySaveValidator:
             return RelicResult(relic, ValidationStatus.UNKNOWN, ("遗物 ID 或版本数据未知",))
         if len(relic.effects) != 6:
             return RelicResult(relic, ValidationStatus.UNKNOWN, ("词条记录不是六个存档槽位",))
+        original = self._validate_template(relic, meta)
+        key = self._random_template_key(meta)
+        if self.check_id_consistency or key is None or original.status is ValidationStatus.CONFORMS:
+            return original
+        # Size, required curses, conflicts and stored order remain mandatory
+        # even when the original ID's particular generation pools are optional.
+        intrinsic = tuple(reason for reason in original.reasons if any(
+            text in reason for text in ("正面词条数量不匹配", "必须附带负面词条",
+                                       "没有对应的正面词条", "词条存在已知冲突", "顺序违反")))
+        if intrinsic:
+            return RelicResult(relic, ValidationStatus.VIOLATES, intrinsic)
+        uncertain = False
+        for slots in self._combination_groups[key]:
+            candidate = self._validate_template(relic, {**meta, "slots": slots})
+            if candidate.status is ValidationStatus.CONFORMS:
+                return RelicResult(relic, ValidationStatus.CONFORMS)
+            if candidate.status is ValidationStatus.UNKNOWN:
+                uncertain = True
+        if uncertain:
+            return RelicResult(relic, ValidationStatus.UNKNOWN,
+                               ("词条或生成池资料不足，无法确认完整组合是否合法",))
+        return RelicResult(relic, ValidationStatus.VIOLATES,
+                           ("词条组合不符合已知的同颜色、同大小、同类型遗物生成规则",))
+
+    def _validate_template(self, relic: RelicRecord, meta: dict) -> RelicResult:
         reasons = []
         uncertain_reasons = []
         expected = meta["slots"]

@@ -20,13 +20,14 @@ from core.utils import get_user_data_path
 class _ValidationWorker(QObject):
     finished = Signal(object)
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, check_id_consistency: bool = False):
         super().__init__()
         self.path = path
+        self.check_id_consistency = check_id_consistency
 
     def run(self):
         try:
-            report = ReadOnlySaveValidator().validate_path(self.path)
+            report = ReadOnlySaveValidator(check_id_consistency=self.check_id_consistency).validate_path(self.path)
         except Exception as exc:
             report = ValidationReport(ValidationStatus.UNKNOWN, reasons=(f"验证失败：{exc}",))
         self.finished.emit(report)
@@ -151,12 +152,14 @@ class SavePage(QWidget):
         card_layout.setContentsMargins(20, 20, 20, 20)
         card_layout.setSpacing(8)
 
-        title = QLabel("违规遗物检测")
+        title = QLabel("遗物规则检查")
         title.setStyleSheet("font-size: 16pt; font-weight: bold;")
         card_layout.addWidget(title)
-        note = QLabel("只读检查当前已知规则，列出明确违规和无法判定的遗物及原因。无法判断遗物是否经过 CE 修改。")
+        note = QLabel("符合当前已知生成规则的遗物视为合法。只读检查存档，列出不合法和无法判定的遗物及原因。ID 一致性检查可在设置中开启。")
         note.setWordWrap(True)
         card_layout.addWidget(note)
+        self.validation_mode_label = QLabel("检查模式：尚未检查")
+        card_layout.addWidget(self.validation_mode_label)
 
         controls = QHBoxLayout()
         self.validate_current_btn = PushButton("验证当前存档")
@@ -219,7 +222,21 @@ class SavePage(QWidget):
         self.validation_player_combo.setEnabled(False)
         self.validation_status_label.setText("正在只读验证，不会写入或修改存档……")
         self._validation_thread = QThread(self)
-        self._validation_worker = _ValidationWorker(path)
+        try:
+            settings = {}
+            if os.path.exists(self.settings_file):
+                with open(self.settings_file, encoding="utf-8") as handle:
+                    settings = json.load(handle)
+            check_id = bool(settings.get("check_relic_id_consistency", False))
+        except (OSError, ValueError, AttributeError) as exc:
+            self._validation_thread.deleteLater()
+            self._validation_done()
+            self._on_validation_finished(ValidationReport(
+                ValidationStatus.UNKNOWN, reasons=(f"无法读取检查设置：{exc}",)))
+            return
+        self.validation_mode_label.setText(
+            "本次检查：词条组合规则" + (" + ID 一致性" if check_id else "（ID 一致性检查关闭）"))
+        self._validation_worker = _ValidationWorker(path, check_id)
         self._validation_worker.moveToThread(self._validation_thread)
         self._validation_thread.started.connect(self._validation_worker.run)
         self._validation_worker.finished.connect(self._on_validation_finished)
@@ -275,14 +292,14 @@ class SavePage(QWidget):
                       else ValidationStatus.CONFORMS)
             report = ValidationReport(status, results, report.reasons, report.source)
         labels = {
-            ValidationStatus.CONFORMS: "符合已知规则（不代表官方有效性或无封禁风险）",
-            ValidationStatus.VIOLATES: "违反明确的已知规则",
-            ValidationStatus.UNKNOWN: "未知：无法对该存档或遗物作出安全判断",
+            ValidationStatus.CONFORMS: "合法遗物：符合当前检查规则",
+            ValidationStatus.VIOLATES: "存在不合法遗物，详情见下方",
+            ValidationStatus.UNKNOWN: "资料不足或读取失败，无法判定",
         }
         detail = "；".join(report.reasons)
         counts = {status: sum(item.status is status for item in report.results) for status in ValidationStatus}
-        summary = (f"共 {len(report.results)} 个遗物：符合 {counts[ValidationStatus.CONFORMS]}，"
-                   f"违反 {counts[ValidationStatus.VIOLATES]}，无法判定 {counts[ValidationStatus.UNKNOWN]}。")
+        summary = (f"共 {len(report.results)} 个遗物：合法 {counts[ValidationStatus.CONFORMS]}，"
+                   f"不合法 {counts[ValidationStatus.VIOLATES]}，无法判定 {counts[ValidationStatus.UNKNOWN]}。")
         if not report.results and report.status is ValidationStatus.CONFORMS:
             self.validation_status_label.setText("未检测到遗物，无法判断。")
         else:
@@ -312,7 +329,7 @@ class SavePage(QWidget):
                 entry_layout = QVBoxLayout(entry)
                 entry_layout.setContentsMargins(8, 6, 8, 6)
                 entry_layout.setSpacing(4)
-                status_text = ("明确违规" if item.status is ValidationStatus.VIOLATES
+                status_text = ("不合法" if item.status is ValidationStatus.VIOLATES
                                else "无法判定")
                 title = QLabel(f"{status_text} · 遗物 ID {relic.relic_id} · "
                                f"{color_names.get(relic.color, '未知颜色')} · "

@@ -68,12 +68,41 @@ class SettingsPage(QWidget):
         shop_group = self._create_shop_settings()
         layout.addWidget(shop_group)
 
+        layout.addWidget(self._create_validation_settings())
+
         # 开发者设置默认显示
         self.developer_card = self._create_developer_settings()
         layout.addWidget(self.developer_card)
 
         layout.addStretch()
         scroll_area.setWidget(scroll_content)
+
+    def _create_validation_settings(self) -> CardWidget:
+        card = CardWidget()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(20, 20, 20, 20)
+        card_layout.setSpacing(12)
+        title = QLabel("遗物规则检查")
+        title.setStyleSheet("font-size: 16pt; font-weight: bold;")
+        card_layout.addWidget(title)
+        row = QHBoxLayout()
+        label = QLabel("检查 ID 一致性:")
+        label.setFixedWidth(150)
+        self.check_relic_id_switch = SwitchButton()
+        self.check_relic_id_switch.setChecked(self.settings.get("check_relic_id_consistency", False))
+        self.check_relic_id_switch.checkedChanged.connect(self._auto_save_settings)
+        row.addWidget(label)
+        row.addWidget(self.check_relic_id_switch)
+        row.addStretch()
+        card_layout.addLayout(row)
+        description = QLabel(
+            "开启后，额外检查存档中的遗物 ID 所规定的正负词条数量和生成模板是否与实际词条对应。"
+            "关闭时按遗物类型、颜色、大小和词条组合判断是否合法。下次存档检查生效。")
+        description.setFont(QFont("Segoe UI", 8))
+        description.setStyleSheet("color: gray;")
+        description.setWordWrap(True)
+        card_layout.addWidget(description)
+        return card
 
     def _create_general_settings(self) -> CardWidget:
         """创建通用设置组"""
@@ -525,6 +554,7 @@ class SettingsPage(QWidget):
             "steam_path": "",
             "ocr_debug": False,
             "timing_debug": False,
+            "check_relic_id_consistency": False,
             "template_threshold": 0.7,
             "brightness_threshold": 45,
             "sl_mode_enabled": False,
@@ -537,6 +567,7 @@ class SettingsPage(QWidget):
 
         self.settings = {
             **self.settings,
+            "check_relic_id_consistency": self.check_relic_id_switch.isChecked() if hasattr(self, 'check_relic_id_switch') else self.settings.get("check_relic_id_consistency", False),
             "allow_operate_favorited": self.allow_favorited_switch.isChecked(),
             "require_double_valid": not self.require_double_switch.isChecked(),
             "shop_require_double_valid": not self.shop_require_double_switch.isChecked(),
