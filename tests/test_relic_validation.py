@@ -127,6 +127,24 @@ class RelicValidationTests(unittest.TestCase):
                               'Blue', 'special', False, False)
         self.assertIs(validator._validate_relic(invalid).status, ValidationStatus.VIOLATES)
 
+    def test_deep_effect_in_combined_pool_but_not_assigned_pool_is_unknown(self):
+        rules = RuleData(
+            relics={2003002: {'slots': (2100000, 2100000, 2100000, -1, -1, -1)}},
+            effects={effect: {'conflict': -1, 'sort': effect} for effect in (1, 2, 3, 4)},
+            pools={2100000: {1, 2, 3}, 2200000: {4}},
+            pool_ids={2100000, 2200000},
+        )
+        validator = ReadOnlySaveValidator(rules)
+        broad_only = RelicRecord(0, 2003002, (1, 2, 4, 0, 0, 0),
+                                 'Blue', 'deep', False, False)
+        result = validator._validate_relic(broad_only)
+        self.assertIs(result.status, ValidationStatus.UNKNOWN)
+        self.assertIn('仅匹配合并池', result.reasons[0])
+
+        exact = RelicRecord(0, 2003002, (1, 2, 3, 0, 0, 0),
+                            'Blue', 'deep', False, False)
+        self.assertIs(validator._validate_relic(exact).status, ValidationStatus.CONFORMS)
+
 
 if __name__ == '__main__':
     unittest.main()

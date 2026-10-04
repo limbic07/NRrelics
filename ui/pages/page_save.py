@@ -154,7 +154,7 @@ class SavePage(QWidget):
         title = QLabel("违规遗物检测")
         title.setStyleSheet("font-size: 16pt; font-weight: bold;")
         card_layout.addWidget(title)
-        note = QLabel("只读检查当前已知规则，仅展示明确违规的遗物；无法判定会单独计数。无法判断遗物是否经过 CE 修改。")
+        note = QLabel("只读检查当前已知规则，列出明确违规和无法判定的遗物及原因。无法判断遗物是否经过 CE 修改。")
         note.setWordWrap(True)
         card_layout.addWidget(note)
 
@@ -296,25 +296,35 @@ class SavePage(QWidget):
         names = validation_affix_names()
         by_slot = {}
         for item in report.results:
-            if item.status is not ValidationStatus.VIOLATES:
+            if item.status is ValidationStatus.CONFORMS:
                 continue
-            by_slot.setdefault(item.relic.slot or "未知槽位", []).append(item.relic)
+            by_slot.setdefault(item.relic.slot or "未知槽位", []).append(item)
         color_names = {"Red": "红色", "Blue": "蓝色", "Yellow": "黄色",
                        "Green": "绿色", "White": "白色"}
-        for slot, relics in by_slot.items():
-            header = QLabel(f"玩家：{relics[0].player_name or '未命名角色'}")
+        for slot, items in by_slot.items():
+            header = QLabel(f"玩家：{items[0].relic.player_name or '未命名角色'}")
             header.setTextFormat(Qt.PlainText)
             header.setStyleSheet("font-size: 10pt; font-weight: bold;")
             self.validation_results_layout.insertWidget(self.validation_results_layout.count() - 1, header)
-            for relic in relics:
+            for item in items:
+                relic = item.relic
                 entry = CardWidget()
                 entry_layout = QVBoxLayout(entry)
                 entry_layout.setContentsMargins(8, 6, 8, 6)
                 entry_layout.setSpacing(4)
-                title = QLabel(f"{color_names.get(relic.color, '未知颜色')} · "
+                status_text = ("明确违规" if item.status is ValidationStatus.VIOLATES
+                               else "无法判定")
+                title = QLabel(f"{status_text} · 遗物 ID {relic.relic_id} · "
+                               f"{color_names.get(relic.color, '未知颜色')} · "
                                f"{'已收藏' if relic.favorite else '未收藏'}")
+                title.setTextFormat(Qt.PlainText)
                 title.setStyleSheet("font-size: 10pt; font-weight: bold;")
                 entry_layout.addWidget(title)
+                for reason in item.reasons:
+                    reason_label = QLabel(f"原因：{reason}")
+                    reason_label.setTextFormat(Qt.PlainText)
+                    reason_label.setWordWrap(True)
+                    entry_layout.addWidget(reason_label)
                 for index in range(3):
                     for effect, positive in ((relic.effects[index], True),
                                              (relic.effects[index + 3], False)):
@@ -322,6 +332,7 @@ class SavePage(QWidget):
                             continue
                         text = names.get(effect, f"未知词条（ID: {effect}）")
                         affix = QLabel(f"[{'正面' if positive else '负面'}] {text}")
+                        affix.setTextFormat(Qt.PlainText)
                         affix.setFont(QFont("Segoe UI", 9))
                         affix.setStyleSheet(f"color: {'#4CAF50' if positive else '#FF5722'};")
                         affix.setWordWrap(True)

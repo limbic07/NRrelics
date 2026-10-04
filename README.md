@@ -60,9 +60,11 @@
 1. 设置Steam安装路径
 2. 选择Steam用户
 3. 创建备份 / 恢复备份
-4. 可验证当前存档或选择其他存档；检测不会写回文件，无法判定的遗物会单独计数
+4. 可验证当前存档或选择其他存档；检测不会写回文件，明确违规和无法判定的遗物会列出原因
 
 存档检测依据固定版本的社区参数，只表示是否符合当前已知规则，不能证明官方有效性或无封禁风险，也不能判断遗物是否经过 CE 修改。参数及中文名称参考 [alfizari/Elden-Ring-Nightreign-Save-Editor](https://github.com/alfizari/Elden-Ring-Nightreign-Save-Editor)，参考提交 `0d2ad1494c372098e689c23159656df70ff2d76d`；数据和 MIT 许可保留在 `data/relic_validation/`。检测不包含存档编辑或写回功能。
+
+具体判定条件、数据来源和不确定项见 [存档遗物校验规则](docs/save_validation_rules.md)。此校验与商店筛选、仓库清理的 OCR 预设匹配无关。
 
 ## 词条匹配规则
 
