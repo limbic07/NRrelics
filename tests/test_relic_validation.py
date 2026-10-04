@@ -107,7 +107,7 @@ class RelicValidationTests(unittest.TestCase):
         self.assertTrue(all(any('唯一遗物重复' in reason for reason in result.reasons)
                             for result in duplicate.results))
 
-    def test_unmapped_special_curse_is_unknown_but_bad_positive_is_violation(self):
+    def test_extra_curse_violates_item_id_slot_count(self):
         effects = {effect: {'conflict': -1, 'sort': effect}
                    for effect in (1, 2, 3, 4, 100)}
         rules = RuleData(
@@ -117,11 +117,11 @@ class RelicValidationTests(unittest.TestCase):
             pool_ids={2100000, 3000000},
         )
         validator = ReadOnlySaveValidator(rules)
-        unclear = RelicRecord(0, 2003002, (1, 2, 3, 0, 0, 100),
-                              'Blue', 'special', False, False)
-        result = validator._validate_relic(unclear)
-        self.assertIs(result.status, ValidationStatus.UNKNOWN)
-        self.assertIn('额外负面词条', result.reasons[0])
+        extra = RelicRecord(0, 2003002, (1, 2, 3, 0, 0, 100),
+                            'Blue', 'special', False, False)
+        result = validator._validate_relic(extra)
+        self.assertIs(result.status, ValidationStatus.VIOLATES)
+        self.assertIn('负面词条数量不匹配：应为 0 条，实际 1 条', result.reasons[0])
 
         invalid = RelicRecord(0, 2003002, (1, 2, 4, 0, 0, 100),
                               'Blue', 'special', False, False)
@@ -144,6 +144,82 @@ class RelicValidationTests(unittest.TestCase):
         exact = RelicRecord(0, 2003002, (1, 2, 3, 0, 0, 0),
                             'Blue', 'deep', False, False)
         self.assertIs(validator._validate_relic(exact).status, ValidationStatus.CONFORMS)
+
+    def test_public_wrong_id_example_and_matching_template(self):
+        # Upstream issue #55: same effects can fit a different item ID, while
+        # 2003202 has no curse slots. The save itself is never rewritten.
+        validator = ReadOnlySaveValidator()
+        effects = (7044100, 6610400, 6610802, 0xFFFFFFFF, 6820200, 6850900)
+        wrong = RelicRecord(0, 2003202, effects, 'Yellow', 'deep', False, False)
+        valid = RelicRecord(0, 2001202, effects, 'Yellow', 'deep', False, False)
+        result = validator._validate_relic(wrong)
+        self.assertIs(result.status, ValidationStatus.VIOLATES)
+        self.assertIn('应为 0 条，实际 2 条', result.reasons[0])
+        self.assertIs(validator._validate_relic(valid).status, ValidationStatus.CONFORMS)
+
+    def test_required_curse_cannot_be_bypassed_by_no_curse_template(self):
+        validator = ReadOnlySaveValidator()
+        relic = RelicRecord(0, 2003002,
+                            (7044100, 6610400, 6610802, 0, 0, 0),
+                            'Red', 'deep', False, False)
+        result = validator._validate_relic(relic)
+        self.assertIs(result.status, ValidationStatus.VIOLATES)
+        self.assertTrue(any('必须附带负面词条' in reason for reason in result.reasons))
+
+    def test_curses_must_remain_paired_even_when_total_count_is_correct(self):
+        validator = ReadOnlySaveValidator()
+        relic = RelicRecord(0, 2001202,
+                            (7044100, 6610400, 6610802, 6820200, 6850900, 0),
+                            'Yellow', 'deep', False, False)
+        result = validator._validate_relic(relic)
+        self.assertIs(result.status, ValidationStatus.VIOLATES)
+        self.assertTrue(any('第 3 条正面词条' in reason for reason in result.reasons))
+
+    def test_missing_configured_curse_is_not_optional(self):
+        validator = ReadOnlySaveValidator()
+        relic = RelicRecord(0, 2001102,
+                            (6500000, 6631900, 6610400, 0, 0, 6820000),
+                            'Blue', 'deep', False, False)
+        result = validator._validate_relic(relic)
+        self.assertIs(result.status, ValidationStatus.VIOLATES)
+        self.assertIn('应为 2 条，实际 1 条', result.reasons[0])
+
+    def test_exact_pool_check_uses_same_effect_curse_permutation(self):
+        rules = RuleData(
+            relics={2000001: {'slots': (2000000, 2100000, -1, 3000000, -1, -1)}},
+            effects={effect: {'conflict': -1, 'sort': effect} for effect in (1, 2, 100)},
+            pools={2000000: {2}, 2100000: {1}, 2200000: {2}, 3000000: {100}},
+            pool_ids={2000000, 2100000, 2200000, 3000000},
+            effect_pools={1: {2100000}, 2: {2000000, 2200000}},
+        )
+        relic = RelicRecord(0, 2000001, (1, 2, 0, 100, 0, 0),
+                            'Red', 'deep', False, False)
+        result = ReadOnlySaveValidator(rules)._validate_relic(relic)
+        self.assertIs(result.status, ValidationStatus.UNKNOWN)
+        self.assertIn('仅匹配合并池', result.reasons[0])
+
+    def test_unknown_effect_does_not_hide_known_slot_count_mismatch(self):
+        rules = RuleData(relics={100: {'slots': (100, -1, -1, -1, -1, -1)}})
+        relic = RelicRecord(0, 100, (999, 0, 0, 888, 0, 0),
+                            'Red', 'unknown effects', False, False)
+        result = ReadOnlySaveValidator(rules)._validate_relic(relic)
+        self.assertIs(result.status, ValidationStatus.VIOLATES)
+        self.assertIn('应为 0 条，实际 1 条', result.reasons[0])
+        self.assertIn('词条或生成池数据未知', result.reasons)
+
+    def test_one_and_two_effect_relics_use_their_own_template_counts(self):
+        rules = RuleData(
+            relics={100: {'slots': (100, -1, -1, -1, -1, -1)},
+                    101: {'slots': (100, 100, -1, -1, -1, -1)}},
+            effects={effect: {'conflict': -1, 'sort': effect} for effect in (1, 2)},
+            pools={100: {1, 2}}, pool_ids={100},
+        )
+        validator = ReadOnlySaveValidator(rules)
+        for relic_id, effects in ((100, (1, 0, 0, 0, 0, 0)),
+                                  (101, (1, 2, 0, 0, 0, 0))):
+            with self.subTest(relic_id=relic_id):
+                relic = RelicRecord(0, relic_id, effects, 'Red', 'normal', False, False)
+                self.assertIs(validator._validate_relic(relic).status, ValidationStatus.CONFORMS)
 
 
 if __name__ == '__main__':
