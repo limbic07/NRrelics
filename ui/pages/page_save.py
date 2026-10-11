@@ -385,9 +385,10 @@ class SavePage(QWidget):
         title.setStyleSheet("font-size: 16pt; font-weight: bold;")
         card_layout.addWidget(title)
 
-        # 备份列表滚动区域（移除最大高度限制，让它填满剩余空间）
+        # 外层页面滚动时也保留列表高度，避免只剩一行操作按钮。
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setMinimumHeight(240)
         scroll.setStyleSheet("QScrollArea { border: none; }")
 
         self.backup_list_widget = QWidget()
