@@ -89,12 +89,12 @@ class SavePage(QWidget):
         self.save_info_card = self._create_save_info_card()
         layout.addWidget(self.save_info_card)
 
-        self.validation_card = self._create_validation_card()
-        layout.addWidget(self.validation_card)
-
         # 备份列表卡片
         self.backup_card = self._create_backup_card()
-        layout.addWidget(self.backup_card, 1)  # stretch=1 填满剩余空间
+        layout.addWidget(self.backup_card, 1)
+
+        self.validation_card = self._create_validation_card()
+        layout.addWidget(self.validation_card)
         self.page_scroll.setWidget(self.page_content)
         outer_layout.addWidget(self.page_scroll)
 
@@ -300,6 +300,11 @@ class SavePage(QWidget):
         counts = {status: sum(item.status is status for item in report.results) for status in ValidationStatus}
         summary = (f"共 {len(report.results)} 个遗物：合法 {counts[ValidationStatus.CONFORMS]}，"
                    f"不合法 {counts[ValidationStatus.VIOLATES]}，无法判定 {counts[ValidationStatus.UNKNOWN]}。")
+        checked = [item for item in report.results if item.id_status is not None]
+        if checked:
+            failed = sum(item.id_status is ValidationStatus.VIOLATES for item in checked)
+            unknown = sum(item.id_status is ValidationStatus.UNKNOWN for item in checked)
+            summary += f" ID 一致性：不通过 {failed}，无法判定 {unknown}。"
         if not report.results and report.status is ValidationStatus.CONFORMS:
             self.validation_status_label.setText("未检测到遗物，无法判断。")
         else:
@@ -313,7 +318,8 @@ class SavePage(QWidget):
         names = validation_affix_names()
         by_slot = {}
         for item in report.results:
-            if item.status is ValidationStatus.CONFORMS:
+            if (item.status is ValidationStatus.CONFORMS
+                    and item.id_status in (None, ValidationStatus.CONFORMS)):
                 continue
             by_slot.setdefault(item.relic.slot or "未知槽位", []).append(item)
         color_names = {"Red": "红色", "Blue": "蓝色", "Yellow": "黄色",
@@ -329,8 +335,12 @@ class SavePage(QWidget):
                 entry_layout = QVBoxLayout(entry)
                 entry_layout.setContentsMargins(8, 6, 8, 6)
                 entry_layout.setSpacing(4)
-                status_text = ("不合法" if item.status is ValidationStatus.VIOLATES
-                               else "无法判定")
+                status_text = ("合法" if item.status is ValidationStatus.CONFORMS else
+                               "不合法" if item.status is ValidationStatus.VIOLATES else "无法判定")
+                if item.id_status is ValidationStatus.VIOLATES:
+                    status_text += "，但 ID 一致性不通过" if item.status is ValidationStatus.CONFORMS else "；ID 一致性不通过"
+                elif item.id_status is ValidationStatus.UNKNOWN:
+                    status_text += "；ID 一致性无法判定"
                 title = QLabel(f"{status_text} · 遗物 ID {relic.relic_id} · "
                                f"{color_names.get(relic.color, '未知颜色')} · "
                                f"{'已收藏' if relic.favorite else '未收藏'}")
@@ -339,6 +349,11 @@ class SavePage(QWidget):
                 entry_layout.addWidget(title)
                 for reason in item.reasons:
                     reason_label = QLabel(f"原因：{reason}")
+                    reason_label.setTextFormat(Qt.PlainText)
+                    reason_label.setWordWrap(True)
+                    entry_layout.addWidget(reason_label)
+                for reason in item.id_reasons:
+                    reason_label = QLabel(f"ID 一致性：{reason}")
                     reason_label.setTextFormat(Qt.PlainText)
                     reason_label.setWordWrap(True)
                     entry_layout.addWidget(reason_label)
@@ -411,8 +426,10 @@ class SavePage(QWidget):
         title.setStyleSheet("font-size: 16pt; font-weight: bold;")
         card_layout.addWidget(title)
 
-        # 备份列表滚动区域（移除最大高度限制，让它填满剩余空间）
-        scroll = QScrollArea()
+        # 按前六条备份的实际行高保留空间，页面不足时由外层滚动。
+        # 更多备份仍可在列表内滚动，规则检查卡片不会挤压列表。
+        self.backup_scroll = scroll = QScrollArea()
+        scroll.setMinimumHeight(180)
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; }")
 
@@ -494,6 +511,8 @@ class SavePage(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
+        self.backup_scroll.setMinimumHeight(180)
+
         steam_id = self._get_current_steam_id()
         if not steam_id:
             return
@@ -507,9 +526,16 @@ class SavePage(QWidget):
             self.backup_list_layout.insertWidget(0, no_backup_label)
             return
 
+        visible_rows = []
         for backup in backups:
             row = self._create_backup_row(backup)
             self.backup_list_layout.insertWidget(self.backup_list_layout.count() - 1, row)
+            if len(visible_rows) < 6:
+                visible_rows.append(row)
+        rows_height = sum(row.sizeHint().height() for row in visible_rows)
+        rows_height += self.backup_list_layout.spacing() * max(0, len(visible_rows) - 1)
+        rows_height += self.backup_scroll.frameWidth() * 2
+        self.backup_scroll.setMinimumHeight(max(180, rows_height))
 
     def _create_backup_row(self, backup: dict) -> QWidget:
         """创建备份行"""

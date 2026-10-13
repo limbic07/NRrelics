@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 import struct
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from itertools import permutations
 from pathlib import Path
@@ -42,6 +42,8 @@ class RelicResult:
     relic: RelicRecord
     status: ValidationStatus
     reasons: tuple[str, ...] = ()
+    id_status: ValidationStatus | None = None
+    id_reasons: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -261,8 +263,8 @@ class ReadOnlySaveValidator:
         for result_index, result in enumerate(results):
             key = (result.relic.slot, result.relic.relic_id)
             if seen_unique.get(key, 0) > 1:
-                result = RelicResult(result.relic, ValidationStatus.VIOLATES,
-                                     result.reasons + ("唯一遗物重复出现",))
+                result = replace(result, status=ValidationStatus.VIOLATES,
+                                 reasons=result.reasons + ("唯一遗物重复出现",))
                 results[result_index] = result
         statuses = {result.status for result in results}
         status = (ValidationStatus.VIOLATES if ValidationStatus.VIOLATES in statuses
@@ -271,6 +273,17 @@ class ReadOnlySaveValidator:
         return ValidationReport(status, tuple(results), source=source)
 
     def _validate_relic(self, relic: RelicRecord) -> RelicResult:
+        result = self._validate_combination(relic)
+        if not self.check_id_consistency:
+            return result
+        meta = self.rule_data.relics.get(relic.relic_id)
+        if meta is None or len(relic.effects) != 6:
+            return replace(result, id_status=ValidationStatus.UNKNOWN,
+                           id_reasons=("遗物 ID 或词条数据不足，无法检查 ID 一致性",))
+        exact = self._validate_template(relic, meta)
+        return replace(result, id_status=exact.status, id_reasons=exact.reasons)
+
+    def _validate_combination(self, relic: RelicRecord) -> RelicResult:
         meta = self.rule_data.relics.get(relic.relic_id)
         if relic.relic_id in self.ILLEGAL_RANGE:
             return RelicResult(relic, ValidationStatus.VIOLATES, ("遗物 ID 位于已知非法范围",))
@@ -280,7 +293,7 @@ class ReadOnlySaveValidator:
             return RelicResult(relic, ValidationStatus.UNKNOWN, ("词条记录不是六个存档槽位",))
         original = self._validate_template(relic, meta)
         key = self._random_template_key(meta)
-        if self.check_id_consistency or key is None or original.status is ValidationStatus.CONFORMS:
+        if key is None or original.status is ValidationStatus.CONFORMS:
             return original
         # Size, required curses, conflicts and stored order remain mandatory
         # even when the original ID's particular generation pools are optional.

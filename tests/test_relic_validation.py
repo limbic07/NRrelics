@@ -153,8 +153,9 @@ class RelicValidationTests(unittest.TestCase):
         wrong = RelicRecord(0, 2003202, effects, 'Yellow', 'deep', False, False)
         valid = RelicRecord(0, 2001202, effects, 'Yellow', 'deep', False, False)
         result = validator._validate_relic(wrong)
-        self.assertIs(result.status, ValidationStatus.VIOLATES)
-        self.assertIn('应为 0 条，实际 2 条', result.reasons[0])
+        self.assertIs(result.status, ValidationStatus.CONFORMS)
+        self.assertIs(result.id_status, ValidationStatus.VIOLATES)
+        self.assertIn('应为 0 条，实际 2 条', result.id_reasons[0])
         self.assertIs(validator._validate_relic(valid).status, ValidationStatus.CONFORMS)
 
     def test_required_curse_cannot_be_bypassed_by_no_curse_template(self):
@@ -181,8 +182,9 @@ class RelicValidationTests(unittest.TestCase):
                             (6500000, 6631900, 6610400, 0, 0, 6820000),
                             'Blue', 'deep', False, False)
         result = validator._validate_relic(relic)
-        self.assertIs(result.status, ValidationStatus.VIOLATES)
-        self.assertIn('应为 2 条，实际 1 条', result.reasons[0])
+        self.assertIs(result.status, ValidationStatus.CONFORMS)
+        self.assertIs(result.id_status, ValidationStatus.VIOLATES)
+        self.assertIn('应为 2 条，实际 1 条', result.id_reasons[0])
 
     def test_default_accepts_legal_combination_and_strict_checks_original_id(self):
         effects = (6633100, 7044500, 6610802, 0, 0, 6820000)
@@ -190,8 +192,13 @@ class RelicValidationTests(unittest.TestCase):
         self.assertIs(ReadOnlySaveValidator()._validate_relic(relic).status,
                       ValidationStatus.CONFORMS)
         strict = ReadOnlySaveValidator(check_id_consistency=True)._validate_relic(relic)
-        self.assertIs(strict.status, ValidationStatus.VIOLATES)
-        self.assertIn('应为 0 条，实际 1 条', strict.reasons[0])
+        self.assertIs(strict.status, ValidationStatus.CONFORMS)
+        self.assertIs(strict.id_status, ValidationStatus.VIOLATES)
+        self.assertFalse(strict.reasons)
+        self.assertIn('应为 0 条，实际 1 条', strict.id_reasons[0])
+        unchecked = ReadOnlySaveValidator()._validate_relic(relic)
+        self.assertIsNone(unchecked.id_status)
+        self.assertFalse(unchecked.id_reasons)
         self.assertEqual(relic.relic_id, 2003002)
 
     def test_combination_mode_preserves_size_type_and_fixed_relic(self):
