@@ -44,7 +44,7 @@ class OcrModelBundleTests(unittest.TestCase):
                            and any(isinstance(target, ast.Name) and target.id == '_static_data'
                                    for target in node.targets))
         packaged = {source for source, destination in static_data
-                    if destination == 'resources/models'}
+                    if destination == 'resources/models' and source.endswith('.onnx')}
         self.assertEqual(packaged, {
             f'resources/models/{name}' for name in OCR_MODEL_FILES.values()})
 

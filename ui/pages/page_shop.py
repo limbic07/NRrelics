@@ -129,9 +129,13 @@ class PageShop(QWidget):
     def _load_settings(self) -> dict:
         """加载设置"""
         settings_file = get_user_data_path("data/settings.json")
-        if os.path.exists(settings_file):
-            with open(settings_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+        try:
+            if os.path.exists(settings_file):
+                with open(settings_file, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+                return settings if isinstance(settings, dict) else {}
+        except (OSError, ValueError):
+            pass
 
         return {}
 

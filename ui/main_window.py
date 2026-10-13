@@ -5,6 +5,7 @@ from PySide6.QtCore import QSize, Signal
 from .config import NAVIGATION_CONFIG, WINDOW_CONFIG, THEME_CONFIG
 from ui.components.log_manager import LogManager
 from core.preset_manager import PresetManager
+from app_version import APP_NAME, APP_VERSION
 
 
 class MainWindow(FluentWindow):
@@ -15,7 +16,7 @@ class MainWindow(FluentWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NRrelic Bot v2.0.3")
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
 
         # 应用窗口配置
         self.resize(WINDOW_CONFIG["width"], WINDOW_CONFIG["height"])

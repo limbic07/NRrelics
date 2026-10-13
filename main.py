@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Signal, QObject, QThread
+from PySide6.QtCore import Signal, QObject, QThread, Qt
 from PySide6.QtGui import QFont
 from ui import MainWindow
 from ui.dialogs.welcome_dialog import WelcomeDialog
@@ -45,6 +45,9 @@ class Application:
         # 设置默认字体，避免Qt尝试加载不存在的MS Sans Serif
         default_font = QFont("Segoe UI", 9)
         self.app.setFont(default_font)
+        from app_version import APP_NAME, APP_VERSION
+        self.app.setApplicationName(APP_NAME)
+        self.app.setApplicationVersion(APP_VERSION)
 
         # 设置字体替换，防止Qt尝试使用MS Sans Serif
         QFont.insertSubstitution("MS Sans Serif", "Segoe UI")
@@ -65,13 +68,18 @@ class Application:
         self.ocr_engine = None
         self.ocr_thread = None
         self.ocr_worker = None
+        self.app.aboutToQuit.connect(self._stop_ocr_thread)
 
     def _load_config(self) -> dict:
         """加载配置"""
         config_path = Path(get_user_data_path("data/settings.json"))
-        if config_path.exists():
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        try:
+            if config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                return config if isinstance(config, dict) else {}
+        except (OSError, ValueError):
+            pass
         return {}
 
 
@@ -96,8 +104,8 @@ class Application:
         self.ocr_thread.started.connect(self.ocr_worker.initialize)
         self.ocr_worker.finished.connect(self._on_ocr_initialized)
         self.ocr_worker.error.connect(self._on_ocr_error)
-        self.ocr_worker.finished.connect(self.ocr_thread.quit)
-        self.ocr_worker.error.connect(self.ocr_thread.quit)
+        self.ocr_worker.finished.connect(self.ocr_thread.quit, Qt.DirectConnection)
+        self.ocr_worker.error.connect(self.ocr_thread.quit, Qt.DirectConnection)
         self.ocr_thread.finished.connect(self.ocr_thread.deleteLater)
 
         # 启动线程
@@ -113,9 +121,18 @@ class Application:
             # 将引擎传递到 UI 层
             self.window.init_ocr_dependencies(self.ocr_engine)
 
-    def _on_ocr_error(self, _error_msg: str):
+    def _on_ocr_error(self, error_msg: str):
         """OCR 初始化失败"""
-        pass
+        self.window.log_manager.log(f"OCR 初始化失败：{error_msg}", "ERROR")
+
+    def _stop_ocr_thread(self):
+        """Keep the OCR worker alive until its initialization has returned."""
+        if self.ocr_thread is not None:
+            try:
+                self.ocr_thread.quit()
+                self.ocr_thread.wait()
+            except RuntimeError:  # Qt may already have deleted a finished thread.
+                pass
 
     def _show_welcome_if_needed(self):
         """首次启动时显示使用须知"""
@@ -156,6 +173,9 @@ class Application:
 
 def main():
     """主函数"""
+    if len(sys.argv) == 3 and sys.argv[1] == "--self-test":
+        from core.release_check import run_release_check
+        sys.exit(run_release_check(Application, Path(sys.argv[2])))
     app = Application()
     sys.exit(app.run())
 

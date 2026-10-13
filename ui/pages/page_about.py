@@ -3,6 +3,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea
 from PySide6.QtGui import QFont
 from qfluentwidgets import CardWidget
+from app_version import APP_VERSION
 
 
 class AboutPage(QWidget):
@@ -61,7 +62,7 @@ class AboutPage(QWidget):
         version_title.setStyleSheet("font-size: 12pt; font-weight: bold;")
         version_layout.addWidget(version_title)
 
-        self.version_label = QLabel("v2.0.3")
+        self.version_label = QLabel(f"v{APP_VERSION}")
         self.version_label.setFont(QFont("Segoe UI", 9))
         self.version_label.setStyleSheet("color: gray;")
         version_layout.addWidget(self.version_label)

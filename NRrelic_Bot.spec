@@ -5,6 +5,12 @@ import os as _os
 from PyInstaller.utils.hooks import collect_all
 import shutil as _shutil
 import pathlib as _pl
+import runpy as _runpy
+from PyInstaller.utils.win32.versioninfo import (
+    VSVersionInfo, FixedFileInfo, StringFileInfo, StringTable, StringStruct, VarFileInfo, VarStruct,
+)
+
+_version = _runpy.run_path(str(_pl.Path(SPECPATH) / 'app_version.py'))
 
 block_cipher = None
 
@@ -26,22 +32,13 @@ _static_data = [
     ('data/icon_cup.png', 'data'),
     ('data/icon_bookmark.png', 'data'),
     ('resources/models/PP-OCRv6_rec_small.onnx', 'resources/models'),
+    ('resources/models/README.md', 'resources/models'),
+    ('docs/third-party/affix-parameters/LICENSE', 'licenses/affix-parameters'),
 ]
 datas = list(_static_data)
 
-# conda 环境缺失的系统 DLL
-_conda_bin = r'D:\anaconda3\envs\NRrelics\Library\bin'
-_binaries_to_add = [
-    ('expat.dll', '.'), ('libexpat.dll', '.'), ('ffi.dll', '.'),
-    ('liblzma.dll', '.'), ('libbz2.dll', '.'), ('libmpdec-4.dll', '.'),
-]
+# System and Python DLLs are resolved from the active build environment.
 binaries = []
-for _dll, _dest in _binaries_to_add:
-    _dll_path = _os.path.join(_conda_bin, _dll)
-    if _os.path.exists(_dll_path):
-        binaries.append((_dll_path, _dest))
-    else:
-        print(f'WARNING: DLL not found: {_dll_path}')
 
 # -----------------------------------------------------------------------------
 # 隐式导入
@@ -111,6 +108,17 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    version=VSVersionInfo(
+        ffi=FixedFileInfo(filevers=_version['VERSION_INFO'], prodvers=_version['VERSION_INFO'],
+                          mask=0x3f, flags=0, OS=0x40004, fileType=1, subtype=0, date=(0, 0)),
+        kids=[StringFileInfo([StringTable('040904B0', [
+            StringStruct('FileDescription', _version['APP_NAME']),
+            StringStruct('FileVersion', _version['APP_VERSION']),
+            StringStruct('ProductName', _version['APP_NAME']),
+            StringStruct('ProductVersion', _version['APP_VERSION']),
+            StringStruct('OriginalFilename', 'NRrelic_Bot.exe'),
+        ])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])],
+    ),
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -132,12 +140,15 @@ coll = COLLECT(
 # =============================================================================
 # 打包后清理 — 删除不需要的文件以减小体积
 # =============================================================================
-_DIST = _pl.Path('dist/NRrelics/_internal')
+_DIST = (_pl.Path(coll.name) / '_internal').resolve()
 _PYSIDE = _DIST / 'PySide6'
 removed_size = 0
 
 def _safe_rm(path):
     global removed_size
+    path = path.resolve()
+    if not path.is_relative_to(_DIST) or path == _DIST:
+        raise ValueError(f'Refusing to remove a path outside the build: {path}')
     if not path.exists():
         return
     if path.is_file():

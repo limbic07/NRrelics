@@ -1,4 +1,4 @@
-# NRrelic Bot
+# NRrelic Bot v2.0.4
 
 一款用于《艾尔登法环：黑夜君临》（Elden Ring Nightreign）的遗物自动化管理工具。<br>
 本软件不涉及任何游戏内数据修改，本质上不进行作弊以及任何违反游戏规则的行为。
@@ -31,7 +31,8 @@
 - 自动检测Steam用户
 - 存档备份与恢复
 - 支持多个备份槽位管理
-- 只读检查 `.sl2` / `.co2` 存档中的遗物，按角色查看明确违反当前已知规则的结果
+- 只读检查 `.sl2` / `.co2` 存档中的遗物，按角色查看合法、不合法和无法判定的结果
+- 可在“设置 → 存档管理设置”开启 ID 一致性检查；组合合法但 ID 不匹配的遗物仍显示为合法，单独列出 ID 检查结果
 
 ### 预设管理
 - 通用预设：适用于所有遗物的词条白名单
@@ -60,9 +61,10 @@
 1. 设置Steam安装路径
 2. 选择Steam用户
 3. 创建备份 / 恢复备份
-4. 可验证当前存档或选择其他存档；检测不会写回文件，明确违规和无法判定的遗物会列出原因
+4. 可检查当前存档、备份或其他存档；检查不会写回文件，不合法和无法判定的遗物会列出原因
+5. ID 一致性检查默认关闭；开启后额外检查存档 ID 的词条数量与生成模板是否对应，不影响组合合法性统计
 
-存档检测依据固定版本的社区参数，只表示是否符合当前已知规则，不能证明官方有效性或无封禁风险，也不能判断遗物是否经过 CE 修改。参数及中文名称参考 [alfizari/Elden-Ring-Nightreign-Save-Editor](https://github.com/alfizari/Elden-Ring-Nightreign-Save-Editor)，参考提交 `0d2ad1494c372098e689c23159656df70ff2d76d`；数据和 MIT 许可保留在 `data/relic_validation/`。检测不包含存档编辑或写回功能。
+存档检查依据固定版本的社区参数，符合当前已知生成规则即视为合法。参数及中文名称参考 [alfizari/Elden-Ring-Nightreign-Save-Editor](https://github.com/alfizari/Elden-Ring-Nightreign-Save-Editor)，参考提交 `0d2ad1494c372098e689c23159656df70ff2d76d`；数据和 MIT 许可保留在 `data/relic_validation/`。本功能不判断取得途径。
 
 具体判定条件、数据来源和不确定项见 [存档遗物校验规则](docs/save_validation_rules.md)。此校验与商店筛选、仓库清理的 OCR 预设匹配无关。
 
@@ -91,6 +93,24 @@
 - **UI框架**：PySide6 + PySide6-Fluent-Widgets
 - **图像处理**：OpenCV（模板匹配、边缘检测）
 - **自动化**：pydirectinput / pyautogui
+
+## 下载与更新
+
+下载 `NRrelics-2.0.4-windows-x64.zip`，完整解压后运行 `NRrelic_Bot.exe`。
+请保留同目录的 `_internal` 文件夹。OCR 识别模型已内置，不需要安装 Python 或首次下载模型。
+
+升级时先关闭旧版本，把旧程序同级的 `data/` 文件夹复制到新程序同级目录，保留预设、设置、存档备份和历史记录。
+不要用旧版 `_internal` 覆盖新版。更新内容见 [2.0.4 发布说明](docs/releases/2.0.4.md)。
+
+## 开发与打包
+
+```powershell
+python -m pip install -r requirements-build.txt
+python tools/build_release.py
+```
+
+构建脚本运行回归测试，打包后在临时副本中检查页面、离线 OCR、词条库和遗物规则资源，
+生成发布 ZIP、SHA-256 校验文件和验证报告。发布包不包含本机预设、设置、存档、日志或调试采集。
 
 ## 目录结构
 
