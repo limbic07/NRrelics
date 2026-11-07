@@ -77,6 +77,8 @@ class MainWindow(FluentWindow):
 
         # 存档管理
         self.save_page = SavePage()
+        self.save_page.inventory_restored.connect(self.relic_page.refresh)
+        self.save_page.inventory_restored.connect(self.loadout_page.refresh)
         self.addSubInterface(
             self.save_page,
             FluentIcon.SAVE,

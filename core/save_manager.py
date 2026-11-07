@@ -6,6 +6,9 @@
 import os
 import re
 import shutil
+import sqlite3
+import tempfile
+from contextlib import closing
 from datetime import datetime
 from core.utils import get_user_data_path, log_debug
 
@@ -25,6 +28,32 @@ class SaveManager:
 
     # 备份目录
     BACKUP_DIR = get_user_data_path("data/save_backups")
+    INVENTORY_PATH = get_user_data_path("data/relic_inventory.sqlite3")
+
+    @staticmethod
+    def _inventory_backup_path(save_backup_path: str) -> str:
+        return os.path.splitext(save_backup_path)[0] + ".relic_inventory.sqlite3"
+
+    @staticmethod
+    def _temporary_path(directory: str) -> str:
+        fd, path = tempfile.mkstemp(prefix=".nrrelic_backup_", dir=directory)
+        os.close(fd)
+        return path
+
+    @staticmethod
+    def _snapshot_inventory(source: str, destination: str):
+        """通过 SQLite 备份接口获取一致的数据库快照。"""
+        with closing(sqlite3.connect(f"file:{os.path.abspath(source)}?mode=ro", uri=True)) as db:
+            with closing(sqlite3.connect(destination)) as snapshot:
+                db.backup(snapshot)
+
+    @staticmethod
+    def _validate_inventory(path: str):
+        with closing(sqlite3.connect(f"file:{os.path.abspath(path)}?mode=ro", uri=True)) as db:
+            if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                raise ValueError("遗物数据库校验失败")
+            if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='relics'").fetchone():
+                raise ValueError("遗物数据库缺少遗物表")
 
     def __init__(self, steam_path: str = ""):
         configured_path = self._normalize_steam_path(steam_path)
@@ -224,7 +253,8 @@ class SaveManager:
                     "display_name": display_name,
                     "path": filepath,
                     "modified_time": modified_time,
-                    "size": stat.st_size
+                    "size": stat.st_size,
+                    "has_inventory": os.path.isfile(self._inventory_backup_path(filepath))
                 })
 
         backups.sort(key=lambda x: x["modified_time"], reverse=True)
@@ -244,35 +274,81 @@ class SaveManager:
         os.makedirs(backup_dir, exist_ok=True)
 
         backup_path = os.path.join(backup_dir, f"{backup_name}.sl2")
-        if os.path.exists(backup_path):
+        inventory_backup = self._inventory_backup_path(backup_path)
+        if os.path.exists(backup_path) or os.path.exists(inventory_backup):
             return False, f"已存在同名备份: {backup_name}"
 
+        if not os.path.isfile(self.INVENTORY_PATH):
+            return False, "遗物数据库不存在，无法创建完整备份"
+
+        temp_save = temp_inventory = None
         try:
-            shutil.copy2(save_path, backup_path)
-            return True, f"备份成功: {backup_name}"
+            temp_save = self._temporary_path(backup_dir)
+            temp_inventory = self._temporary_path(backup_dir)
+            shutil.copy2(save_path, temp_save)
+            self._snapshot_inventory(self.INVENTORY_PATH, temp_inventory)
+            self._validate_inventory(temp_inventory)
+            os.replace(temp_inventory, inventory_backup)
+            temp_inventory = None
+            os.replace(temp_save, backup_path)
+            temp_save = None
+            return True, f"备份成功: {backup_name}（含遗物库存）"
         except Exception as e:
+            for path in (backup_path, inventory_backup):
+                if os.path.exists(path):
+                    os.remove(path)
             return False, f"备份失败: {e}"
+        finally:
+            for path in (temp_save, temp_inventory):
+                if path and os.path.exists(path):
+                    os.remove(path)
 
     def restore_save(self, steam_id: str, backup_path: str) -> tuple:
         """恢复存档"""
         if not os.path.exists(backup_path):
             return False, "备份文件不存在"
 
+        inventory_backup = self._inventory_backup_path(backup_path)
+        has_inventory = os.path.isfile(inventory_backup)
         save_path = self.get_save_path(steam_id)
         save_dir = os.path.dirname(save_path)
-        os.makedirs(save_dir, exist_ok=True)
+        temp_save = temp_inventory = None
 
         try:
-            # 如果当前存档存在，先备份到游戏存档目录（.sl2.bak）
+            if has_inventory:
+                self._validate_inventory(inventory_backup)
+            os.makedirs(save_dir, exist_ok=True)
+            temp_save = self._temporary_path(save_dir)
+            shutil.copy2(backup_path, temp_save)
+            if has_inventory:
+                inventory_dir = os.path.dirname(self.INVENTORY_PATH)
+                os.makedirs(inventory_dir, exist_ok=True)
+                temp_inventory = self._temporary_path(inventory_dir)
+                shutil.copy2(inventory_backup, temp_inventory)
             if os.path.exists(save_path):
-                bak_path = save_path + ".bak"
-                shutil.copy2(save_path, bak_path)
-
-            # 恢复备份
-            shutil.copy2(backup_path, save_path)
-            return True, "存档恢复成功"
+                shutil.copy2(save_path, save_path + ".bak")
+            if has_inventory and os.path.exists(self.INVENTORY_PATH):
+                self._snapshot_inventory(self.INVENTORY_PATH, self.INVENTORY_PATH + ".bak")
+            os.replace(temp_save, save_path)
+            temp_save = None
+            try:
+                if has_inventory:
+                    os.replace(temp_inventory, self.INVENTORY_PATH)
+                    temp_inventory = None
+            except Exception:
+                if os.path.exists(save_path + ".bak"):
+                    shutil.copy2(save_path + ".bak", save_path)
+                else:
+                    os.remove(save_path)
+                raise
+            return True, ("存档和遗物库存恢复成功" if has_inventory else
+                          "存档恢复成功；旧备份不含遗物库存，当前库存未改动")
         except Exception as e:
             return False, f"恢复失败: {e}"
+        finally:
+            for path in (temp_save, temp_inventory):
+                if path and os.path.exists(path):
+                    os.remove(path)
 
     def rename_backup(self, old_path: str, new_name: str) -> tuple:
         """重命名备份"""
@@ -281,14 +357,20 @@ class SaveManager:
 
         new_name = re.sub(r'[<>:"/\\|?*]', '_', new_name)
         new_path = os.path.join(os.path.dirname(old_path), f"{new_name}.sl2")
+        old_inventory = self._inventory_backup_path(old_path)
+        new_inventory = self._inventory_backup_path(new_path)
 
-        if os.path.exists(new_path):
+        if os.path.exists(new_path) or os.path.exists(new_inventory):
             return False, f"已存在同名备份: {new_name}"
 
         try:
+            if os.path.exists(old_inventory):
+                os.rename(old_inventory, new_inventory)
             os.rename(old_path, new_path)
             return True, f"重命名成功: {new_name}"
         except Exception as e:
+            if os.path.exists(new_inventory):
+                os.rename(new_inventory, old_inventory)
             return False, f"重命名失败: {e}"
 
     def delete_backup(self, backup_path: str) -> tuple:
@@ -297,6 +379,9 @@ class SaveManager:
             return False, "备份文件不存在"
 
         try:
+            inventory_backup = self._inventory_backup_path(backup_path)
+            if os.path.exists(inventory_backup):
+                os.remove(inventory_backup)
             os.remove(backup_path)
             return True, "删除成功"
         except Exception as e:
