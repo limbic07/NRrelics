@@ -1,682 +1,393 @@
-"""
-预设编辑对话框
-用于编辑通用预设和专用预设
-"""
-
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QListWidget, QListWidgetItem, QPushButton,
-                               QCheckBox, QMessageBox)
+"""The same tier-first editor for general and dedicated relic presets."""
 from PySide6.QtCore import Qt, Signal
-from qfluentwidgets import (LineEdit, PrimaryPushButton, PushButton,
-                           MessageBox, InfoBar, InfoBarPosition, isDarkTheme)
-from core.affix_catalog import AffixCatalog, normalize_name
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                               QListWidget, QListWidgetItem, QPushButton, QAbstractItemView)
+from qfluentwidgets import LineEdit, PrimaryPushButton, PushButton, MessageBox
+
+from core.relic_scoring import POSITIVE_TIERS, NEGATIVE_TIERS, DEFAULT_NEGATIVE_TIERS
+from ui.dialogs.official_relic_score_dialog import OfficialRelicScoreDialog
+
+
+TIER_NAMES = {
+    "core": "重要", "secondary": "次要", "bonus": "锦上添花",
+    "unacceptable": "不可接受", "harmful": "很伤", "negligible": "几乎无负面",
+}
+TIER_ORDER = POSITIVE_TIERS + NEGATIVE_TIERS
 
 
 class PresetEditDialog(QDialog):
-    """预设编辑对话框"""
+    """Selecting a tier first makes every checkbox's meaning unambiguous."""
 
-    # 信号
-    dedicated_saved = Signal(str, str, list, list, list)
-    grouped_saved = Signal(str, str, list, list, list)
-    preset_saved = Signal(str, str, list)  # (preset_id, name, affixes)
+    preset_saved = Signal(str, str, list)  # Legacy global-blacklist editor.
+    graded_saved = Signal(str, str, list, dict, dict, list, dict)
 
-    def __init__(self, vocabulary: list, preset_data: dict = None, is_general: bool = False, parent=None,
-                 mode="normal", exception_vocabulary=None, inherited_vocabulary=None):
-        """
-        初始化对话框
-
-        Args:
-            vocabulary: 词条库列表
-            preset_data: 预设数据（编辑模式）
-            is_general: 是否为通用预设
-            parent: 父窗口
-        """
+    def __init__(self, vocabulary, preset_data=None, is_general=False, parent=None,
+                 mode="normal", exception_vocabulary=None, inherited_vocabulary=None,
+                 inherited_tiers=None, inherited_negative_tiers=None,
+                 default_negative_tiers=None, new_character=None, suggested_name=''):
         super().__init__(parent)
-        self.inherited_vocabulary = set(inherited_vocabulary or [])
-        self.vocabulary = list(vocabulary)
-        for value in self.inherited_vocabulary:
-            if value not in self.vocabulary:
-                self.vocabulary.append(value)
-        self.preset_data = preset_data
-        if preset_data:
-            for value in preset_data.get("affixes", []):
-                if value not in self.vocabulary:
-                    self.vocabulary.append(value)
-            imported_groups = preset_data.get("required_affix_groups")
-            imported_required = (
-                [member for group in imported_groups if isinstance(group, list)
-                 for member in group]
-                if isinstance(imported_groups, list)
-                else preset_data.get("required_affixes", [])
-            )
-            for value in imported_required:
-                if isinstance(value, str) and value not in self.vocabulary:
-                    self.vocabulary.append(value)
-        self.mode = mode
-        self.exception_vocabulary = exception_vocabulary or []
-        self.affix_catalog = AffixCatalog()
-        self.required_list = None
-        self.required_groups_list = None
-        self.exceptions_list = None
+        self.preset_data = preset_data or {}
+        self.new_character = new_character
+        self.suggested_name = suggested_name
         self.is_general = is_general
-        self.is_edit_mode = preset_data is not None
+        self.is_blacklist = self.preset_data.get("type") == "deepnight_blacklist"
+        self.mode = mode
+        self.positive_vocabulary = list(dict.fromkeys(
+            list(vocabulary) + list(self.preset_data.get("affixes", []))
+            + list(inherited_vocabulary or [])))
+        self.negative_vocabulary = (list(dict.fromkeys(exception_vocabulary or []))
+                                    if mode == "deepnight" and not self.is_blacklist else [])
+        self.inherited_positive = {
+            name: (inherited_tiers or {}).get(name, "secondary")
+            for name in inherited_vocabulary or []
+        }
+        self.inherited_negative = dict(inherited_negative_tiers or {})
+        self.default_negative = dict(DEFAULT_NEGATIVE_TIERS)
+        self.default_negative.update(default_negative_tiers or {})
+        old_positive = self.preset_data.get("affix_tiers", {})
+        self.local_positive = {
+            name: old_positive.get(name, "secondary")
+            for name in self.preset_data.get("affixes", [])
+        }
+        self.local_positive.update({
+            name: tier for name, tier in old_positive.items()
+            if name in self.inherited_positive and name not in self.local_positive
+        })
+        self.local_negative = dict(self.preset_data.get("negative_tiers", {}))
+        self.excluded = set(self.preset_data.get("excluded_affixes", []))
+        self.official_scores = dict(self.preset_data.get('official_scores', {}))
+        self.blacklist_selected = set(self.preset_data.get("affixes", [])) if self.is_blacklist else set()
+        self.current_tier = "core"
+        self._loading = False
 
-        self.setWindowTitle("编辑预设" if self.is_edit_mode else "创建预设")
-        self.setMinimumSize(600, 500)
+        self.setWindowTitle("编辑预设" if preset_data else "创建预设")
+        self.resize(820, 690)
+        self.setMinimumSize(700, 560)
+        self.setStyleSheet('''
+            QDialog { background: #f5f5f5; }
+            QListWidget { background: white; border: 1px solid #d8d8d8;
+                          border-radius: 9px; padding: 4px; }
+            QListWidget::item { min-height: 30px; padding: 4px 8px; }
+            QListWidget::item:selected { background: #dceffc; color: #111; border-radius: 5px; }
+            QPushButton#tierButton { min-height: 30px; }
+            QPushButton#tierButton:checked { background: #009eaa; color: white;
+                border: 1px solid #009eaa; border-radius: 5px; }
+        ''')
+        self._build_ui()
+        self._render_choices()
 
-        self._init_ui()
-        self._load_preset_data()
-        self._sync_required()
-        if self.required_list is not None:
-            groups = (self.preset_data or {}).get("required_affix_groups")
-            required = ([a for group in groups if isinstance(group, list)
-                         for a in group if isinstance(a, str)] if isinstance(groups, list)
-                        else (self.preset_data or {}).get("required_affixes", []))
-            for i in range(self.required_list.count()):
-                item = self.required_list.item(i)
-                item.setCheckState(Qt.Checked if item.text() in required else Qt.Unchecked)
-
-    def _init_ui(self):
-        """初始化UI"""
+    def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(8)
 
-        # 预设名称
         if not self.is_general:
-            name_layout = QHBoxLayout()
-            name_label = QLabel("预设名称:")
-            name_label.setFixedWidth(80)
+            name_row = QHBoxLayout()
+            name_row.addWidget(QLabel("流派名称" if self.new_character else "预设名称"))
             self.name_input = LineEdit()
             self.name_input.setPlaceholderText("输入预设名称")
-            name_layout.addWidget(name_label)
-            name_layout.addWidget(self.name_input)
-            layout.addLayout(name_layout)
+            self.name_input.setText(self.preset_data.get("name", self.suggested_name))
+            name_row.addWidget(self.name_input)
+            layout.addLayout(name_row)
         else:
-            # 通用预设显示标题
-            title = QLabel("通用预设词条选择")
-            title.setStyleSheet("font-size: 16pt; font-weight: bold;")
-            layout.addWidget(title)
+            layout.addWidget(QLabel("深夜黑名单" if self.is_blacklist else "通用预设"))
 
-        # 搜索框
-        search_layout = QHBoxLayout()
-        search_label = QLabel("搜索:")
-        search_label.setFixedWidth(80)
+        if not self.is_blacklist:
+            layout.addWidget(QLabel("先选择词条等级，再在下方勾选词条"))
+            self.tier_buttons = {}
+            positive_row = QHBoxLayout()
+            for tier in POSITIVE_TIERS:
+                button = QPushButton(TIER_NAMES[tier])
+                button.setObjectName('tierButton')
+                button.setFixedWidth(120)
+                button.setCheckable(True)
+                button.clicked.connect(lambda checked=False, value=tier: self._switch_tier(value))
+                positive_row.addWidget(button)
+                self.tier_buttons[tier] = button
+            positive_row.addStretch()
+            layout.addLayout(positive_row)
+            if self.mode == "deepnight":
+                layout.addWidget(QLabel("深夜负面词条也可在上方选为正面效果；或在这里指定扣分等级"))
+                negative_row = QHBoxLayout()
+                for tier in NEGATIVE_TIERS:
+                    button = QPushButton(TIER_NAMES[tier])
+                    button.setObjectName('tierButton')
+                    button.setFixedWidth(120)
+                    button.setCheckable(True)
+                    button.clicked.connect(lambda checked=False, value=tier: self._switch_tier(value))
+                    negative_row.addWidget(button)
+                    self.tier_buttons[tier] = button
+                negative_row.addStretch()
+                layout.addLayout(negative_row)
+            self._update_tier_buttons()
+
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("搜索"))
         self.search_input = LineEdit()
         self.search_input.setPlaceholderText("输入关键词搜索词条")
-        self.search_input.textChanged.connect(self._filter_vocabulary)
-        search_layout.addWidget(search_label)
-        search_layout.addWidget(self.search_input)
-        layout.addLayout(search_layout)
+        self.search_input.textChanged.connect(self._render_choices)
+        search_row.addWidget(self.search_input)
+        layout.addLayout(search_row)
 
-        # 批量操作按钮
-        batch_layout = QHBoxLayout()
-        batch_layout.addWidget(QLabel("批量操作:"))
+        batch_row = QHBoxLayout()
+        for title, handler in (("全选可见", self._select_visible),
+                               ("全不选可见", self._clear_visible)):
+            button = PushButton(title)
+            button.clicked.connect(handler)
+            batch_row.addWidget(button)
+        batch_row.addStretch()
+        layout.addLayout(batch_row)
 
-        self.select_all_btn = PushButton("全选")
-        self.select_all_btn.setFixedWidth(80)
-        self.select_all_btn.setToolTip("选择所有可见词条（受搜索过滤影响）")
-        self.select_all_btn.clicked.connect(self._select_all)
-        batch_layout.addWidget(self.select_all_btn)
-
-        self.deselect_all_btn = PushButton("全不选")
-        self.deselect_all_btn.setFixedWidth(80)
-        self.deselect_all_btn.setToolTip("取消选择所有可见词条（受搜索过滤影响）")
-        self.deselect_all_btn.clicked.connect(self._deselect_all)
-        batch_layout.addWidget(self.deselect_all_btn)
-
-        self.invert_selection_btn = PushButton("反选")
-        self.invert_selection_btn.setFixedWidth(80)
-        self.invert_selection_btn.setToolTip("反选所有可见词条（受搜索过滤影响）")
-        self.invert_selection_btn.clicked.connect(self._invert_selection)
-        batch_layout.addWidget(self.invert_selection_btn)
-
-        batch_layout.addStretch()
-        layout.addLayout(batch_layout)
-
-        # 词条列表
-        list_label = QLabel(f"词条列表 (共 {len(self.vocabulary)} 条):")
-        layout.addWidget(list_label)
-
+        self.list_label = QLabel()
+        layout.addWidget(self.list_label)
         self.vocab_list = QListWidget()
-        self._apply_list_stylesheet()
+        self.vocab_list.setSelectionMode(QAbstractItemView.NoSelection)
+        self.vocab_list.itemChanged.connect(self._on_item_changed)
+        layout.addWidget(self.vocab_list, 1)
+        layout.addWidget(QLabel('右键词条所在行可勾选或取消勾选。'))
 
-        # 添加词条到列表
-        for vocab in self.vocabulary:
-            item = QListWidgetItem(vocab)
-            if vocab in self.inherited_vocabulary and vocab not in (self.preset_data or {}).get("affixes", []):
-                item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
-                item.setData(Qt.UserRole + 1, True)
-                item.setToolTip("来自当前启用的通用预设；可加入必须词条组，但不会复制到专用词条")
-            else:
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(Qt.Unchecked)
-            self.vocab_list.addItem(item)
+        if self.mode == 'normal' and not self.is_blacklist:
+            official_row = QHBoxLayout()
+            official_button = PushButton('官方遗物分数…')
+            official_button.clicked.connect(self._edit_official_scores)
+            official_row.addWidget(official_button)
+            self.official_count = QLabel()
+            official_row.addWidget(self.official_count)
+            official_row.addStretch()
+            layout.addLayout(official_row)
+            self._update_official_count()
 
-        layout.addWidget(self.vocab_list)
+        bottom_row = QHBoxLayout()
+        self.view_button = PushButton("查看已选择词条")
+        self.view_button.clicked.connect(self._show_selected)
+        bottom_row.addWidget(self.view_button)
+        self.count_label = QLabel()
+        bottom_row.addWidget(self.count_label)
+        bottom_row.addStretch()
+        cancel = PushButton("取消")
+        cancel.clicked.connect(self.reject)
+        bottom_row.addWidget(cancel)
+        save = PrimaryPushButton("保存")
+        save.clicked.connect(self._save)
+        bottom_row.addWidget(save)
+        layout.addLayout(bottom_row)
 
-        if not self.is_general:
-            layout.addWidget(QLabel("候选词条：勾选后点击加入/更新组才生效（仅已选有效词条）"))
-            self.required_list = QListWidget()
-            self.required_list.setMaximumHeight(110)
-            layout.addWidget(self.required_list)
-            layout.addWidget(QLabel("必须词条组：组内满足任一词条，组与组之间都必须满足"))
-            self.required_groups_list = QListWidget()
-            self.required_groups_list.setMaximumHeight(120)
-            self.required_groups_list.currentRowChanged.connect(self._load_group_selection)
-            layout.addWidget(self.required_groups_list)
-            self.group_warning_label = QLabel()
-            self.group_warning_label.setWordWrap(True)
-            self.group_warning_label.setStyleSheet("color: #b06a00;")
-            self.group_warning_label.setVisible(False)
-            layout.addWidget(self.group_warning_label)
-            group_buttons = QHBoxLayout()
-            add_group = PushButton("将勾选词条加入同一 OR 组")
-            add_group.clicked.connect(self._add_required_group)
-            family_group = PushButton("加入已验证同族候选")
-            family_group.clicked.connect(self._add_family_alternatives)
-            edit_group = PushButton("更新选中组")
-            edit_group.clicked.connect(self._update_required_group)
-            remove_group = PushButton("删除选中组")
-            remove_group.clicked.connect(self._remove_required_group)
-            group_buttons.addWidget(add_group)
-            group_buttons.addWidget(family_group)
-            group_buttons.addWidget(edit_group)
-            group_buttons.addWidget(remove_group)
-            group_buttons.addStretch()
-            layout.addLayout(group_buttons)
-            if self.mode == "deepnight":
-                layout.addWidget(QLabel("黑名单例外（仅容忍，不计有效；与全局黑名单交集生效）"))
-                self.exceptions_list = QListWidget()
-                self.exceptions_list.setMaximumHeight(110)
-                selected = (self.preset_data or {}).get("blacklist_exceptions", [])
-                for text in self.exception_vocabulary:
-                    item = QListWidgetItem(text)
-                    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                    item.setCheckState(Qt.Checked if text in selected else Qt.Unchecked)
-                    self.exceptions_list.addItem(item)
-                layout.addWidget(self.exceptions_list)
+    def _switch_tier(self, tier):
+        self.current_tier = tier
+        self._update_tier_buttons()
+        self._render_choices()
 
-        # 统计信息
-        self.count_label = QLabel("已选择: 0 条")
-        self.count_label.setStyleSheet("color: #666; font-size: 12pt;")
-        layout.addWidget(self.count_label)
+    def _update_tier_buttons(self):
+        for tier, button in self.tier_buttons.items():
+            button.setChecked(tier == self.current_tier)
 
-        # 只连接更新计数，不连接排序（排序只在加载时执行一次）
-        self.vocab_list.itemChanged.connect(self._update_count)
+    def _positive_tier(self, name):
+        if name in self.excluded:
+            return None
+        return self.local_positive.get(name, self.inherited_positive.get(name))
 
-        # 按钮
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
+    def _negative_tier(self, name):
+        return self.local_negative.get(
+            name, self.inherited_negative.get(name,
+                                              self.default_negative.get(name, "negligible")))
 
-        self.cancel_btn = PushButton("取消")
-        self.cancel_btn.clicked.connect(self.reject)
-        button_layout.addWidget(self.cancel_btn)
-
-        self.save_btn = PrimaryPushButton("保存")
-        self.save_btn.clicked.connect(self._save_preset)
-        button_layout.addWidget(self.save_btn)
-
-        layout.addLayout(button_layout)
-
-    def _apply_list_stylesheet(self):
-        """根据主题应用列表样式"""
-        if isDarkTheme():
-            # 深色模式
-            stylesheet = """
-                QListWidget {
-                    border: 1px solid #3d3d3d;
-                    border-radius: 6px;
-                    background-color: #1e1e1e;
-                    outline: none;
-                    padding: 4px;
-                }
-                QListWidget::item {
-                    height: 38px;
-                    padding-left: 8px;
-                    color: #e0e0e0;
-                    border-radius: 4px;
-                    margin-bottom: 2px;
-                }
-                QListWidget::item:hover {
-                    background-color: #2d2d2d;
-                }
-                QListWidget::item:selected {
-                    background-color: #1a3a52;
-                    color: #e0e0e0;
-                }
-                QListWidget::indicator {
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 4px;
-                    border: 1px solid #555555;
-                    background-color: #2d2d2d;
-                    margin-right: 12px;
-                }
-                QListWidget::indicator:hover {
-                    border-color: #009faa;
-                    background-color: #3d3d3d;
-                }
-                QListWidget::indicator:checked {
-                    background-color: #009faa;
-                    border: 1px solid #009faa;
-                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
-                }
-                QListWidget::indicator:checked:selected {
-                    background-color: #009faa;
-                    border: 1px solid #009faa;
-                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
-                }
-                QListWidget::indicator:unchecked:selected {
-                    border: 1px solid #009faa;
-                    background-color: #2d2d2d;
-                }
-            """
+    def _render_choices(self, *_):
+        self._loading = True
+        self.vocab_list.clear()
+        search = self.search_input.text().strip().lower()
+        if self.is_blacklist:
+            names = self.positive_vocabulary
+            label = "黑名单词条"
+        elif self.current_tier in NEGATIVE_TIERS:
+            names = self.negative_vocabulary
+            label = f"{TIER_NAMES[self.current_tier]}：选择深夜负面词条"
         else:
-            # 浅色模式
-            stylesheet = """
-                QListWidget {
-                    border: 1px solid #e0e0e0;
-                    border-radius: 6px;
-                    background-color: white;
-                    outline: none;
-                    padding: 4px;
-                }
-                QListWidget::item {
-                    height: 38px;
-                    padding-left: 8px;
-                    color: #333;
-                    border-radius: 4px;
-                    margin-bottom: 2px;
-                }
-                QListWidget::item:hover {
-                    background-color: #f5f5f5;
-                }
-                QListWidget::item:selected {
-                    background-color: #e3f2fd;
-                    color: #000;
-                }
-                QListWidget::indicator {
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 4px;
-                    border: 1px solid #c0c0c0;
-                    background-color: white;
-                    margin-right: 12px;
-                }
-                QListWidget::indicator:hover {
-                    border-color: #009faa;
-                    background-color: #f0f8ff;
-                }
-                QListWidget::indicator:checked {
-                    background-color: #009faa;
-                    border: 1px solid #009faa;
-                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
-                }
-                QListWidget::indicator:checked:selected {
-                    background-color: #009faa;
-                    border: 1px solid #009faa;
-                    image: url(":/qfluentwidgets/images/check_box_checked_white.png");
-                }
-                QListWidget::indicator:unchecked:selected {
-                    border: 1px solid #009faa;
-                    background-color: white;
-                }
-            """
-        self.vocab_list.setStyleSheet(stylesheet)
-
-    def _load_preset_data(self):
-        """加载预设数据（编辑模式）"""
-        if not self.preset_data:
-            return
-
-        # 设置名称
-        if not self.is_general and "name" in self.preset_data:
-            self.name_input.setText(self.preset_data["name"])
-
-        # 暂时断开信号，避免加载时触发排序
-        self.vocab_list.itemChanged.disconnect(self._update_count)
-
-        # 勾选已有词条
-        selected_affixes = set(self.preset_data.get("affixes", []))
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            if item.text() in selected_affixes:
-                item.setCheckState(Qt.Checked)
-
-        # 重新连接信号
-        self.vocab_list.itemChanged.connect(self._update_count)
-
-        # 更新计数和排序（只在加载时执行一次）
+            names = self.positive_vocabulary + self.negative_vocabulary
+            label = f"{TIER_NAMES[self.current_tier]}：选择正面词条"
+        names = [name for name in dict.fromkeys(names) if search in name.lower()]
+        self.list_label.setText(f"{label}（当前显示 {len(names)} 条）")
+        for name in names:
+            if self.is_blacklist:
+                selected = name in self.blacklist_selected
+                suffix = ""
+            elif name in self.negative_vocabulary:
+                current = self._negative_tier(name)
+                explicit = name in self.local_negative or name in self.inherited_negative
+                selected = explicit and current == self.current_tier
+                source = "已选" if explicit else "默认"
+                suffix = f"  · {source}：{TIER_NAMES[current]}"
+            else:
+                current = self._positive_tier(name)
+                selected = current == self.current_tier
+                suffix = (f"  · 已选：{TIER_NAMES[current]}" if current
+                          else "  · 已排除通用" if name in self.excluded else "")
+            item = QListWidgetItem(name + suffix)
+            item.setData(Qt.UserRole, name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if selected else Qt.Unchecked)
+            self.vocab_list.addItem(item)
+        self._loading = False
         self._update_count()
-        self._sort_items()
-        self._load_required_groups()
 
-    def _filter_vocabulary(self, text: str):
-        """过滤词条列表"""
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            item.setHidden(text.lower() not in item.text().lower())
+    def _on_item_changed(self, item):
+        if self._loading:
+            return
+        name = item.data(Qt.UserRole)
+        checked = item.checkState() == Qt.Checked
+        if self.is_blacklist:
+            (self.blacklist_selected.add if checked else self.blacklist_selected.discard)(name)
+        elif name in self.negative_vocabulary:
+            if checked:
+                self.local_negative[name] = self.current_tier
+            elif self._negative_tier(name) == self.current_tier:
+                if name in self.inherited_negative:
+                    self.local_negative[name] = self.default_negative.get(name, "negligible")
+                else:
+                    self.local_negative.pop(name, None)
+        else:
+            if checked:
+                self.local_positive[name] = self.current_tier
+                self.excluded.discard(name)
+            elif self._positive_tier(name) == self.current_tier:
+                self.local_positive.pop(name, None)
+                if name in self.inherited_positive:
+                    self.excluded.add(name)
+        self._render_choices()
+
+    def _batch(self, action):
+        choices = [(self.vocab_list.item(i).data(Qt.UserRole),
+                    self.vocab_list.item(i).checkState() == Qt.Checked)
+                   for i in range(self.vocab_list.count())]
+        for name, checked in choices:
+            desired = action == "select"
+            if desired == checked:
+                continue
+            if self.is_blacklist:
+                (self.blacklist_selected.add if desired else self.blacklist_selected.discard)(name)
+            elif name in self.negative_vocabulary:
+                if desired:
+                    self.local_negative[name] = self.current_tier
+                elif name in self.inherited_negative:
+                    self.local_negative[name] = self.default_negative.get(name, "negligible")
+                else:
+                    self.local_negative.pop(name, None)
+            elif desired:
+                self.local_positive[name] = self.current_tier
+                self.excluded.discard(name)
+            else:
+                self.local_positive.pop(name, None)
+                if name in self.inherited_positive:
+                    self.excluded.add(name)
+        self._render_choices()
+
+    def _select_visible(self):
+        self._batch("select")
+
+    def _clear_visible(self):
+        self._batch("clear")
+
+    def _selected_rows(self):
+        rows = []
+        for name in set(self.inherited_positive) | set(self.local_positive):
+            tier = self._positive_tier(name)
+            if tier:
+                rows.append((tier, name, "通用继承" if name in self.inherited_positive else "本预设"))
+        for name in set(self.local_negative) | set(self.inherited_negative):
+            tier = self._negative_tier(name)
+            rows.append((tier, name, "通用继承" if name in self.inherited_negative
+                         and name not in self.local_negative else "本预设"))
+        for name in self.excluded:
+            rows.append(("excluded", name, "已排除通用"))
+        return sorted(rows, key=lambda row: (TIER_ORDER.index(row[0])
+                                             if row[0] in TIER_ORDER else len(TIER_ORDER), row[1]))
 
     def _update_count(self):
-        """更新选择计数"""
-        count = sum(1 for i in range(self.vocab_list.count())
-                   if self.vocab_list.item(i).checkState() == Qt.Checked)
-        self.count_label.setText(f"已选择: {count} 条")
-        self._sync_required()
+        count = len(self.blacklist_selected) if self.is_blacklist else len(self._selected_rows())
+        self.count_label.setText(f"已选择：{count} 条")
 
-    @staticmethod
-    def _checked_items(widget):
-        if widget is None:
-            return []
-        return [widget.item(i).text() for i in range(widget.count())
-                if widget.item(i).checkState() == Qt.Checked]
+    def _show_selected(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("已选择词条")
+        dialog.resize(720, 520)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("按重要性从高到低排列；专属预设显示继承与覆盖后的结果"))
+        selected_list = QListWidget()
+        layout.addWidget(selected_list)
 
-    def _sync_required(self):
-        if self.required_list is None:
-            return
-        selected = set(self._checked_items(self.required_list)) & (
-            set(self.get_selected_affixes()) | self.inherited_vocabulary
-        )
-        existing = {
-            member for group in self._current_required_groups()
-            if isinstance(group, list) for member in group if isinstance(member, str)
-        }
-        self.required_list.clear()
-        for text in dict.fromkeys(
-                self.get_selected_affixes() + list(self.inherited_vocabulary) + list(existing)):
-            item = QListWidgetItem(text)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Checked if text in selected else Qt.Unchecked)
-            self.required_list.addItem(item)
-        self._update_group_warnings()
-
-    def _load_required_groups(self):
-        if self.required_groups_list is None:
-            return
-        self.required_groups_list.clear()
-        data = self.preset_data or {}
-        groups = data.get("required_affix_groups")
-        if "required_affix_groups" not in data:
-            legacy = data.get("required_affixes", [])
-            groups = [[a] for a in legacy] if isinstance(legacy, list) else [legacy]
-        if not isinstance(groups, list):
-            groups = [groups]  # Preserve malformed imports until explicitly repaired/deleted.
-        for group in groups:
-            item = QListWidgetItem(
-                " 或 ".join(str(a) for a in group) if isinstance(group, list)
-                else "无效组：" + repr(group)
-            )
-            item.setData(Qt.UserRole, group)
-            self.required_groups_list.addItem(item)
-        self._update_group_warnings()
-
-    def _current_required_groups(self):
-        if self.required_groups_list is None:
-            return []
-        groups = []
-        for i in range(self.required_groups_list.count()):
-            item = self.required_groups_list.item(i)
-            value = item.data(Qt.UserRole)
-            groups.append(value if value is not None else item.text())
-        return groups
-
-    def _add_required_group(self):
-        selected = self._checked_items(self.required_list)
-        if not selected:
-            return
-        item = QListWidgetItem(" 或 ".join(selected))
-        item.setData(Qt.UserRole, list(selected))
-        self.required_groups_list.addItem(item)
-        for i in range(self.required_list.count()):
-            self.required_list.item(i).setCheckState(Qt.Unchecked)
-        self._update_group_warnings()
-
-    def _load_group_selection(self, row):
-        groups = self._current_required_groups()
-        group = groups[row] if 0 <= row < len(groups) else []
-        selected = {a for a in group if isinstance(a, str)} if isinstance(group, list) else set()
-        for i in range(self.required_list.count()):
-            item = self.required_list.item(i)
-            item.setCheckState(Qt.Checked if item.text() in selected else Qt.Unchecked)
-
-    def _update_required_group(self):
-        row = self.required_groups_list.currentRow()
-        if row < 0:
-            return
-        selected = self._checked_items(self.required_list)
-        if not selected:
-            return
-        item = self.required_groups_list.item(row)
-        item.setData(Qt.UserRole, list(selected))
-        item.setText(" 或 ".join(selected))
-        self._update_group_warnings()
-
-    def _remove_required_group(self):
-        row = self.required_groups_list.currentRow()
-        if row >= 0:
-            self.required_groups_list.takeItem(row)
-            self._update_group_warnings()
-
-    def _add_family_alternatives(self):
-        row = self.required_groups_list.currentRow()
-        if row < 0:
-            return
-        group = self._current_required_groups()[row]
-        if not isinstance(group, list):
-            return
-        selected = set(self.get_selected_affixes()) | self.inherited_vocabulary
-        normalized_selected = {normalize_name(name): name for name in selected}
-        alternatives = {
-            normalized_selected[normalize_name(name)]
-            for entry in group
-            for name in self.affix_catalog.alternatives(normalize_name(entry))
-            if normalize_name(name) in normalized_selected
-        }
-        additions = sorted(alternatives - set(group))
-        if additions:
-            group.extend(additions)
-            item = self.required_groups_list.item(row)
-            item.setData(Qt.UserRole, group)
-            item.setText(" 或 ".join(group))
-            self._update_group_warnings()
-
-    def _update_group_warnings(self):
-        if self.required_groups_list is None:
-            return
-        groups = self._current_required_groups()
-        if any(not isinstance(g, list) or not g or
-               any(not isinstance(a, str) or not a.strip() for a in g) for g in groups):
-            self._show_group_error("必须词条组格式无效，请修正或删除无效组。")
-            return
-        warnings = self.affix_catalog.compatibility_warnings(groups)
-        if warnings:
-            text = "提示：组间可能存在兼容性冲突：" + "、".join(
-                f"组{left}与组{right}" for left, right in warnings
-            )
-            self.group_warning_label.setText(text)
-            self.group_warning_label.setVisible(True)
-        else:
-            self.group_warning_label.clear()
-            self.group_warning_label.setVisible(False)
-
-    def _validate_required_groups(self):
-        selected = set(self.get_selected_affixes()) | self.inherited_vocabulary
-        for group in self._current_required_groups():
-            if not isinstance(group, list) or not group:
-                self._show_group_error("必须词条组格式无效：每组至少需要一个词条。")
-                return False
-            if any(not isinstance(member, str) or not member.strip()
-                   for member in group):
-                self._show_group_error("必须词条组格式无效：词条不能为空。")
-                return False
-            if any(member not in selected for member in group):
-                self._show_group_error("必须词条组包含未选择的词条，请修正或删除该组。")
-                return False
-        self._show_group_error("")
-        return True
-
-    def _show_group_error(self, text):
-        self.group_warning_label.setText(text)
-        self.group_warning_label.setVisible(bool(text))
-
-    def _emit_saved(self, preset_id, name, affixes):
-        if self.is_general:
-            self.preset_saved.emit(preset_id, name, affixes)
-        else:
-            groups = self._current_required_groups()
-            flattened = [
-                member for group in groups if isinstance(group, list)
-                for member in group
-            ]
-            self.dedicated_saved.emit(preset_id, name, affixes,
-                                      flattened,
-                                      self._checked_items(self.exceptions_list))
-            self.grouped_saved.emit(preset_id, name, affixes,
-                                    groups,
-                                    self._checked_items(self.exceptions_list))
-
-    def _sort_items(self):
-        """将已勾选的词条置顶"""
-        # 暂时断开信号，避免排序时触发 itemChanged
-        self.vocab_list.itemChanged.disconnect(self._update_count)
-
-        # 收集所有项
-        items = []
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            items.append((item.text(), item.checkState(),
-                          bool(item.data(Qt.UserRole + 1))))
-
-        # 排序：已勾选的在前，未勾选的在后，同类按字母排序
-        items.sort(key=lambda x: (x[1] != Qt.Checked, x[0]))
-
-        # 清空列表并重新添加
-        self.vocab_list.clear()
-        for text, check_state, inherited in items:
-            item = QListWidgetItem(text)
-            if inherited:
-                item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
-                item.setData(Qt.UserRole + 1, True)
-                item.setToolTip("来自当前启用的通用预设；可加入必须词条组，但不会复制到专用词条")
+        def refresh():
+            selected_list.clear()
+            if self.is_blacklist:
+                rows = [("blacklist", name, "") for name in sorted(self.blacklist_selected)]
             else:
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(check_state)
-            self.vocab_list.addItem(item)
+                rows = self._selected_rows()
+            for tier, name, source in rows:
+                label = "黑名单" if tier == "blacklist" else TIER_NAMES.get(tier, "已排除")
+                item = QListWidgetItem(f"【{label}】{name}" + (f"  · {source}" if source else ""))
+                item.setData(Qt.UserRole, (tier, name))
+                selected_list.addItem(item)
 
-        # 重新连接信号
-        self.vocab_list.itemChanged.connect(self._update_count)
+        refresh()
+        row = QHBoxLayout()
+        remove_button = PushButton("移除选中项")
 
-    def _select_all(self):
-        """全选所有可见词条"""
-        self.vocab_list.itemChanged.disconnect(self._update_count)
-
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            # 只选择可见的词条
-            if not item.isHidden():
-                item.setCheckState(Qt.Checked)
-
-        self.vocab_list.itemChanged.connect(self._update_count)
-        self._update_count()
-
-    def _deselect_all(self):
-        """取消全选所有可见词条"""
-        self.vocab_list.itemChanged.disconnect(self._update_count)
-
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            # 只取消选择可见的词条
-            if not item.isHidden():
-                item.setCheckState(Qt.Unchecked)
-
-        self.vocab_list.itemChanged.connect(self._update_count)
-        self._update_count()
-
-    def _invert_selection(self):
-        """反选所有可见词条"""
-        self.vocab_list.itemChanged.disconnect(self._update_count)
-
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            # 只反选可见的词条
-            if not item.isHidden():
-                if item.checkState() == Qt.Checked:
-                    item.setCheckState(Qt.Unchecked)
-                else:
-                    item.setCheckState(Qt.Checked)
-
-        self.vocab_list.itemChanged.connect(self._update_count)
-        self._update_count()
-
-    def _save_preset(self):
-        """保存预设"""
-        # 验证名称（非通用预设）
-        if not self.is_general:
-            name = self.name_input.text().strip()
-            if not name:
-                MessageBox("错误", "请输入预设名称", self).exec()
+        def remove():
+            item = selected_list.currentItem()
+            if not item:
                 return
-        else:
-            name = "通用预设"
+            tier, name = item.data(Qt.UserRole)
+            if tier == "blacklist":
+                self.blacklist_selected.discard(name)
+            elif tier == "excluded":
+                self.excluded.discard(name)
+            elif name in self.negative_vocabulary:
+                if name in self.inherited_negative:
+                    self.local_negative[name] = self.default_negative.get(name, "negligible")
+                else:
+                    self.local_negative.pop(name, None)
+            else:
+                self.local_positive.pop(name, None)
+                if name in self.inherited_positive:
+                    self.excluded.add(name)
+            refresh()
+            self._render_choices()
 
-        if not self.is_general and not self._validate_required_groups():
+        remove_button.clicked.connect(remove)
+        row.addWidget(remove_button)
+        row.addStretch()
+        close = PushButton("关闭")
+        close.clicked.connect(dialog.accept)
+        row.addWidget(close)
+        layout.addLayout(row)
+        dialog.exec()
+
+    def get_selected_affixes(self):
+        return sorted(self.blacklist_selected) if self.is_blacklist else sorted(
+            name for name in self.local_positive if name not in self.inherited_positive)
+
+    def get_affix_tiers(self):
+        return self.local_positive.copy()
+
+    def _update_official_count(self):
+        self.official_count.setText(f"已指定 {len(self.official_scores)} 件官方遗物的分数")
+
+    def _edit_official_scores(self):
+        dialog = OfficialRelicScoreDialog(self.official_scores, self)
+        if dialog.exec() == QDialog.Accepted:
+            self.official_scores = dialog.scores()
+            self._update_official_count()
+
+    def _save(self):
+        name = self.name_input.text().strip() if not self.is_general else "通用预设"
+        if not name:
+            MessageBox("错误", "请输入预设名称", self).exec()
             return
-
-        # 获取选中的词条（允许为空）
-        selected_affixes = []
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            if item.checkState() == Qt.Checked:
-                selected_affixes.append(item.text())
-
-        # 发送信号
-        preset_id = self.preset_data.get("id", "") if self.preset_data else ""
-        self._emit_saved(preset_id, name, selected_affixes)
+        if self.new_character:
+            name = f'{self.new_character}｜{name.split("｜", 1)[-1].strip()}'
+        identifier = self.preset_data.get("id", "")
+        if self.is_blacklist:
+            self.preset_saved.emit(identifier, name, sorted(self.blacklist_selected))
+        else:
+            self.graded_saved.emit(identifier, name, self.get_selected_affixes(),
+                                   self.get_affix_tiers(), self.local_negative.copy(),
+                                   sorted(self.excluded), self.official_scores.copy())
         self.accept()
-
-    def get_selected_affixes(self) -> list:
-        """获取选中的词条"""
-        selected = []
-        for i in range(self.vocab_list.count()):
-            item = self.vocab_list.item(i)
-            if item.checkState() == Qt.Checked:
-                selected.append(item.text())
-        return selected
-
-    def closeEvent(self, event):
-        """关闭窗口时自动保存"""
-        # 验证名称（非通用预设）
-        if not self.is_general:
-            name = self.name_input.text().strip()
-            if not name:
-                # 如果没有名称，询问是否放弃
-                reply = MessageBox("提示", "预设名称为空，是否放弃保存？", self)
-                if reply.exec():
-                    event.accept()
-                else:
-                    event.ignore()
-                return
-        else:
-            name = "通用预设"
-
-        if not self.is_general and not self._validate_required_groups():
-            event.ignore()
-            return
-
-        # 获取选中的词条
-        selected_affixes = self.get_selected_affixes()
-
-        if not selected_affixes:
-            # 如果没有选择词条，询问是否放弃
-            reply = MessageBox("提示", "未选择任何词条，是否放弃保存？", self)
-            if reply.exec():
-                event.accept()
-            else:
-                event.ignore()
-            return
-
-        # 发送保存信号
-        preset_id = self.preset_data.get("id", "") if self.preset_data else ""
-        self._emit_saved(preset_id, name, selected_affixes)
-        event.accept()

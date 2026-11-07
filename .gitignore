@@ -6,6 +6,10 @@ CLAUDE.md
 logs/
 *.json
 !data/affix_catalog.json
+!data/build_requirements.json
+!data/default_presets.json
+!data/official_relics.json
+!data/vessels.json
 *.backup
 nr.cmd
 
@@ -55,6 +59,12 @@ htmlcov/
 .DS_Store
 Thumbs.db
 data/presets.json
-data/presets.json
-
 data/relic_history.jsonl
+data/relic_inventory.sqlite3
+data/settings.json
+tests/_tmp*/
+
+# Local review/build artifacts
+dist_*/
+.pytest_tmp*/
+review_diff_ui.txt

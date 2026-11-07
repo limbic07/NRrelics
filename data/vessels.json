@@ -1,0 +1,594 @@
+[
+  {
+    "name_en": "Decrepit Duchess' Goblet",
+    "hero_en": "Duchess",
+    "normal_en": "Blue, Green, Green",
+    "deep_en": "Blue, Green, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "女爵的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Executor's Goblet",
+    "hero_en": "Executor",
+    "normal_en": "Red, Red, Yellow",
+    "deep_en": "Red, Red, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "执行者的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Guardian's Goblet",
+    "hero_en": "Guardian",
+    "normal_en": "Yellow, Green, Green",
+    "deep_en": "Yellow, Green, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "守护者的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Ironeye's Goblet",
+    "hero_en": "Ironeye",
+    "normal_en": "Blue, Blue, Green",
+    "deep_en": "Blue, Blue, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "铁之眼的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Raider's Goblet",
+    "hero_en": "Raider",
+    "normal_en": "Yellow, Yellow, Green",
+    "deep_en": "Yellow, Yellow, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "无赖的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Recluse's Goblet",
+    "hero_en": "Recluse",
+    "normal_en": "Red, Red, Blue",
+    "deep_en": "Red, Red, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "隐士的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Revenant's Goblet",
+    "hero_en": "Revenant",
+    "normal_en": "Red, Red, Yellow",
+    "deep_en": "Red, Red, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "复仇者的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Scholar's Goblet",
+    "hero_en": "Scholar",
+    "normal_en": "Blue, Blue, Green",
+    "deep_en": "Blue, Blue, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "学者的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Undertaker's Goblet",
+    "hero_en": "Undertaker",
+    "normal_en": "Red, Blue, Blue",
+    "deep_en": "Red, Blue, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "送葬者的残破高脚杯"
+  },
+  {
+    "name_en": "Decrepit Wylder's Goblet",
+    "hero_en": "Wylder",
+    "normal_en": "Blue, Green, Yellow",
+    "deep_en": "Blue, Green, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "追踪者的残破高脚杯"
+  },
+  {
+    "name_en": "Duchess' Chalice",
+    "hero_en": "Duchess",
+    "normal_en": "Blue, Yellow, White (any colour)",
+    "deep_en": "Red, Blue, Yellow",
+    "obtain_en": "Duchess's Remembrance, Chapter 6",
+    "name": "女爵的追忆高脚杯"
+  },
+  {
+    "name_en": "Duchess' Goblet",
+    "hero_en": "Duchess",
+    "normal_en": "Yellow, Yellow, Green",
+    "deep_en": "Yellow, Yellow, Green",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk",
+    "name": "女爵的商店高脚杯"
+  },
+  {
+    "name_en": "Duchess' Urn",
+    "hero_en": "Duchess",
+    "normal_en": "Red, Blue, Blue",
+    "deep_en": "Red, Blue, Blue",
+    "obtain_en": "Owned from the start",
+    "name": "女爵的初始器皿"
+  },
+  {
+    "name_en": "Executor's Chalice",
+    "hero_en": "Executor",
+    "normal_en": "Blue, Yellow, White (any colour)",
+    "deep_en": "Yellow, Yellow, Green",
+    "obtain_en": "Executor's Remembrance, Chapter 3",
+    "name": "执行者的追忆高脚杯"
+  },
+  {
+    "name_en": "Executor's Goblet",
+    "hero_en": "Executor",
+    "normal_en": "Red, Blue, Green",
+    "deep_en": "Red, Blue, Green",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk (after 1 Nightlord)",
+    "name": "执行者的商店高脚杯"
+  },
+  {
+    "name_en": "Executor's Urn",
+    "hero_en": "Executor",
+    "normal_en": "Red, Yellow, Yellow",
+    "deep_en": "Red, Yellow, Yellow",
+    "obtain_en": "Owned from the start",
+    "name": "执行者的初始器皿"
+  },
+  {
+    "name_en": "Forgotten Duchess' Goblet",
+    "hero_en": "Duchess",
+    "normal_en": "Green, Yellow, Yellow",
+    "deep_en": "Red, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "女爵的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Executor's Goblet",
+    "hero_en": "Executor",
+    "normal_en": "Green, Blue, Red",
+    "deep_en": "Yellow, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "执行者的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Guardian's Goblet",
+    "hero_en": "Guardian",
+    "normal_en": "Green, Blue, Blue",
+    "deep_en": "Red, Blue, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "守护者的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Ironeye's Goblet",
+    "hero_en": "Ironeye",
+    "normal_en": "Yellow, Blue, Red",
+    "deep_en": "Yellow, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "铁之眼的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Raider's Goblet",
+    "hero_en": "Raider",
+    "normal_en": "Yellow, Blue, Red",
+    "deep_en": "Red, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "无赖的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Recluse's Goblet",
+    "hero_en": "Recluse",
+    "normal_en": "Yellow, Blue, Red",
+    "deep_en": "Blue, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "隐士的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Revenant's Goblet",
+    "hero_en": "Revenant",
+    "normal_en": "Green, Red, Red",
+    "deep_en": "Yellow, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "复仇者的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Scholar's Goblet",
+    "hero_en": "Scholar",
+    "normal_en": "Yellow, Green, Blue",
+    "deep_en": "Red, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "学者的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Undertaker's Goblet",
+    "hero_en": "Undertaker",
+    "normal_en": "Yellow, Yellow, Red",
+    "deep_en": "Blue, Yellow, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "送葬者的遗忘高脚杯"
+  },
+  {
+    "name_en": "Forgotten Wylder's Goblet",
+    "hero_en": "Wylder",
+    "normal_en": "Green, Green, Yellow",
+    "deep_en": "Red, Green, White (any colour)",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "追踪者的遗忘高脚杯"
+  },
+  {
+    "name_en": "Giant's Cradle Grail",
+    "hero_en": "Any Nightfarer",
+    "normal_en": "Blue, Blue, Blue",
+    "deep_en": "Blue, Blue, Blue",
+    "obtain_en": "Small Jar Bazaar, 3,000 Murk",
+    "name": "巨人摇篮圣杯"
+  },
+  {
+    "name_en": "Guardian's Chalice",
+    "hero_en": "Guardian",
+    "normal_en": "Blue, Yellow, White (any colour)",
+    "deep_en": "Red, Blue, Yellow",
+    "obtain_en": "Guardian's Remembrance, Chapter 7",
+    "name": "守护者的追忆高脚杯"
+  },
+  {
+    "name_en": "Guardian's Goblet",
+    "hero_en": "Guardian",
+    "normal_en": "Blue, Blue, Green",
+    "deep_en": "Blue, Blue, Green",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk (after 1 Nightlord)",
+    "name": "守护者的商店高脚杯"
+  },
+  {
+    "name_en": "Guardian's Urn",
+    "hero_en": "Guardian",
+    "normal_en": "Red, Yellow, Yellow",
+    "deep_en": "Red, Yellow, Yellow",
+    "obtain_en": "Owned from the start",
+    "name": "守护者的初始器皿"
+  },
+  {
+    "name_en": "Ironeye's Chalice",
+    "hero_en": "Ironeye",
+    "normal_en": "Red, Green, White (any colour)",
+    "deep_en": "Red, Red, Green",
+    "obtain_en": "Ironeye's Remembrance, Chapter 5",
+    "name": "铁之眼的追忆高脚杯"
+  },
+  {
+    "name_en": "Ironeye's Goblet",
+    "hero_en": "Ironeye",
+    "normal_en": "Red, Blue, Yellow",
+    "deep_en": "Red, Blue, Yellow",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk (after 1 Nightlord)",
+    "name": "铁之眼的商店高脚杯"
+  },
+  {
+    "name_en": "Ironeye's Urn",
+    "hero_en": "Ironeye",
+    "normal_en": "Yellow, Green, Green",
+    "deep_en": "Yellow, Green, Green",
+    "obtain_en": "Owned from the start",
+    "name": "铁之眼的初始器皿"
+  },
+  {
+    "name_en": "Raider's Chalice",
+    "hero_en": "Raider",
+    "normal_en": "Red, Red, White (any colour)",
+    "deep_en": "Red, Yellow, Yellow",
+    "obtain_en": "Raider's Remembrance, Chapter 5",
+    "name": "无赖的追忆高脚杯"
+  },
+  {
+    "name_en": "Raider's Goblet",
+    "hero_en": "Raider",
+    "normal_en": "Red, Blue, Yellow",
+    "deep_en": "Red, Blue, Yellow",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk (after 1 Nightlord)",
+    "name": "无赖的商店高脚杯"
+  },
+  {
+    "name_en": "Raider's Urn",
+    "hero_en": "Raider",
+    "normal_en": "Red, Green, Green",
+    "deep_en": "Red, Green, Green",
+    "obtain_en": "Owned from the start",
+    "name": "无赖的初始器皿"
+  },
+  {
+    "name_en": "Recluse's Chalice",
+    "hero_en": "Recluse",
+    "normal_en": "Yellow, Green, White (any colour)",
+    "deep_en": "Blue, Green, Green",
+    "obtain_en": "Recluse's Remembrance, Chapter 3",
+    "name": "隐士的追忆高脚杯"
+  },
+  {
+    "name_en": "Recluse's Goblet",
+    "hero_en": "Recluse",
+    "normal_en": "Red, Blue, Yellow",
+    "deep_en": "Red, Blue, Yellow",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk (after 1 Nightlord)",
+    "name": "隐士的商店高脚杯"
+  },
+  {
+    "name_en": "Recluse's Urn",
+    "hero_en": "Recluse",
+    "normal_en": "Blue, Blue, Green",
+    "deep_en": "Blue, Blue, Green",
+    "obtain_en": "Owned from the start",
+    "name": "隐士的初始器皿"
+  },
+  {
+    "name_en": "Revenant's Chalice",
+    "hero_en": "Revenant",
+    "normal_en": "Blue, Green, White (any colour)",
+    "deep_en": "Blue, Yellow, Green",
+    "obtain_en": "Revenant's Remembrance, Chapter 6",
+    "name": "复仇者的追忆高脚杯"
+  },
+  {
+    "name_en": "Revenant's Goblet",
+    "hero_en": "Revenant",
+    "normal_en": "Red, Red, Green",
+    "deep_en": "Red, Red, Green",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk",
+    "name": "复仇者的商店高脚杯"
+  },
+  {
+    "name_en": "Revenant's Urn",
+    "hero_en": "Revenant",
+    "normal_en": "Blue, Blue, Yellow",
+    "deep_en": "Blue, Blue, Yellow",
+    "obtain_en": "Owned from the start",
+    "name": "复仇者的初始器皿"
+  },
+  {
+    "name_en": "Sacred Erdtree Grail",
+    "hero_en": "Any Nightfarer",
+    "normal_en": "Yellow, Yellow, Yellow",
+    "deep_en": "Yellow, Yellow, Yellow",
+    "obtain_en": "Small Jar Bazaar, 3,000 Murk (after Heolstor the Nightlord)",
+    "name": "神圣黄金树圣杯"
+  },
+  {
+    "name_en": "Scadutree Grail",
+    "hero_en": "Any Nightfarer",
+    "normal_en": "Red, Red, Red",
+    "deep_en": "Red, Red, Red",
+    "obtain_en": "Small Jar Bazaar, 3,000 Murk (after Straghess)",
+    "name": "幽影树圣杯"
+  },
+  {
+    "name_en": "Scholar's Chalice",
+    "hero_en": "Scholar",
+    "normal_en": "Red, Blue, White (any colour)",
+    "deep_en": "Red, Yellow, Yellow",
+    "obtain_en": "Scholar's Remembrance, Chapter 4",
+    "name": "学者的追忆高脚杯"
+  },
+  {
+    "name_en": "Scholar's Goblet",
+    "hero_en": "Scholar",
+    "normal_en": "Blue, Green, Yellow",
+    "deep_en": "Blue, Green, Yellow",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk",
+    "name": "学者的商店高脚杯"
+  },
+  {
+    "name_en": "Scholar's Urn",
+    "hero_en": "Scholar",
+    "normal_en": "Red, Red, Yellow",
+    "deep_en": "Red, Red, Yellow",
+    "obtain_en": "Owned from the start",
+    "name": "学者的初始器皿"
+  },
+  {
+    "name_en": "Sealed Duchess' Urn",
+    "hero_en": "Duchess",
+    "normal_en": "Blue, Blue, Red",
+    "deep_en": "Green, Green, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Duchess)",
+    "name": "女爵的封印器皿"
+  },
+  {
+    "name_en": "Sealed Executor's Urn",
+    "hero_en": "Executor",
+    "normal_en": "Yellow, Yellow, Red",
+    "deep_en": "Green, Green, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "执行者的封印器皿"
+  },
+  {
+    "name_en": "Sealed Guardian's Urn",
+    "hero_en": "Guardian",
+    "normal_en": "Yellow, Yellow, Red",
+    "deep_en": "Green, Green, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "守护者的封印器皿"
+  },
+  {
+    "name_en": "Sealed Ironeye's Urn",
+    "hero_en": "Ironeye",
+    "normal_en": "Green, Green, Yellow",
+    "deep_en": "Blue, Blue, Red",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "铁之眼的封印器皿"
+  },
+  {
+    "name_en": "Sealed Raider's Urn",
+    "hero_en": "Raider",
+    "normal_en": "Green, Green, Red",
+    "deep_en": "Yellow, Blue, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "无赖的封印器皿"
+  },
+  {
+    "name_en": "Sealed Recluse's Urn",
+    "hero_en": "Recluse",
+    "normal_en": "Green, Blue, Blue",
+    "deep_en": "Yellow, Yellow, Red",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "隐士的封印器皿"
+  },
+  {
+    "name_en": "Sealed Revenant's Urn",
+    "hero_en": "Revenant",
+    "normal_en": "Yellow, Blue, Blue",
+    "deep_en": "Green, Green, Red",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Revenant)",
+    "name": "复仇者的封印器皿"
+  },
+  {
+    "name_en": "Sealed Scholar's Urn",
+    "hero_en": "Scholar",
+    "normal_en": "Yellow, Red, Red",
+    "deep_en": "Green, Blue, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Scholar)",
+    "name": "学者的封印器皿"
+  },
+  {
+    "name_en": "Sealed Undertaker's Urn",
+    "hero_en": "Undertaker",
+    "normal_en": "Green, Green, Blue",
+    "deep_en": "Yellow, Red, Red",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Undertaker)",
+    "name": "送葬者的封印器皿"
+  },
+  {
+    "name_en": "Sealed Wylder's Urn",
+    "hero_en": "Wylder",
+    "normal_en": "Blue, Red, Red",
+    "deep_en": "Green, Yellow, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "追踪者的封印器皿"
+  },
+  {
+    "name_en": "Soot-Covered Duchess' Urn",
+    "hero_en": "Duchess",
+    "normal_en": "Red, Red, Green",
+    "deep_en": "Red, Red, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Duchess)",
+    "name": "女爵的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Executor's Urn",
+    "hero_en": "Executor",
+    "normal_en": "Red, Red, Blue",
+    "deep_en": "Red, Red, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "执行者的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Guardian's Urn",
+    "hero_en": "Guardian",
+    "normal_en": "Red, Green, Green",
+    "deep_en": "Red, Green, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "守护者的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Ironeye's Urn",
+    "hero_en": "Ironeye",
+    "normal_en": "Blue, Yellow, Yellow",
+    "deep_en": "Blue, Yellow, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "铁之眼的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Raider's Urn",
+    "hero_en": "Raider",
+    "normal_en": "Blue, Blue, Green",
+    "deep_en": "Blue, Blue, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "无赖的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Recluse's Urn",
+    "hero_en": "Recluse",
+    "normal_en": "Red, Red, Yellow",
+    "deep_en": "Red, Red, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "隐士的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Revenant's Urn",
+    "hero_en": "Revenant",
+    "normal_en": "Red, Yellow, Yellow",
+    "deep_en": "Red, Yellow, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Revenant)",
+    "name": "复仇者的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Scholar's Urn",
+    "hero_en": "Scholar",
+    "normal_en": "Blue, Green, Green",
+    "deep_en": "Blue, Green, Green",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Scholar)",
+    "name": "学者的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Undertaker's Urn",
+    "hero_en": "Undertaker",
+    "normal_en": "Red, Red, Blue",
+    "deep_en": "Red, Red, Blue",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils (after unlocking the Undertaker)",
+    "name": "送葬者的熏黑器皿"
+  },
+  {
+    "name_en": "Soot-Covered Wylder's Urn",
+    "hero_en": "Wylder",
+    "normal_en": "Blue, Blue, Yellow",
+    "deep_en": "Blue, Blue, Yellow",
+    "obtain_en": "Collector Signboard, 4 Sovereign Sigils",
+    "name": "追踪者的熏黑器皿"
+  },
+  {
+    "name_en": "Spirit Shelter Grail",
+    "hero_en": "Any Nightfarer",
+    "normal_en": "Green, Green, Green",
+    "deep_en": "Green, Green, Green",
+    "obtain_en": "Small Jar Bazaar, 3,000 Murk (after 4 Nightlords)",
+    "name": "灵体庇护圣杯"
+  },
+  {
+    "name_en": "Undertaker's Chalice",
+    "hero_en": "Undertaker",
+    "normal_en": "Green, Yellow, White (any colour)",
+    "deep_en": "Blue, Green, Yellow",
+    "obtain_en": "Undertaker's Remembrance, Chapter 6",
+    "name": "送葬者的追忆高脚杯"
+  },
+  {
+    "name_en": "Undertaker's Goblet",
+    "hero_en": "Undertaker",
+    "normal_en": "Red, Yellow, Yellow",
+    "deep_en": "Red, Yellow, Yellow",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk",
+    "name": "送葬者的商店高脚杯"
+  },
+  {
+    "name_en": "Undertaker's Urn",
+    "hero_en": "Undertaker",
+    "normal_en": "Blue, Green, Green",
+    "deep_en": "Blue, Green, Green",
+    "obtain_en": "Owned from the start",
+    "name": "送葬者的初始器皿"
+  },
+  {
+    "name_en": "Wylder's Chalice",
+    "hero_en": "Wylder",
+    "normal_en": "Red, Yellow, White (any colour)",
+    "deep_en": "Red, Blue, Green",
+    "obtain_en": "Wylder's Remembrance, Chapter 6",
+    "name": "追踪者的追忆高脚杯"
+  },
+  {
+    "name_en": "Wylder's Goblet",
+    "hero_en": "Wylder",
+    "normal_en": "Yellow, Green, Green",
+    "deep_en": "Yellow, Green, Green",
+    "obtain_en": "Small Jar Bazaar, 1,200 Murk (after 1 Nightlord)",
+    "name": "追踪者的商店高脚杯"
+  },
+  {
+    "name_en": "Wylder's Urn",
+    "hero_en": "Wylder",
+    "normal_en": "Red, Red, Blue",
+    "deep_en": "Red, Red, Blue",
+    "obtain_en": "Owned from the start",
+    "name": "追踪者的初始器皿"
+  }
+]

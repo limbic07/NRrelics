@@ -219,6 +219,7 @@ class RepoNavigationTests(unittest.TestCase):
         repository.extract_line_rois.return_value = lines
         detector = Mock()
         detector.detect_state.return_value = RELIC_STATE_LIGHT
+        detector._has_official_marker.return_value = False
         engine = Mock()
         engine.recognize_with_classification_from_lines.return_value = {
             "success": True, "positive_count": 0, "negative_count": 0, "affixes": []}
@@ -294,6 +295,7 @@ class RepoNavigationTests(unittest.TestCase):
         cleaner.repository_filter = repository
         cleaner.relic_detector = Mock()
         cleaner.relic_detector.detect_state.return_value = RELIC_STATE_LIGHT
+        cleaner.relic_detector._has_official_marker.return_value = False
         cleaner.relic_detector.detect_cursor.return_value = ((1035, 207, 99, 98), 99)
         cleaner.ocr_engine = Mock()
         cleaner.ocr_engine.recognize_with_classification_from_lines.return_value = {
@@ -311,6 +313,8 @@ class RepoNavigationTests(unittest.TestCase):
              patch("core.repo_cleaner.log_match"), \
              patch("core.repo_cleaner.pydirectinput.press") as press, \
              patch.object(cleaner, "_find_game_window", return_value=object()), \
+             patch.object(cleaner, "_record_match"), \
+             patch.object(cleaner, "_publish_result"), \
              patch.object(cleaner, "_match_affixes", side_effect=[bad, good]):
             cleaner.start_cleaning("normal", "sell", 2, False, True)
         self.assertEqual(repository._capture_game_window.call_count, 3)
@@ -332,6 +336,7 @@ class RepoNavigationTests(unittest.TestCase):
         cleaner.repository_filter = repository
         cleaner.relic_detector = Mock()
         cleaner.relic_detector.detect_state.return_value = RELIC_STATE_LIGHT
+        cleaner.relic_detector._has_official_marker.return_value = False
         cleaner.relic_detector.detect_cursor.return_value = ((925, 207, 99, 98), 99)
         cleaner.ocr_engine = Mock()
         cleaner.ocr_engine.recognize_with_classification_from_lines.return_value = {

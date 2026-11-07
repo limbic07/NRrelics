@@ -67,6 +67,14 @@ class MainWindow(FluentWindow):
             NavigationItemPosition.TOP
         )
 
+        from .pages.page_relics import RelicPage
+        self.relic_page = RelicPage(self.preset_manager, 'inventory')
+        self.addSubInterface(self.relic_page, FluentIcon.TILES, "遗物管理",
+                             NavigationItemPosition.TOP)
+        self.loadout_page = RelicPage(self.preset_manager, 'optimizer')
+        self.addSubInterface(self.loadout_page, FluentIcon.TILES, "配装优化",
+                             NavigationItemPosition.TOP)
+
         # 存档管理
         self.save_page = SavePage()
         self.addSubInterface(
@@ -100,10 +108,22 @@ class MainWindow(FluentWindow):
 
         # 连接设置变更信号 → 商店页面更新设置
         self.settings_page.settings_changed.connect(self.shop_page.update_settings)
+        self.settings_page.settings_changed.connect(
+            lambda settings: self.repo_page._refresh_presets())
 
         # 连接预设变更信号：当任一页面修改预设时，通知另一页面刷新
         self.shop_page.presets_modified.connect(self._on_presets_changed)
         self.repo_page.presets_modified.connect(self._on_presets_changed)
+        self.shop_page.preset_updated.connect(
+            lambda mode, pid: self._on_one_preset_updated(self.repo_page, mode, pid))
+        self.repo_page.preset_updated.connect(
+            lambda mode, pid: self._on_one_preset_updated(self.shop_page, mode, pid))
+        self.shop_page.preset_list_changed.connect(
+            lambda mode, pid, action: self._on_preset_list_changed(
+                self.repo_page, mode, pid, action))
+        self.repo_page.preset_list_changed.connect(
+            lambda mode, pid, action: self._on_preset_list_changed(
+                self.shop_page, mode, pid, action))
 
         # 旧配置可能仍指向失效的 C 盘默认目录；将实际检测到的路径同步给所有页面。
         configured_path = self.settings_page.get_settings().get("steam_path", "")
@@ -120,6 +140,23 @@ class MainWindow(FluentWindow):
             self.shop_page.refresh_presets_ui()
         if hasattr(self.repo_page, 'refresh_presets_ui'):
             self.repo_page.refresh_presets_ui()
+
+    def _on_one_preset_updated(self, page, mode, preset_id):
+        from ui.pages.page_repo import refresh_one_preset_card
+        from core.relic_scoring import normalize_scoring
+        settings = (page.settings if page is self.shop_page else page._load_settings())
+        refresh_one_preset_card(page, mode, preset_id,
+                                normalize_scoring(settings.get('scoring'))['enabled'])
+
+    def _on_preset_list_changed(self, page, mode, preset_id, action):
+        from ui.pages.page_repo import add_one_preset_card, remove_one_preset_card
+        from core.relic_scoring import normalize_scoring
+        if action == 'create':
+            settings = page.settings if page is self.shop_page else page._load_settings()
+            add_one_preset_card(page, mode, preset_id,
+                                normalize_scoring(settings.get('scoring'))['enabled'])
+        elif action == 'delete':
+            remove_one_preset_card(page, mode, preset_id)
 
     def init_ocr_dependencies(self, engine):
         """初始化 OCR 依赖（异步加载完成后调用）"""

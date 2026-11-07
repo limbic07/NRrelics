@@ -7,13 +7,71 @@ import sys
 import json
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Signal, QObject, QThread
-from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (QApplication, QAbstractItemView, QAbstractScrollArea,
+                               QAbstractSpinBox, QComboBox, QTableWidget)
+from PySide6.QtCore import Signal, QObject, QThread, QEvent, Qt
+from PySide6.QtGui import QFont, QWheelEvent
+from qfluentwidgets import ComboBox as FluentComboBox
 from ui import MainWindow
 from ui.dialogs.welcome_dialog import WelcomeDialog
 from core.utils import get_user_data_path
 
+
+
+class NoWheelSelectionEdit(QObject):
+    """Keep the wheel for page scrolling, never for changing compact controls."""
+
+    def eventFilter(self, watched, event):
+        if event.type() != QEvent.Wheel:
+            return False
+        widget = watched
+        while widget is not None:
+            if isinstance(widget, (QAbstractSpinBox, QComboBox, FluentComboBox)):
+                parent = widget.parentWidget()
+                while parent is not None and not isinstance(parent, QAbstractScrollArea):
+                    parent = parent.parentWidget()
+                if parent is not None:
+                    viewport = parent.viewport()
+                    forwarded = QWheelEvent(
+                        viewport.mapFromGlobal(event.globalPosition().toPoint()),
+                        event.globalPosition(), event.pixelDelta(), event.angleDelta(),
+                        event.buttons(), event.modifiers(), event.phase(), event.inverted(),
+                        event.source())
+                    QApplication.sendEvent(viewport, forwarded)
+                return True
+            widget = widget.parentWidget() if hasattr(widget, 'parentWidget') else None
+        return False
+
+
+class RightClickChecks(QObject):
+    """Toggle a checkable list row by right-clicking anywhere on that row."""
+
+    def eventFilter(self, watched, event):
+        if event.type() not in (QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.ContextMenu):
+            return False
+        view = watched.parentWidget() if hasattr(watched, 'parentWidget') else None
+        if not isinstance(view, QAbstractItemView) or watched is not view.viewport():
+            return False
+        if event.type() == QEvent.ContextMenu:
+            return True
+        if event.button() != Qt.RightButton:
+            return False
+        if event.type() == QEvent.MouseButtonPress:
+            return True
+        index = view.indexAt(event.position().toPoint())
+        if not index.isValid():
+            return False
+        if isinstance(view, QTableWidget):
+            index = index.siblingAtColumn(0)
+        flags = view.model().flags(index)
+        if not (flags & Qt.ItemIsEnabled and flags & Qt.ItemIsUserCheckable):
+            return False
+        old = index.data(Qt.CheckStateRole)
+        old_value = old.value if isinstance(old, Qt.CheckState) else old
+        new_value = (Qt.Unchecked if old_value == Qt.Checked.value else Qt.Checked).value
+        view.model().setData(index, new_value,
+                             Qt.CheckStateRole)
+        return True
 
 
 class OCRWorker(QObject):
@@ -41,6 +99,10 @@ class Application:
     def __init__(self):
         self.config = self._load_config()
         self.app = QApplication(sys.argv)
+        self.no_wheel_selection_edit = NoWheelSelectionEdit(self.app)
+        self.app.installEventFilter(self.no_wheel_selection_edit)
+        self.right_click_checks = RightClickChecks(self.app)
+        self.app.installEventFilter(self.right_click_checks)
 
         # 设置默认字体，避免Qt尝试加载不存在的MS Sans Serif
         default_font = QFont("Segoe UI", 9)
@@ -156,6 +218,20 @@ class Application:
 
 def main():
     """主函数"""
+    if len(sys.argv) == 3 and sys.argv[1] == '--diagnose-color':
+        import cv2
+        from core.relic_color import recognize_color, _model
+        report = Path(get_user_data_path('data/color_diagnostic.txt'))
+        try:
+            image = cv2.imread(sys.argv[2])
+            result = recognize_color(image)
+            report.write_text(f'image={None if image is None else image.shape}\n'
+                              f'color={result}\nmodel={type(_model()).__name__}\n',
+                              encoding='utf-8')
+        except Exception as exc:
+            import traceback
+            report.write_text(traceback.format_exc(), encoding='utf-8')
+        return
     app = Application()
     sys.exit(app.run())
 
