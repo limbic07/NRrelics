@@ -12,6 +12,10 @@ import pygetwindow as gw
 from typing import Dict, List, Optional
 
 from core.relic_matcher import match_relic, log_match
+from core.relic_scoring import normalize_scoring
+from core.relic_color import recognize_color
+from core.relic_inventory import RelicInventory
+from uuid import uuid4
 from core.repo_navigation import RepositoryNavigation
 from core.relic_recorder import RelicRecorder
 from core.ocr_diagnostics import create_capture_session  # OCR 自动采集调试代码
@@ -55,6 +59,8 @@ class RepoCleaner:
         self.repository_filter = RepositoryFilter(ocr_engine, settings)
 
         self.recorder = RelicRecorder()
+        self.inventory = RelicInventory()
+        self.results = []
         self.ocr_debug_session = None  # OCR 自动采集调试代码
         self.stop_reason = None
 
@@ -84,7 +90,7 @@ class RepoCleaner:
 
     def start_cleaning(self, mode: str, cleaning_mode: str, max_relics: int,
                       allow_operate_favorited: bool, require_double: bool,
-                      log_callback=None):
+                      log_callback=None, result_callback=None):
         """
         开始清理
 
@@ -98,6 +104,8 @@ class RepoCleaner:
         """
         self.stop_reason = None
         self.matched_relics = []
+        self.results = []
+        scan_id = uuid4().hex
         self.repository_filter.settings = self.settings
         self.is_running = True
         self.is_paused = False
@@ -159,16 +167,21 @@ class RepoCleaner:
             if not self.is_running:
                 return
             navigation_total = None
+            starting_relic_count = None
             if max_relics == 0:
                 log("正在自动检测遗物数量...", "INFO")
                 detected_count = self.repository_filter.detect_relic_count()
                 if detected_count > 0:
                     max_relics = detected_count
                     navigation_total = detected_count
+                    starting_relic_count = detected_count
                     log(f"检测到遗物数量: {max_relics}", "SUCCESS")
                 else:
                     log("自动检测失败，使用默认值 100", "WARNING")
                     max_relics = 100
+            elif cleaning_mode == 'sell':
+                count = self.repository_filter.detect_relic_count()
+                starting_relic_count = count if isinstance(count, int) and count > 0 else None
 
             # 3. 获取预设
             if not self.is_running:
@@ -258,11 +271,16 @@ class RepoCleaner:
                 has_next = max_relics <= 0 or self.stats["total_detected"] < max_relics
 
                 # 跳过决策
-                should_skip = self._should_skip_relic(relic_state, cleaning_mode, allow_operate_favorited)
+                official_marker = self.relic_detector._has_official_marker(image)
+                should_skip = official_marker or self._should_skip_relic(
+                    relic_state, cleaning_mode, allow_operate_favorited)
 
                 if should_skip:
                     log("跳过该遗物", "INFO")
                     self.stats["skipped"] += 1
+                    self._publish_result(scan_id, mode, image, None, None, '跳过',
+                                         '特殊遗物' if official_marker else '遗物状态不可操作',
+                                         log, result_callback)
                     if has_next:
                         pydirectinput.press('right')
                         navigation.expect_next(image, "right")
@@ -284,6 +302,8 @@ class RepoCleaner:
                 log(f"识别词条完成 (截取ROI:{t_roi:.3f}s OCR:{t_ocr:.3f}s)", "INFO")
 
                 if not ocr_result["success"]:
+                    self._publish_result(scan_id, mode, image, ocr_result, None, '跳过',
+                                         'OCR识别失败', log, result_callback)
                     # ===== OCR 自动采集调试代码：失败样本也保留 =====
                     if self.ocr_debug_session:
                         self.ocr_debug_session.record(
@@ -317,7 +337,7 @@ class RepoCleaner:
                     general_preset,
                     dedicated_presets,
                     blacklist_preset,
-                    require_double
+                    require_double, mode
                 )
                 t_match = time.time() - t_start
 
@@ -341,9 +361,28 @@ class RepoCleaner:
                     self.stats["unqualified"] += 1
 
                 if not self.is_running:
+                    self._publish_result(scan_id, mode, image, ocr_result, match_result,
+                                         '跳过', '清理已停止，未执行操作', log, result_callback)
                     break
+                if cleaning_mode == 'scan':
+                    # 只读取仓库，不触碰收藏和售出状态。识别可信的遗物均是已拥有库存。
+                    confirmed = match_result.destructive_action_allowed
+                    if not confirmed:
+                        self.stats['skipped'] += 1
+                    self._publish_result(
+                        scan_id, mode, image, ocr_result, match_result,
+                        '保留未动' if confirmed else '跳过',
+                        '' if confirmed else 'OCR或预设无法确认',
+                        log, result_callback, action_confirmed=confirmed,
+                        inventory_scan=True)
+                    if has_next:
+                        pydirectinput.press('right')
+                        navigation.expect_next(image, 'right')
+                    continue
                 if not match_result.destructive_action_allowed:
                     self.stats["skipped"] += 1
+                    self._publish_result(scan_id, mode, image, ocr_result, match_result,
+                                         '跳过', 'OCR或预设无法确认', log, result_callback)
                     if has_next:
                         pydirectinput.press('right')
                         navigation.expect_next(image, "right")
@@ -355,6 +394,27 @@ class RepoCleaner:
                 favorited_before = self.stats["favorited"]
                 need_move_right = self._execute_action(relic_state, match_result.qualified, cleaning_mode, log)
                 t_action = time.time() - t_start
+                if cleaning_mode == 'sell':
+                    action = '待售出' if self.pending_sell_count > pending_before else '保留未动'
+                elif self.stats['favorited'] > favorited_before:
+                    action = '已收藏'
+                elif match_result.qualified:
+                    action = '保留未动'
+                else:
+                    action = '已取消收藏' if relic_state == RELIC_STATE_DARK_F else '保留未动'
+                action_confirmed = action == '保留未动'
+                if action == '已收藏':
+                    verify_image = self.repository_filter._capture_game_window()
+                    if verify_image is not None:
+                        verified_state = self.relic_detector.detect_state(
+                            verify_image, 1.0, self.repository_filter.scale_x,
+                            self.repository_filter.scale_y, cursor_box=cursor_box)
+                        action_confirmed = verified_state in (RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE)
+                    if not action_confirmed:
+                        action = '待核实'
+                self._publish_result(scan_id, mode, image, ocr_result, match_result,
+                                     action, '' if action_confirmed else '游戏操作尚未确认',
+                                     log, result_callback, action_confirmed)
 
                 # 根据清理模式和操作结果，记录遗物
                 # 注意：售出模式下，只有在最后确认售出后才会记录，这里不记录
@@ -394,12 +454,12 @@ class RepoCleaner:
             # 清理完成
             if self.stop_reason == "completed":
                 # 正常完成
-                log("清理完成", "SUCCESS")
-                self._print_stats(log)
+                log("仓库检索完成" if cleaning_mode == 'scan' else "清理完成", "SUCCESS")
+                self._print_stats(log, cleaning_mode)
             else:
                 # 手动停止
-                log("清理已停止", "INFO")
-                self._print_stats(log)
+                log("仓库检索已停止" if cleaning_mode == 'scan' else "清理已停止", "INFO")
+                self._print_stats(log, cleaning_mode)
 
             # 自动完成售出操作（仅在正常停止时执行）
             if self.stop_reason == "completed" and self.is_running and cleaning_mode == "sell" and self.pending_sell_count > 0:
@@ -410,10 +470,27 @@ class RepoCleaner:
                     return
                 pydirectinput.press('f')  # 确认售出
                 time.sleep(0.5)
-                log("售出完成", "SUCCESS")
+                remaining = self.repository_filter.detect_relic_count()
+                sale_confirmed = (starting_relic_count is not None and isinstance(remaining, int) and remaining > 0
+                                  and remaining == starting_relic_count - self.pending_sell_count)
+                log('售出数量已核实' if sale_confirmed else '售出确认按键已执行，数量未核实；仍记为待售出',
+                    'SUCCESS' if sale_confirmed else 'WARNING')
+
+                if sale_confirmed:
+                    for result in self.results:
+                        if result['action'] != '待售出':
+                            continue
+                        result['action'] = '已售出'
+                        result['action_confirmed'] = True
+                        try:
+                            self.inventory.update_action(scan_id, result['index'], '已售出', confirmed=True)
+                        except Exception as exc:
+                            log(f'更新售出记录失败：{exc}', 'WARNING')
+                        if result_callback:
+                            result_callback(result.copy())
 
                 # 确认售出后，将待售出的遗物转移到已售出列表
-                if hasattr(self, 'pending_sell_relics') and self.pending_sell_relics:
+                if sale_confirmed and hasattr(self, 'pending_sell_relics') and self.pending_sell_relics:
                     self.qualified_relics.extend(self.pending_sell_relics)
                     log(f"已记录 {len(self.pending_sell_relics)} 个售出遗物到仪表盘", "INFO")
                     self.pending_sell_relics = []
@@ -488,6 +565,8 @@ class RepoCleaner:
         if relic_state not in (RELIC_STATE_LIGHT, RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE,
                                RELIC_STATE_DARK_E, RELIC_STATE_DARK_O):
             return True
+        if cleaning_mode == 'scan':
+            return relic_state == RELIC_STATE_DARK_O
         if cleaning_mode == "sell":
             if relic_state == RELIC_STATE_LIGHT:
                 return False  # 自由状态，可售出
@@ -528,9 +607,61 @@ class RepoCleaner:
             log(f"匹配记录写入失败，仍保留遗物: {exc}", "WARNING")
 
     def _match_affixes(self, ocr_result, general_preset, dedicated_presets,
-                      blacklist_preset, require_double):
+                      blacklist_preset, require_double, mode="normal"):
         return match_relic(ocr_result, general_preset, dedicated_presets, blacklist_preset,
-                           threshold=2 if require_double else 3, general_fallback="no_active")
+                           threshold=2 if require_double else 3, general_fallback="no_active",
+                           scoring_config=self.settings.get("scoring"), mode=mode)
+
+    def _publish_result(self, scan_id, mode, image, observation, match, action,
+                        reason, log, callback, action_confirmed=False,
+                        inventory_scan=False):
+        """Persist and send one result after the current action is known."""
+        scoring_enabled = normalize_scoring(self.settings.get('scoring'))['enabled']
+        candidate = (match.best_match or match.candidate_match) if match else None
+        affixes = (observation or {}).get('affixes') or []
+        if not observation or not match or not match.destructive_action_allowed:
+            decision = '无法确认'
+        elif match.qualified:
+            decision = ('备选' if scoring_enabled and candidate.score_grade == 'backup'
+                        else '保留')
+        else:
+            decision = '淘汰'
+        points = dict(candidate.score_details) if candidate and scoring_enabled else {}
+        color, confidence = recognize_color(image) if observation else ('未知', 0.0)
+        result = {
+            'index': self.stats['total_detected'], 'mode': mode,
+            'color': color, 'color_confidence': confidence,
+            'affixes': affixes,
+            'affix_scores': [{'name': a.get('cleaned_text', ''),
+                              'points': points.get(a.get('cleaned_text'), 0) if scoring_enabled else None}
+                             for a in affixes],
+            'score': candidate.score if scoring_enabled and candidate else None,
+            'score_details': candidate.score_details if scoring_enabled and candidate else [],
+            'scoring_enabled': scoring_enabled,
+            'effective_count': candidate.effective_count if candidate else 0,
+            'preset_id': candidate.preset_id if candidate else None,
+            'preset_name': candidate.preset_name if candidate else None,
+            'decision': decision, 'action': action,
+            'inventory_scan': inventory_scan,
+            'action_confirmed': action_confirmed,
+            'owned_verified': action_confirmed and action in ('保留未动', '已收藏')
+                              and (inventory_scan or decision in ('保留', '备选')),
+            'reason': reason or ('；'.join(match.candidate_failure_reasons + match.uncertainty_reasons)
+                                 if match else reason),
+        }
+        self.results.append(result)
+        score_text = (str(result['score']) + ' 分' if scoring_enabled and candidate else
+                      ('无候选分数' if scoring_enabled else '未启用评分'))
+        log(f"#{result['index']}｜{color}｜{score_text}｜{decision}｜{action}"
+            + (f"｜{result['reason']}" if result['reason'] else ''), 'INFO')
+        if result['score_details']:
+            log('评分明细：' + '、'.join(f'{name} {value:+d}' for name, value in result['score_details']), 'INFO')
+        try:
+            self.inventory.record(scan_id, result['index'], result, self.settings)
+        except Exception as exc:
+            log(f'遗物数据库写入失败：{exc}', 'WARNING')
+        if callback:
+            callback(result.copy())
 
     def _execute_action(self, relic_state: str, is_qualified: bool, cleaning_mode: str, log) -> bool:
         """
@@ -584,10 +715,10 @@ class RepoCleaner:
 
         return True  # 默认需要按右方向键
 
-    def _print_stats(self, log):
+    def _print_stats(self, log, cleaning_mode='sell'):
         """打印统计信息"""
         log("=" * 50, "INFO")
-        log("清理统计", "INFO")
+        log("检索统计" if cleaning_mode == 'scan' else "清理统计", "INFO")
         log("=" * 50, "INFO")
         log(f"总检测数: {self.stats['total_detected']}", "INFO")
         log(f"合格: {self.stats['qualified']}", "SUCCESS")

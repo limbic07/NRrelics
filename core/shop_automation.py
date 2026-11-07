@@ -618,7 +618,7 @@ class ShopAutomation:
 
             match_result = self._match_affixes(
                 ocr_result, general_preset, dedicated_presets,
-                blacklist_preset, require_double
+                blacklist_preset, require_double, mode
             )
 
             # ===== OCR 自动采集调试代码：在任何售出/保留按键前写入完整证据和实际匹配结果 =====
@@ -685,9 +685,10 @@ class ShopAutomation:
             debug_timer.record("处理10个遗物总耗时", total_time)
 
     def _match_affixes(self, ocr_result, general_preset, dedicated_presets,
-                       blacklist_preset, require_double):
+                       blacklist_preset, require_double, mode="normal"):
         return match_relic(ocr_result, general_preset, dedicated_presets, blacklist_preset,
-                           threshold=2 if require_double else 3, general_fallback="always")
+                           threshold=2 if require_double else 3, general_fallback="always",
+                           scoring_config=self.settings.get("scoring"), mode=mode)
 
 
     def _execute_sl_operation(self, log) -> bool:

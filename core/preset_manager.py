@@ -6,8 +6,10 @@
 import json
 import os
 import uuid
+from pathlib import Path
 from typing import Dict, List, Optional
 from core.utils import get_resource_path, get_user_data_path, log_debug
+from core.relic_scoring import POSITIVE_TIERS, NEGATIVE_TIERS
 
 
 
@@ -31,6 +33,7 @@ class PresetManager:
         self.normal_dedicated = {}
         self.deepnight_whitelist_dedicated = {}
         self.deepnight_blacklist = None
+        self.default_catalog_version = 0
 
         # 词条库缓存
         self._vocab_cache = {}
@@ -55,6 +58,10 @@ class PresetManager:
             self.normal_dedicated = data.get("normal_dedicated", {})
             self.deepnight_whitelist_dedicated = data.get("deepnight_whitelist_dedicated", {})
             self.deepnight_blacklist = data.get("deepnight_blacklist")
+            self.default_catalog_version = int(data.get("default_catalog_version", 0))
+            if self.default_catalog_version < 3:
+                self._merge_bundled_defaults()
+                self.save_presets()
 
         except Exception as e:
             log_debug(f"[错误] 加载预设失败: {e}")
@@ -63,7 +70,8 @@ class PresetManager:
     def save_presets(self):
         """保存预设到文件"""
         data = {
-            "version": "1.0",
+            "version": "2.0",
+            "default_catalog_version": self.default_catalog_version,
             "normal_general": self.normal_general,
             "deepnight_general": self.deepnight_general,
             "normal_dedicated": self.normal_dedicated,
@@ -81,6 +89,19 @@ class PresetManager:
 
     def _initialize_default_presets(self):
         """初始化默认预设"""
+        try:
+            with open(get_resource_path('data/default_presets.json'), encoding='utf-8') as f:
+                bundled = json.load(f)
+            self.normal_general = bundled['normal_general']
+            self.deepnight_general = bundled['deepnight_general']
+            self.normal_dedicated = bundled['normal_dedicated']
+            self.deepnight_whitelist_dedicated = bundled['deepnight_whitelist_dedicated']
+            self.deepnight_blacklist = bundled['deepnight_blacklist']
+            self.default_catalog_version = 3
+            return
+        except (OSError, ValueError, KeyError) as exc:
+            log_debug(f"[警告] 内置默认预设不可用: {exc}")
+
         # 普通模式通用预设
         self.normal_general = {
             "id": "normal_general",
@@ -110,6 +131,75 @@ class PresetManager:
             "is_general": False,
             "is_active": True
         }
+
+    def restore_bundled_defaults(self):
+        """Atomically replace user presets with bundled defaults."""
+        with open(get_resource_path('data/default_presets.json'), encoding='utf-8') as source:
+            bundled = json.load(source)
+        fields = ('normal_general', 'deepnight_general', 'normal_dedicated',
+                  'deepnight_whitelist_dedicated', 'deepnight_blacklist')
+        for field in fields:
+            if field not in bundled:
+                raise ValueError(f'内置默认预设缺少 {field}')
+        target = Path(self.presets_file)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = {field: bundled[field] for field in fields}
+        payload.update(version='2.0', default_catalog_version=3)
+        temporary = target.with_name(target.name + '.restore.tmp')
+        try:
+            temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        for field in fields:
+            setattr(self, field, bundled[field])
+        self.default_catalog_version = 3
+        self._vocab_cache.clear()
+
+    def _merge_bundled_defaults(self):
+        """One-time migration: add missing builds and official scores without replacing edits."""
+        try:
+            with open(get_resource_path('data/default_presets.json'), encoding='utf-8') as f:
+                bundled = json.load(f)
+        except (OSError, ValueError) as exc:
+            log_debug(f"[警告] 无法迁移内置预设: {exc}")
+            return
+        self.normal_general = self.normal_general or bundled['normal_general']
+        self.deepnight_general = self.deepnight_general or bundled['deepnight_general']
+        self.deepnight_blacklist = self.deepnight_blacklist or bundled['deepnight_blacklist']
+        for mode, field in (('normal', 'normal_dedicated'),
+                            ('deepnight', 'deepnight_whitelist_dedicated')):
+            current = getattr(self, field)
+            for pid, preset in bundled[field].items():
+                if pid not in current:
+                    current[pid] = preset
+                elif mode == 'normal':
+                    if 'official_scores' not in current[pid]:
+                        current[pid]['official_scores'] = preset.get('official_scores', {}).copy()
+                    for affix in ('出击时，武器战技改为落雷',
+                                  '【追踪者】发动技艺时，轻攻击能使出缠绕火焰的追加攻击（仅限大剑）'):
+                        if affix in preset.get('affixes', []) and affix not in current[pid].get('affixes', []):
+                            current[pid].setdefault('affixes', []).append(affix)
+                            current[pid].setdefault('affix_tiers', {})[affix] = preset['affix_tiers'][affix]
+                if pid in {f'build_{build_id}_{mode}' for build_id in ('R01', 'R02', 'R07')}:
+                    affix = '血量偏低时，能提升减伤率'
+                    if affix not in current[pid].get('affixes', []):
+                        current[pid].setdefault('affixes', []).append(affix)
+                        current[pid].setdefault('affix_tiers', {})[affix] = 'secondary'
+        # 旧整合流派会把互斥的武器池或法祷分支一起计分。保留用户修改，
+        # 但默认停用旧预设，由拆分后的独立预设接替。
+        merged_ids = {
+            'C27', 'C28', 'C41', 'C42', 'C13', 'C14', 'D12', 'D14',
+            'R14', 'V09', 'V10', 'V14', 'H03', 'H07', 'E13', 'E15',
+            'S12', 'U10', 'W7', 'G3', 'D15', 'R15', 'H11', 'S13',
+        }
+        for build_id in merged_ids:
+            for field, suffix in (('normal_dedicated', 'normal'),
+                                  ('deepnight_whitelist_dedicated', 'deepnight')):
+                old = getattr(self, field).get(f'build_{build_id}_{suffix}')
+                if old:
+                    old['is_active'] = False
+        self.default_catalog_version = 3
 
     def load_vocabulary(self, preset_type: str, for_editing: bool = True) -> List[str]:
         """
@@ -179,12 +269,45 @@ class PresetManager:
             return self.deepnight_general
         return None
 
-    def update_general_preset(self, mode: str, affixes: List[str]):
+    @staticmethod
+    def _checked_tiers(affixes, tiers, inherited=()):
+        if tiers is None:
+            return None
+        allowed = set(affixes) | set(inherited)
+        if not isinstance(tiers, dict) or any(
+                name not in allowed or tier not in POSITIVE_TIERS
+                for name, tier in tiers.items()):
+            raise ValueError("词条等级配置无效")
+        return {**{name: tiers.get(name, "secondary") for name in affixes},
+                **{name: tier for name, tier in tiers.items() if name in inherited}}
+
+    @staticmethod
+    def _checked_negative_tiers(tiers):
+        if tiers is None:
+            return None
+        if not isinstance(tiers, dict) or any(
+                not isinstance(name, str) or tier not in POSITIVE_TIERS + NEGATIVE_TIERS
+                for name, tier in tiers.items()):
+            raise ValueError("负面词条等级配置无效")
+        return tiers.copy()
+
+    def update_general_preset(self, mode: str, affixes: List[str], affix_tiers=None,
+                              negative_tiers=None, official_scores=None):
         """更新通用预设的词条"""
+        grades = self._checked_tiers(affixes, affix_tiers)
         if mode == "normal":
-            self.normal_general["affixes"] = affixes
+            preset = self.normal_general
         elif mode == "deepnight":
-            self.deepnight_general["affixes"] = affixes
+            preset = self.deepnight_general
+        else:
+            raise ValueError("未知遗物模式")
+        preset["affixes"] = affixes
+        preset["affix_tiers"] = (grades if grades is not None else
+                                 {a: t for a, t in preset.get("affix_tiers", {}).items() if a in affixes})
+        if mode == "deepnight" and negative_tiers is not None:
+            preset["negative_tiers"] = self._checked_negative_tiers(negative_tiers)
+        if mode == 'normal' and official_scores is not None:
+            preset['official_scores'] = self._checked_official_scores(official_scores)
         self.save_presets()
 
     # ==================== 专用预设操作 ====================
@@ -204,7 +327,9 @@ class PresetManager:
 
     def create_dedicated_preset(self, mode: str, name: str, affixes: List[str],
                                 required_affixes=None, blacklist_exceptions=None,
-                                required_affix_groups=None) -> str:
+                                required_affix_groups=None, affix_tiers=None,
+                                negative_tiers=None, excluded_affixes=None,
+                                official_scores=None) -> str:
         """
         创建专用预设
 
@@ -213,8 +338,8 @@ class PresetManager:
         """
         # 检查数量限制
         presets = self.get_dedicated_presets(mode)
-        if len(presets) >= 20:
-            raise ValueError("专用预设数量已达上限（20个）")
+        if len(presets) >= 500:
+            raise ValueError("专用预设数量已达上限（500个）")
 
         grouped_supplied = required_affix_groups is not None
         if required_affix_groups is None:
@@ -227,6 +352,9 @@ class PresetManager:
         if not set(required_affixes) <= allowed_affixes:
             raise ValueError("必须词条必须属于有效词条")
         blacklist_exceptions = list(blacklist_exceptions or []) if mode == "deepnight" else []
+        excluded = list(dict.fromkeys(excluded_affixes or []))
+        if not set(excluded) <= self._active_general_affixes(mode) or set(excluded) & set(affixes):
+            raise ValueError("排除词条必须来自通用预设，且不能同时作为专属词条")
         # 创建预设
         preset_id = str(uuid.uuid4())
         preset_type = PRESET_TYPE_NORMAL_WHITELIST if mode == "normal" else PRESET_TYPE_DEEPNIGHT_WHITELIST
@@ -236,6 +364,10 @@ class PresetManager:
             "name": name,
             "type": preset_type,
             "affixes": list(affixes),
+            "affix_tiers": self._checked_tiers(affixes, affix_tiers,
+                                               self._active_general_affixes(mode)) or
+                           {a: "secondary" for a in affixes},
+            "excluded_affixes": excluded,
             "required_affixes": required_affixes,
             "blacklist_exceptions": blacklist_exceptions,
             "is_general": False,
@@ -243,8 +375,11 @@ class PresetManager:
         }
         if grouped_supplied:
             preset["required_affix_groups"] = required_affix_groups
+        if mode == "deepnight":
+            preset["negative_tiers"] = self._checked_negative_tiers(negative_tiers) or {}
 
         if mode == "normal":
+            preset["official_scores"] = self._checked_official_scores(official_scores)
             self.normal_dedicated[preset_id] = preset
         elif mode == "deepnight":
             self.deepnight_whitelist_dedicated[preset_id] = preset
@@ -254,7 +389,9 @@ class PresetManager:
 
     def update_dedicated_preset(self, mode: str, preset_id: str, name: str = None, affixes: List[str] = None,
                                 required_affixes=None, blacklist_exceptions=None,
-                                required_affix_groups=None):
+                                required_affix_groups=None, affix_tiers=None,
+                                negative_tiers=None, excluded_affixes=None,
+                                official_scores=None):
         """更新专用预设"""
         presets = self.get_dedicated_presets(mode)
 
@@ -284,14 +421,38 @@ class PresetManager:
         if name is not None:
             preset["name"] = name
         preset["affixes"] = useful
+        grades = self._checked_tiers(useful, affix_tiers, self._active_general_affixes(mode))
+        preset["affix_tiers"] = (grades if grades is not None else
+                                 {a: t for a, t in preset.get("affix_tiers", {}).items()
+                                  if a in set(useful) | self._active_general_affixes(mode)})
         preset["required_affixes"] = required
         if (required_affix_groups is not None or grouped_existing or
                 "required_affix_groups" in preset):
             preset["required_affix_groups"] = groups
         if blacklist_exceptions is not None:
             preset["blacklist_exceptions"] = list(blacklist_exceptions) if mode == "deepnight" else []
+        if negative_tiers is not None and mode == "deepnight":
+            preset["negative_tiers"] = self._checked_negative_tiers(negative_tiers)
+        if mode == 'normal' and official_scores is not None:
+            preset['official_scores'] = self._checked_official_scores(official_scores)
+        if excluded_affixes is not None:
+            excluded = list(dict.fromkeys(excluded_affixes))
+            if not set(excluded) <= self._active_general_affixes(mode) or set(excluded) & set(useful):
+                raise ValueError("排除词条必须来自通用预设，且不能同时作为专属词条")
+            preset["excluded_affixes"] = excluded
 
         self.save_presets()
+
+    @staticmethod
+    def _checked_official_scores(scores):
+        if scores is None:
+            return {}
+        if not isinstance(scores, dict) or any(
+                not str(key).isdigit() or isinstance(value, bool) or
+                not isinstance(value, int) or not -999 <= value <= 999
+                for key, value in scores.items()):
+            raise ValueError('官方遗物分数无效')
+        return {str(key): value for key, value in scores.items()}
 
     @staticmethod
     def _validate_required_groups(groups):

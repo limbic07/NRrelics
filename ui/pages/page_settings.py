@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QCheckBox, QGroupBox, QPushButton, QFileDialog,
-                               QScrollArea)
+                               QScrollArea, QSpinBox, QComboBox)
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont
 from qfluentwidgets import (CardWidget, SwitchButton, LineEdit,
@@ -11,7 +11,8 @@ import json
 import os
 import shutil
 from datetime import datetime
-from core.utils import get_user_data_path
+from core.utils import get_user_data_path, get_resource_path
+from core.relic_scoring import normalize_scoring
 
 
 
@@ -29,6 +30,7 @@ class SettingsPage(QWidget):
         # 设置文件路径
         self.settings_file = get_user_data_path("data/settings.json")
         self.settings = self._load_settings()
+        self.scoring_config = normalize_scoring(self.settings.get("scoring"))
 
         self._init_ui()
 
@@ -67,6 +69,8 @@ class SettingsPage(QWidget):
         # 商店筛选设置
         shop_group = self._create_shop_settings()
         layout.addWidget(shop_group)
+
+        layout.addWidget(self._create_scoring_settings())
 
         # 开发者设置默认显示
         self.developer_card = self._create_developer_settings()
@@ -132,6 +136,121 @@ class SettingsPage(QWidget):
         card_layout.addWidget(steam_desc)
 
         return card
+
+    def _create_scoring_settings(self) -> CardWidget:
+        card = CardWidget()
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+        title = QLabel("综合评分")
+        title.setStyleSheet("font-size: 16pt; font-weight: bold;")
+        layout.addWidget(title)
+
+        enabled_row = QHBoxLayout()
+        enabled_row.addWidget(QLabel("启用综合评分"))
+        self.scoring_switch = SwitchButton()
+        self.scoring_switch.setChecked(self.scoring_config["enabled"])
+        self.scoring_switch.checkedChanged.connect(self._auto_save_settings)
+        enabled_row.addWidget(self.scoring_switch)
+        enabled_row.addStretch()
+        layout.addLayout(enabled_row)
+        layout.addWidget(QLabel("与商店、仓库各自的双有效／三有效门槛同时生效；达到备选线的遗物也会保留。"))
+
+        self.score_inputs = {}
+        positive_labels = (("positive", "core", "重要"),
+                           ("positive", "secondary", "次要"),
+                           ("positive", "bonus", "锦上添花"))
+        negative_labels = (("negative", "unacceptable", "不可接受"),
+                           ("negative", "harmful", "很伤"),
+                           ("negative", "negligible", "几乎无负面"))
+        threshold_labels = ((None, "keep_min", "保留线"),
+                            (None, "backup_min", "备选线"))
+        for mode, display in (("normal", "普通遗物"), ("deepnight", "深夜遗物")):
+            layout.addWidget(QLabel(display))
+            labels = positive_labels + (negative_labels if mode == "deepnight" else ()) + threshold_labels
+            for sign, key, label in labels:
+                row = QHBoxLayout()
+                row.addWidget(QLabel(label))
+                field = QSpinBox()
+                field.setRange(-999, 999)
+                field.setValue(self.scoring_config[mode][sign][key] if sign
+                               else self.scoring_config[mode][key])
+                field.valueChanged.connect(self._auto_save_settings)
+                row.addWidget(field)
+                row.addStretch()
+                layout.addLayout(row)
+                self.score_inputs[(mode, sign, key)] = field
+
+        layout.addWidget(QLabel("深夜负面词条等级（选择词条后修改）"))
+        neg_row = QHBoxLayout()
+        self.negative_combo = QComboBox()
+        try:
+            with open(get_resource_path("data/deepnight_neg.txt"), encoding="utf-8") as handle:
+                for line in handle:
+                    name = line.strip()
+                    if name:
+                        self.negative_combo.addItem(name)
+        except OSError:
+            pass
+        self.negative_combo.currentIndexChanged.connect(self._show_negative_tier)
+        neg_row.addWidget(self.negative_combo)
+        self.negative_tier_combo = QComboBox()
+        for tier, label in (("unacceptable", "不可接受"),
+                            ("harmful", "很伤"), ("negligible", "几乎无负面")):
+            self.negative_tier_combo.addItem(label, tier)
+        self.negative_tier_combo.currentIndexChanged.connect(self._change_negative_tier)
+        neg_row.addWidget(self.negative_tier_combo)
+        layout.addLayout(neg_row)
+        self._show_negative_tier()
+
+        hard_row = QHBoxLayout()
+        hard_row.addWidget(QLabel("黑名单仍强制排除"))
+        self.hard_blacklist_switch = SwitchButton()
+        self.hard_blacklist_switch.setChecked(self.scoring_config["hard_blacklist"])
+        self.hard_blacklist_switch.checkedChanged.connect(self._auto_save_settings)
+        hard_row.addWidget(self.hard_blacklist_switch)
+        hard_row.addStretch()
+        layout.addLayout(hard_row)
+        layout.addWidget(QLabel("默认关闭：评分模式下黑名单词条按负面等级扣分；开启后仍按原黑名单强制排除。"))
+        return card
+
+    def _show_negative_tier(self, *_):
+        name = self.negative_combo.currentText()
+        tier = self.scoring_config["negative_tiers"].get(name, "negligible")
+        self.negative_tier_combo.blockSignals(True)
+        self.negative_tier_combo.setCurrentIndex(max(0, self.negative_tier_combo.findData(tier)))
+        self.negative_tier_combo.blockSignals(False)
+
+    def _change_negative_tier(self, *_):
+        name = self.negative_combo.currentText()
+        if name:
+            self.scoring_config["negative_tiers"][name] = self.negative_tier_combo.currentData()
+            self._auto_save_settings()
+
+    def _collect_scoring(self):
+        result = normalize_scoring(self.scoring_config)
+        result["enabled"] = self.scoring_switch.isChecked()
+        result["hard_blacklist"] = self.hard_blacklist_switch.isChecked()
+        for (mode, sign, key), field in self.score_inputs.items():
+            if sign:
+                result[mode][sign][key] = field.value()
+            else:
+                result[mode][key] = field.value()
+        return normalize_scoring(result)
+
+    def _set_scoring_ui(self, value):
+        self.scoring_config = normalize_scoring(value)
+        self.scoring_switch.blockSignals(True)
+        self.scoring_switch.setChecked(self.scoring_config["enabled"])
+        self.scoring_switch.blockSignals(False)
+        self.hard_blacklist_switch.blockSignals(True)
+        self.hard_blacklist_switch.setChecked(self.scoring_config["hard_blacklist"])
+        self.hard_blacklist_switch.blockSignals(False)
+        for (mode, sign, key), field in self.score_inputs.items():
+            field.blockSignals(True)
+            field.setValue(self.scoring_config[mode][sign][key] if sign else self.scoring_config[mode][key])
+            field.blockSignals(False)
+        self._show_negative_tier()
 
     def _create_repo_settings(self) -> CardWidget:
         """创建仓库清理设置组"""
@@ -353,8 +472,11 @@ class SettingsPage(QWidget):
             return  # 用户取消
 
         try:
-            # 复制预设文件到目标位置
-            shutil.copy2(presets_file, file_path)
+            with open(presets_file, 'r', encoding='utf-8') as source:
+                exported_data = json.load(source)
+            exported_data['scoring'] = self._collect_scoring()
+            with open(file_path, 'w', encoding='utf-8') as target:
+                json.dump(exported_data, target, ensure_ascii=False, indent=2)
 
             InfoBar.success(
                 title="导出成功",
@@ -424,7 +546,16 @@ class SettingsPage(QWidget):
             # 写入新配置
             os.makedirs(os.path.dirname(presets_file), exist_ok=True)
             with open(presets_file, 'w', encoding='utf-8') as f:
-                json.dump(imported_data, f, ensure_ascii=False, indent=2)
+                # Only preset fields belong in presets.json. Scoring travels in
+                # exports, but is stored in settings.json at runtime.
+                json.dump({k: v for k, v in imported_data.items() if k != 'scoring'},
+                          f, ensure_ascii=False, indent=2)
+
+            # Legacy exports have no grades or scores: keep their old matching
+            # behavior until the user explicitly enables scoring again.
+            imported_scoring = normalize_scoring(imported_data.get('scoring'))
+            self._set_scoring_ui(imported_scoring)
+            self._auto_save_settings()
 
             # 发送预设变更信号，让主窗口通知页面刷新
             main_window = self.window()
@@ -503,7 +634,8 @@ class SettingsPage(QWidget):
             "template_threshold": 0.7,
             "brightness_threshold": 45,
             "sl_mode_enabled": False,
-            "developer_mode": True
+            "developer_mode": True,
+            "scoring": normalize_scoring(None)
         }
 
     def _auto_save_settings(self):
@@ -521,7 +653,8 @@ class SettingsPage(QWidget):
             "template_threshold": self._get_threshold_value(),
             "brightness_threshold": self._get_brightness_threshold_value(),
             "sl_mode_enabled": self.sl_mode_switch.isChecked() if hasattr(self, 'sl_mode_switch') else self.settings.get("sl_mode_enabled", False),
-            "developer_mode": True
+            "developer_mode": True,
+            "scoring": self._collect_scoring()
         }
 
         try:

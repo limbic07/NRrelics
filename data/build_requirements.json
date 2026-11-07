@@ -1,0 +1,6333 @@
+{
+  "status": "按用户补充规则更新；尚未接入程序的组合优化",
+  "rules": [
+    "必带仅指流派身份、用户定义的改池要求和面板匹配低于80时的最小转职。",
+    "choose_one_weapon_branch 是或关系；每个分支内部 required_affixes 是且关系。",
+    "additional_any_of_affixes 中每组至少满足一条。",
+    "普通核心词条、深夜核心词条与必带词条是不同概念。",
+    "改池词条只增加寻找倾向；局内实际取得武器另行检查。",
+    "choose_one_spell_school 非空时只选一个派系，不要求同时满足全部派系。",
+    "所有非肉流派须携带每次打倒黑夜入侵者提升攻击力；肉流派为 W5、G1、G2、R01、R02、R07、E02。",
+    "所有流派须在打倒敌人累积绝招量表的 +0/+1 中至少携带一条。",
+    "R02 必须携带整件官方遗物黑夜·恶魔，不能仅凭同名效果判定满足。",
+    "肉无赖 R01、R07 须在虚血 +0/+1/+2 中至少携带一条；R02 垃圾王赖不要求虚血。"
+  ],
+  "builds": [
+    {
+      "id": "C16",
+      "hero": "追踪者",
+      "build": "非战技物理·大槌",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大槌",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大槌"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C17",
+      "hero": "追踪者",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C18",
+      "hero": "追踪者",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C19",
+      "hero": "追踪者",
+      "build": "非战技物理·短剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C20",
+      "hero": "追踪者",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C21",
+      "hero": "追踪者",
+      "build": "非战技物理·曲剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "曲剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到曲剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C22",
+      "hero": "追踪者",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C23",
+      "hero": "追踪者",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C24",
+      "hero": "追踪者",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C25",
+      "hero": "追踪者",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C26",
+      "hero": "追踪者",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C27_dagger",
+      "hero": "追踪者",
+      "build": "属性战技·短剑",
+      "output": "属性战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C27"
+    },
+    {
+      "id": "C27_scythe",
+      "hero": "追踪者",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C27"
+    },
+    {
+      "id": "C27_colossal_weapon",
+      "hero": "追踪者",
+      "build": "属性战技·特大武器",
+      "output": "属性战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大武器",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大武器"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C27"
+    },
+    {
+      "id": "C28_greatshield",
+      "hero": "追踪者",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C28"
+    },
+    {
+      "id": "C28_greatbow",
+      "hero": "追踪者",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C28"
+    },
+    {
+      "id": "C28_greatsword",
+      "hero": "追踪者",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C28"
+    },
+    {
+      "id": "C29",
+      "hero": "追踪者",
+      "build": "物理战技·刀",
+      "output": "物理战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到刀"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "W4",
+      "hero": "追踪者",
+      "build": "冻折钩棒追",
+      "output": "冻伤目标输出",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": null,
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "可靠地使目标冻伤；钩棒武器池尚未校对，不强加指定池词条"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "W5",
+      "hero": "追踪者",
+      "build": "肉追",
+      "output": "生存加伤害",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": null,
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "以承伤与持续作战为玩法主体；不强制某一条生存词条"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "W6",
+      "hero": "追踪者",
+      "build": "垃圾王追",
+      "output": "双大剑跳劈",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "出现异常状态量表时，能缓慢提升攻击力",
+        "出击时，武器战技改为切腹",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "血量没有全满时，累积猩红腐败量表",
+          "血量没有全满时，累积中毒量表"
+        ],
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "保持异常状态量表以触发垃圾王增伤"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "W7_glintblade",
+      "hero": "追踪者",
+      "build": "辉剑·法追",
+      "output": "魔法",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】提升智力、信仰，但降低力气、灵巧",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "辉剑"
+      ],
+      "required_relics": [],
+      "source_build_id": "W7"
+    },
+    {
+      "id": "W7_crystalian",
+      "hero": "追踪者",
+      "build": "结晶人·法追",
+      "output": "魔法",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】提升智力、信仰，但降低力气、灵巧",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "结晶人"
+      ],
+      "required_relics": [],
+      "source_build_id": "W7"
+    },
+    {
+      "id": "W7_thorn",
+      "hero": "追踪者",
+      "build": "荆棘·法追",
+      "output": "魔法",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】提升智力、信仰，但降低力气、灵巧",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "荆棘"
+      ],
+      "required_relics": [],
+      "source_build_id": "W7"
+    },
+    {
+      "id": "W7_carian_sword",
+      "hero": "追踪者",
+      "build": "卡利亚剑·法追",
+      "output": "魔法",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】提升智力、信仰，但降低力气、灵巧",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "卡利亚剑"
+      ],
+      "required_relics": [],
+      "source_build_id": "W7"
+    },
+    {
+      "id": "W7_digger",
+      "hero": "追踪者",
+      "build": "挖石·法追",
+      "output": "魔法",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】提升智力、信仰，但降低力气、灵巧",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "挖石"
+      ],
+      "required_relics": [],
+      "source_build_id": "W7"
+    },
+    {
+      "id": "W7_invisible",
+      "hero": "追踪者",
+      "build": "隐形·法追",
+      "output": "魔法",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】提升智力、信仰，但降低力气、灵巧",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "隐形"
+      ],
+      "required_relics": [],
+      "source_build_id": "W7"
+    },
+    {
+      "id": "W7_gravity",
+      "hero": "追踪者",
+      "build": "重力·法追",
+      "output": "魔法",
+      "source_config": "按原流派",
+      "common_required_affixes": [
+        "【追踪者】提升智力、信仰，但降低力气、灵巧",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【追踪者】技艺的使用次数+1",
+        "【追踪者】技艺会附加引发异常状态出血的效果"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "重力"
+      ],
+      "required_relics": [],
+      "source_build_id": "W7"
+    },
+    {
+      "id": "C30",
+      "hero": "守护者",
+      "build": "非战技物理·大槌",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大槌",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大槌"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C31",
+      "hero": "守护者",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C32",
+      "hero": "守护者",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C33",
+      "hero": "守护者",
+      "build": "非战技物理·短剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑",
+            "【守护者】提升力气、灵巧，但降低生命力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C34",
+      "hero": "守护者",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C35",
+      "hero": "守护者",
+      "build": "非战技物理·曲剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "曲剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到曲剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C36",
+      "hero": "守护者",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C37",
+      "hero": "守护者",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C38",
+      "hero": "守护者",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C39",
+      "hero": "守护者",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C40",
+      "hero": "守护者",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C41_dagger",
+      "hero": "守护者",
+      "build": "属性战技·短剑",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑",
+            "【守护者】提升力气、灵巧，但降低生命力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C41"
+    },
+    {
+      "id": "C41_scythe",
+      "hero": "守护者",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀",
+            "【守护者】提升力气、灵巧，但降低生命力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C41"
+    },
+    {
+      "id": "C41_colossal_weapon",
+      "hero": "守护者",
+      "build": "属性战技·特大武器",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大武器",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大武器",
+            "【守护者】提升力气、灵巧，但降低生命力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C41"
+    },
+    {
+      "id": "C42_greatshield",
+      "hero": "守护者",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C42"
+    },
+    {
+      "id": "C42_greatbow",
+      "hero": "守护者",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C42"
+    },
+    {
+      "id": "C42_greatsword",
+      "hero": "守护者",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C42"
+    },
+    {
+      "id": "C43",
+      "hero": "守护者",
+      "build": "物理战技·刀",
+      "output": "物理战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到刀",
+            "【守护者】提升力气、灵巧，但降低生命力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "G1",
+      "hero": "守护者",
+      "build": "肉鸟",
+      "output": "防御／防反／生存",
+      "source_config": "按原流派",
+      "common_required_affixes": [],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": null,
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "以承伤与持续作战为玩法主体；不强制某一条生存词条"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "G2",
+      "hero": "守护者",
+      "build": "防反鸟",
+      "output": "防御反击",
+      "source_config": "按原流派",
+      "common_required_affixes": [],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": null,
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "能够防御并以防御反击输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "G3_frenzy",
+      "hero": "守护者",
+      "build": "癫火·非野兽祷鸟",
+      "output": "祷告",
+      "source_config": "圣印记转职",
+      "common_required_affixes": [
+        "【守护者】提升集中力、信仰，但降低生命力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "癫火"
+      ],
+      "required_relics": [],
+      "source_build_id": "G3"
+    },
+    {
+      "id": "G3_golden_order",
+      "hero": "守护者",
+      "build": "黄金律法基本主义·非野兽祷鸟",
+      "output": "祷告",
+      "source_config": "圣印记转职",
+      "common_required_affixes": [
+        "【守护者】提升集中力、信仰，但降低生命力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "黄金律法基本主义"
+      ],
+      "required_relics": [],
+      "source_build_id": "G3"
+    },
+    {
+      "id": "G3_giant_flame",
+      "hero": "守护者",
+      "build": "巨人火焰·非野兽祷鸟",
+      "output": "祷告",
+      "source_config": "圣印记转职",
+      "common_required_affixes": [
+        "【守护者】提升集中力、信仰，但降低生命力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "巨人火焰"
+      ],
+      "required_relics": [],
+      "source_build_id": "G3"
+    },
+    {
+      "id": "G3_dragon_communion",
+      "hero": "守护者",
+      "build": "龙飨·非野兽祷鸟",
+      "output": "祷告",
+      "source_config": "圣印记转职",
+      "common_required_affixes": [
+        "【守护者】提升集中力、信仰，但降低生命力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "龙飨"
+      ],
+      "required_relics": [],
+      "source_build_id": "G3"
+    },
+    {
+      "id": "G3_godskin",
+      "hero": "守护者",
+      "build": "狩猎神祇·非野兽祷鸟",
+      "output": "祷告",
+      "source_config": "圣印记转职",
+      "common_required_affixes": [
+        "【守护者】提升集中力、信仰，但降低生命力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "狩猎神祇"
+      ],
+      "required_relics": [],
+      "source_build_id": "G3"
+    },
+    {
+      "id": "G3_ancient_dragon",
+      "hero": "守护者",
+      "build": "王城古龙信仰·非野兽祷鸟",
+      "output": "祷告",
+      "source_config": "圣印记转职",
+      "common_required_affixes": [
+        "【守护者】提升集中力、信仰，但降低生命力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "王城古龙信仰"
+      ],
+      "required_relics": [],
+      "source_build_id": "G3"
+    },
+    {
+      "id": "G4",
+      "hero": "守护者",
+      "build": "野兽祷鸟",
+      "output": "野兽祷告",
+      "source_config": "圣印记转职",
+      "common_required_affixes": [
+        "【守护者】提升集中力、信仰，但降低生命力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C01",
+      "hero": "铁之眼",
+      "build": "毒弓铁眼",
+      "output": "弓与中毒",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "出击时的武器，附加异常状态中毒",
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "弓",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "以弓输出并可靠地使目标中毒"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C02",
+      "hero": "铁之眼",
+      "build": "非战技物理·大槌",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大槌",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大槌",
+            "【铁之眼】提升生命力、力气，但降低灵巧"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C03",
+      "hero": "铁之眼",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C04",
+      "hero": "铁之眼",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C05",
+      "hero": "铁之眼",
+      "build": "非战技物理·短剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C06",
+      "hero": "铁之眼",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C07",
+      "hero": "铁之眼",
+      "build": "非战技物理·曲剑",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "曲剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到曲剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C08",
+      "hero": "铁之眼",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C09",
+      "hero": "铁之眼",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C10",
+      "hero": "铁之眼",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑",
+            "【铁之眼】提升生命力、力气，但降低灵巧"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C11",
+      "hero": "铁之眼",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C12",
+      "hero": "铁之眼",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "C13_dagger",
+      "hero": "铁之眼",
+      "build": "属性战技·短剑",
+      "output": "属性战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C13"
+    },
+    {
+      "id": "C13_scythe",
+      "hero": "铁之眼",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C13"
+    },
+    {
+      "id": "C14_greatshield",
+      "hero": "铁之眼",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾",
+            "【铁之眼】提升生命力、力气，但降低灵巧"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C14"
+    },
+    {
+      "id": "C14_greatbow",
+      "hero": "铁之眼",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓",
+            "【铁之眼】提升生命力、力气，但降低灵巧"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C14"
+    },
+    {
+      "id": "C14_greatsword",
+      "hero": "铁之眼",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "C14"
+    },
+    {
+      "id": "C15",
+      "hero": "铁之眼",
+      "build": "物理战技·刀",
+      "output": "物理战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力",
+        "【铁之眼】技艺的使用次数+1",
+        "【铁之眼】技艺会附加引发异常状态中毒的效果对上陷入中毒的敌人，能给予大伤害"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到刀"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D01",
+      "hero": "女爵",
+      "build": "短剑重演爵",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "【女爵】短剑连击的最后攻击命中时，能对着周围的敌人，再次上演最近做过的行动",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "短剑连击触发再次上演",
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D02",
+      "hero": "女爵",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D03",
+      "hero": "女爵",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D04",
+      "hero": "女爵",
+      "build": "非战技物理·大槌",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大槌",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大槌",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D05",
+      "hero": "女爵",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D06",
+      "hero": "女爵",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D07",
+      "hero": "女爵",
+      "build": "非战技物理·曲剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "曲剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到曲剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D08",
+      "hero": "女爵",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D09",
+      "hero": "女爵",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D10",
+      "hero": "女爵",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D11",
+      "hero": "女爵",
+      "build": "物理战技·刀",
+      "output": "物理战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到刀"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D12_greatsword",
+      "hero": "女爵",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "D12"
+    },
+    {
+      "id": "D12_greatbow",
+      "hero": "女爵",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "D12"
+    },
+    {
+      "id": "D12_greatshield",
+      "hero": "女爵",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾",
+            "【女爵】提升生命力、力气，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "D12"
+    },
+    {
+      "id": "D13",
+      "hero": "女爵",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "D14_dagger",
+      "hero": "女爵",
+      "build": "属性战技·短剑",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "D14"
+    },
+    {
+      "id": "D14_scythe",
+      "hero": "女爵",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "D14"
+    },
+    {
+      "id": "D15_glintblade",
+      "hero": "女爵",
+      "build": "辉剑·法爵",
+      "output": "魔法",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "辉剑"
+      ],
+      "required_relics": [],
+      "source_build_id": "D15"
+    },
+    {
+      "id": "D15_crystalian",
+      "hero": "女爵",
+      "build": "结晶人·法爵",
+      "output": "魔法",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "结晶人"
+      ],
+      "required_relics": [],
+      "source_build_id": "D15"
+    },
+    {
+      "id": "D15_thorn",
+      "hero": "女爵",
+      "build": "荆棘·法爵",
+      "output": "魔法",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "荆棘"
+      ],
+      "required_relics": [],
+      "source_build_id": "D15"
+    },
+    {
+      "id": "D15_carian_sword",
+      "hero": "女爵",
+      "build": "卡利亚剑·法爵",
+      "output": "魔法",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "卡利亚剑"
+      ],
+      "required_relics": [],
+      "source_build_id": "D15"
+    },
+    {
+      "id": "D15_digger",
+      "hero": "女爵",
+      "build": "挖石·法爵",
+      "output": "魔法",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "挖石"
+      ],
+      "required_relics": [],
+      "source_build_id": "D15"
+    },
+    {
+      "id": "D15_invisible",
+      "hero": "女爵",
+      "build": "隐形·法爵",
+      "output": "魔法",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "隐形"
+      ],
+      "required_relics": [],
+      "source_build_id": "D15"
+    },
+    {
+      "id": "D15_gravity",
+      "hero": "女爵",
+      "build": "重力·法爵",
+      "output": "魔法",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "重力"
+      ],
+      "required_relics": [],
+      "source_build_id": "D15"
+    },
+    {
+      "id": "R01",
+      "hero": "无赖",
+      "build": "特大蓄力赖",
+      "output": "生存蓄力",
+      "source_config": "基础",
+      "common_required_affixes": [],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大武器",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ],
+        [
+          "受到损伤的当下，能通过攻击恢复部分血量",
+          "受到损伤的当下，能通过攻击恢复部分血量+1",
+          "受到损伤的当下，能通过攻击恢复部分血量+2"
+        ]
+      ],
+      "gameplay_requirements": [
+        "以特大武器的蓄力攻击输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R02",
+      "hero": "无赖",
+      "build": "垃圾王赖",
+      "output": "异常状态生存",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "出现异常状态量表时，能缓慢提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "血量没有全满时，累积猩红腐败量表",
+          "血量没有全满时，累积中毒量表"
+        ],
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "保持异常状态量表以触发垃圾王增伤"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [
+        {
+          "name": "黑夜·恶魔",
+          "official_catalog_id": 99,
+          "color": "红",
+          "reason": "使用盘腿坐姿时累积发狂量表"
+        }
+      ]
+    },
+    {
+      "id": "R03",
+      "hero": "无赖",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R04",
+      "hero": "无赖",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R05",
+      "hero": "无赖",
+      "build": "非战技物理·大槌",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大槌",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大槌"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R06",
+      "hero": "无赖",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R07",
+      "hero": "无赖",
+      "build": "拳头肉赖",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ],
+        [
+          "受到损伤的当下，能通过攻击恢复部分血量",
+          "受到损伤的当下，能通过攻击恢复部分血量+1",
+          "受到损伤的当下，能通过攻击恢复部分血量+2"
+        ]
+      ],
+      "gameplay_requirements": [
+        "以承伤与持续作战为玩法主体；不强制某一条生存词条",
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R08",
+      "hero": "无赖",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R09",
+      "hero": "无赖",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R10",
+      "hero": "无赖",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R11",
+      "hero": "无赖",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R12",
+      "hero": "无赖",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R13",
+      "hero": "无赖",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "R14_greatsword",
+      "hero": "无赖",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "R14"
+    },
+    {
+      "id": "R14_colossal_weapon",
+      "hero": "无赖",
+      "build": "属性战技·特大武器",
+      "output": "属性战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大武器",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "R14"
+    },
+    {
+      "id": "R15_glintblade",
+      "hero": "无赖",
+      "build": "辉剑·法赖",
+      "output": "魔法",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "【无赖】提升集中力、智力，但降低生命力、耐力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "辉剑"
+      ],
+      "required_relics": [],
+      "source_build_id": "R15"
+    },
+    {
+      "id": "R15_crystalian",
+      "hero": "无赖",
+      "build": "结晶人·法赖",
+      "output": "魔法",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "【无赖】提升集中力、智力，但降低生命力、耐力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "结晶人"
+      ],
+      "required_relics": [],
+      "source_build_id": "R15"
+    },
+    {
+      "id": "R15_thorn",
+      "hero": "无赖",
+      "build": "荆棘·法赖",
+      "output": "魔法",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "【无赖】提升集中力、智力，但降低生命力、耐力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "荆棘"
+      ],
+      "required_relics": [],
+      "source_build_id": "R15"
+    },
+    {
+      "id": "R15_carian_sword",
+      "hero": "无赖",
+      "build": "卡利亚剑·法赖",
+      "output": "魔法",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "【无赖】提升集中力、智力，但降低生命力、耐力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "卡利亚剑"
+      ],
+      "required_relics": [],
+      "source_build_id": "R15"
+    },
+    {
+      "id": "R15_digger",
+      "hero": "无赖",
+      "build": "挖石·法赖",
+      "output": "魔法",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "【无赖】提升集中力、智力，但降低生命力、耐力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "挖石"
+      ],
+      "required_relics": [],
+      "source_build_id": "R15"
+    },
+    {
+      "id": "R15_invisible",
+      "hero": "无赖",
+      "build": "隐形·法赖",
+      "output": "魔法",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "【无赖】提升集中力、智力，但降低生命力、耐力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "隐形"
+      ],
+      "required_relics": [],
+      "source_build_id": "R15"
+    },
+    {
+      "id": "R15_gravity",
+      "hero": "无赖",
+      "build": "重力·法赖",
+      "output": "魔法",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "【无赖】提升集中力、智力，但降低生命力、耐力",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到手杖"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "重力"
+      ],
+      "required_relics": [],
+      "source_build_id": "R15"
+    },
+    {
+      "id": "V01",
+      "hero": "复仇者",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V02",
+      "hero": "复仇者",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V03",
+      "hero": "复仇者",
+      "build": "非战技物理·大槌",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大槌",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大槌",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V04",
+      "hero": "复仇者",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V05",
+      "hero": "复仇者",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V06",
+      "hero": "复仇者",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V07",
+      "hero": "复仇者",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V08",
+      "hero": "复仇者",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V09_greatsword",
+      "hero": "复仇者",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "V09"
+    },
+    {
+      "id": "V09_greatbow",
+      "hero": "复仇者",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "V09"
+    },
+    {
+      "id": "V09_greatshield",
+      "hero": "复仇者",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "V09"
+    },
+    {
+      "id": "V10_greatsword",
+      "hero": "复仇者",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "V10"
+    },
+    {
+      "id": "V10_colossal_weapon",
+      "hero": "复仇者",
+      "build": "属性战技·特大武器",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大武器",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大武器",
+            "【复仇者】提升力气，但降低信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "V10"
+    },
+    {
+      "id": "V11",
+      "hero": "复仇者",
+      "build": "黄金律法·复仇者祷告",
+      "output": "祷告",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V12",
+      "hero": "复仇者",
+      "build": "野兽祷告复仇者",
+      "output": "野兽祷告",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V13",
+      "hero": "复仇者",
+      "build": "王城古龙·复仇者祷告",
+      "output": "祷告",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "V14_giant_flame",
+      "hero": "复仇者",
+      "build": "巨人火焰复仇者",
+      "output": "祷告",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "巨人火焰"
+      ],
+      "required_relics": [],
+      "source_build_id": "V14"
+    },
+    {
+      "id": "V14_godskin",
+      "hero": "复仇者",
+      "build": "狩猎神祇复仇者",
+      "output": "祷告",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "狩猎神祇"
+      ],
+      "required_relics": [],
+      "source_build_id": "V14"
+    },
+    {
+      "id": "V14_frenzy",
+      "hero": "复仇者",
+      "build": "癫火复仇者",
+      "output": "祷告",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "癫火"
+      ],
+      "required_relics": [],
+      "source_build_id": "V14"
+    },
+    {
+      "id": "V17",
+      "hero": "复仇者",
+      "build": "龙飨·复仇者祷告",
+      "output": "祷告",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "H01",
+      "hero": "隐士",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑",
+            "【隐士】提升生命力、耐力、灵巧，但降低智力、信仰",
+            "【隐士】提升智力、信仰，但降低集中力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "H02",
+      "hero": "隐士",
+      "build": "非战技物理·短剑",
+      "output": "非战技物理",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑",
+            "【隐士】提升生命力、耐力、灵巧，但降低智力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "H03_greatsword",
+      "hero": "隐士",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【隐士】提升生命力、耐力、灵巧，但降低智力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "H03"
+    },
+    {
+      "id": "H03_dagger",
+      "hero": "隐士",
+      "build": "属性战技·短剑",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑",
+            "【隐士】提升生命力、耐力、灵巧，但降低智力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "H03"
+    },
+    {
+      "id": "H03_scythe",
+      "hero": "隐士",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "双转职",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀",
+            "【隐士】提升生命力、耐力、灵巧，但降低智力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "H03"
+    },
+    {
+      "id": "H04",
+      "hero": "隐士",
+      "build": "卡利亚剑法隐",
+      "output": "魔法",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "H05",
+      "hero": "隐士",
+      "build": "隐形法隐",
+      "output": "魔法",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "H06",
+      "hero": "隐士",
+      "build": "荆棘法隐",
+      "output": "魔法",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "H07_digger",
+      "hero": "隐士",
+      "build": "挖石法隐",
+      "output": "魔法",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "挖石"
+      ],
+      "required_relics": [],
+      "source_build_id": "H07"
+    },
+    {
+      "id": "H07_crystalian",
+      "hero": "隐士",
+      "build": "结晶人法隐",
+      "output": "魔法",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "结晶人"
+      ],
+      "required_relics": [],
+      "source_build_id": "H07"
+    },
+    {
+      "id": "H07_gravity",
+      "hero": "隐士",
+      "build": "重力法隐",
+      "output": "魔法",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "重力"
+      ],
+      "required_relics": [],
+      "source_build_id": "H07"
+    },
+    {
+      "id": "H08",
+      "hero": "隐士",
+      "build": "辉剑法隐",
+      "output": "魔法",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "手杖",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "H11_frenzy",
+      "hero": "隐士",
+      "build": "癫火·非野兽祷隐",
+      "output": "祷告",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "癫火"
+      ],
+      "required_relics": [],
+      "source_build_id": "H11"
+    },
+    {
+      "id": "H11_golden_order",
+      "hero": "隐士",
+      "build": "黄金律法基本主义·非野兽祷隐",
+      "output": "祷告",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "黄金律法基本主义"
+      ],
+      "required_relics": [],
+      "source_build_id": "H11"
+    },
+    {
+      "id": "H11_giant_flame",
+      "hero": "隐士",
+      "build": "巨人火焰·非野兽祷隐",
+      "output": "祷告",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "巨人火焰"
+      ],
+      "required_relics": [],
+      "source_build_id": "H11"
+    },
+    {
+      "id": "H11_dragon_communion",
+      "hero": "隐士",
+      "build": "龙飨·非野兽祷隐",
+      "output": "祷告",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "龙飨"
+      ],
+      "required_relics": [],
+      "source_build_id": "H11"
+    },
+    {
+      "id": "H11_godskin",
+      "hero": "隐士",
+      "build": "狩猎神祇·非野兽祷隐",
+      "output": "祷告",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "狩猎神祇"
+      ],
+      "required_relics": [],
+      "source_build_id": "H11"
+    },
+    {
+      "id": "H11_ancient_dragon",
+      "hero": "隐士",
+      "build": "王城古龙信仰·非野兽祷隐",
+      "output": "祷告",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [
+        "王城古龙信仰"
+      ],
+      "required_relics": [],
+      "source_build_id": "H11"
+    },
+    {
+      "id": "H17",
+      "hero": "隐士",
+      "build": "野兽祷隐",
+      "output": "野兽祷告",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "圣印记",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到圣印记"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选派系的施法工具与法术／祷告"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E01",
+      "hero": "执行者",
+      "build": "防反太刀",
+      "output": "防御反击",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "能够防御并以防御反击输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E02",
+      "hero": "执行者",
+      "build": "太奶太刀",
+      "output": "异常状态生存",
+      "source_config": "转职①",
+      "common_required_affixes": [],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "以承伤与持续作战为玩法主体；不强制某一条生存词条"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E03",
+      "hero": "执行者",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E04",
+      "hero": "执行者",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E05",
+      "hero": "执行者",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E06",
+      "hero": "执行者",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E07",
+      "hero": "执行者",
+      "build": "非战技物理·曲剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "曲剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到曲剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E08",
+      "hero": "执行者",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E09",
+      "hero": "执行者",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E10",
+      "hero": "执行者",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E11",
+      "hero": "执行者",
+      "build": "非战技物理·短剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E12",
+      "hero": "执行者",
+      "build": "物理战技·刀",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E13_greatsword",
+      "hero": "执行者",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "E13"
+    },
+    {
+      "id": "E13_greatbow",
+      "hero": "执行者",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "E13"
+    },
+    {
+      "id": "E13_greatshield",
+      "hero": "执行者",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾",
+            "【执行者】提升灵巧、感应，但降低生命力"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "E13"
+    },
+    {
+      "id": "E14",
+      "hero": "执行者",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "E15_dagger",
+      "hero": "执行者",
+      "build": "属性战技·短剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "E15"
+    },
+    {
+      "id": "E15_scythe",
+      "hero": "执行者",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "E15"
+    },
+    {
+      "id": "S01",
+      "hero": "学者",
+      "build": "壶人",
+      "output": "投掷壶",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刺剑",
+          "required_affixes": []
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "有投掷壶可用并以其为主要输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S02",
+      "hero": "学者",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S03",
+      "hero": "学者",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S04",
+      "hero": "学者",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S05",
+      "hero": "学者",
+      "build": "非战技物理·曲剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "曲剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到曲剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S06",
+      "hero": "学者",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S07",
+      "hero": "学者",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S08",
+      "hero": "学者",
+      "build": "非战技物理·短剑",
+      "output": "非战技物理",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S09",
+      "hero": "学者",
+      "build": "物理战技·刀",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到刀",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S10",
+      "hero": "学者",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S11",
+      "hero": "学者",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "S12_dagger",
+      "hero": "学者",
+      "build": "属性战技·短剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "S12"
+    },
+    {
+      "id": "S12_scythe",
+      "hero": "学者",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "S12"
+    },
+    {
+      "id": "S13_dagger",
+      "hero": "学者",
+      "build": "垃圾王学者·短剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "出现异常状态量表时，能缓慢提升攻击力",
+        "出击时，武器战技改为切腹",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "短剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到短剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "血量没有全满时，累积猩红腐败量表",
+          "血量没有全满时，累积中毒量表"
+        ],
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "保持异常状态量表以触发垃圾王增伤",
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "S13"
+    },
+    {
+      "id": "S13_scythe",
+      "hero": "学者",
+      "build": "垃圾王学者·镰刀",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "出现异常状态量表时，能缓慢提升攻击力",
+        "出击时，武器战技改为切腹",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "血量没有全满时，累积猩红腐败量表",
+          "血量没有全满时，累积中毒量表"
+        ],
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "保持异常状态量表以触发垃圾王增伤",
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "S13"
+    },
+    {
+      "id": "S13_greatsword",
+      "hero": "学者",
+      "build": "垃圾王学者·大剑",
+      "output": "属性战技",
+      "source_config": "转职②",
+      "common_required_affixes": [
+        "出现异常状态量表时，能缓慢提升攻击力",
+        "出击时，武器战技改为切腹",
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【学者】提升耐力、灵巧，但降低智力、感应"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "血量没有全满时，累积猩红腐败量表",
+          "血量没有全满时，累积中毒量表"
+        ],
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "保持异常状态量表以触发垃圾王增伤",
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "S13"
+    },
+    {
+      "id": "U01",
+      "hero": "送葬者",
+      "build": "非战技物理·双头剑",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "双头剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到双头剑",
+            "【送葬者】提升灵巧，但降低生命力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U02",
+      "hero": "送葬者",
+      "build": "非战技物理·大剑",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U03",
+      "hero": "送葬者",
+      "build": "非战技物理·大槌",
+      "output": "非战技物理",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大槌",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大槌"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U04",
+      "hero": "送葬者",
+      "build": "非战技物理·大矛",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大矛"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U05",
+      "hero": "送葬者",
+      "build": "非战技物理·拳头",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "拳头",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到拳头"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U06",
+      "hero": "送葬者",
+      "build": "非战技物理·曲剑",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "曲剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到曲剑",
+            "【送葬者】提升灵巧，但降低生命力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U07",
+      "hero": "送葬者",
+      "build": "非战技物理·特大剑",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U08",
+      "hero": "送葬者",
+      "build": "非战技物理·直剑",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "直剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到直剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U09",
+      "hero": "送葬者",
+      "build": "非战技物理·矛",
+      "output": "非战技物理",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "矛",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到矛",
+            "【送葬者】提升灵巧，但降低生命力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得所选类别的武器并以普通攻击系动作输出"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U10_greatsword",
+      "hero": "送葬者",
+      "build": "物理战技·大剑",
+      "output": "物理战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "U10"
+    },
+    {
+      "id": "U10_greatbow",
+      "hero": "送葬者",
+      "build": "物理战技·大弓",
+      "output": "物理战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大弓",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大弓"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "U10"
+    },
+    {
+      "id": "U10_greatshield",
+      "hero": "送葬者",
+      "build": "物理战技·大盾",
+      "output": "物理战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大盾",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大盾"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": [],
+      "source_build_id": "U10"
+    },
+    {
+      "id": "U11",
+      "hero": "送葬者",
+      "build": "属性战技·大剑",
+      "output": "属性战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "大剑",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到大剑",
+            "【送葬者】提升灵巧，但降低生命力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U12",
+      "hero": "送葬者",
+      "build": "属性战技·特大武器",
+      "output": "属性战技",
+      "source_config": "基础",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "特大武器",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到特大武器"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    },
+    {
+      "id": "U13",
+      "hero": "送葬者",
+      "build": "属性战技·镰刀",
+      "output": "属性战技",
+      "source_config": "转职①",
+      "common_required_affixes": [
+        "每次打倒黑夜入侵者，能提升攻击力"
+      ],
+      "choose_one_weapon_branch": [
+        {
+          "weapon": "镰刀",
+          "required_affixes": [
+            "通过潜在能力，能比较容易找到镰刀",
+            "【送葬者】提升灵巧，但降低生命力、信仰"
+          ]
+        }
+      ],
+      "additional_any_of_affixes": [
+        [
+          "打倒敌人时，能累积绝招量表",
+          "打倒敌人时，能累积绝招量表+1"
+        ]
+      ],
+      "gameplay_requirements": [
+        "局内必须取得与所选武器兼容的对应战技"
+      ],
+      "choose_one_spell_school": [],
+      "required_relics": []
+    }
+  ]
+}

@@ -3,8 +3,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QInputDialog, QMessageBox, QScrollArea,
                                QDialog, QDialogButtonBox, QFileDialog)
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QUrl
+from PySide6.QtGui import QFont, QDesktopServices
 from qfluentwidgets import (CardWidget, ComboBox, PrimaryPushButton, PushButton,
                            InfoBar, InfoBarPosition, LineEdit as FluentLineEdit,
                            isDarkTheme)
@@ -152,10 +152,32 @@ class SavePage(QWidget):
         self.refresh_btn.clicked.connect(self._refresh_all)
         btn_layout.addWidget(self.refresh_btn)
 
+        for text, handler in (("打开备份文件夹", self._open_backup_folder),
+                              ("打开游戏存档文件夹", self._open_game_save_folder)):
+            button=PushButton(text)
+            button.clicked.connect(handler)
+            btn_layout.addWidget(button)
+
         btn_layout.addStretch()
         card_layout.addLayout(btn_layout)
 
         return card
+
+    def _open_backup_folder(self):
+        steam_id=self._get_current_steam_id()
+        if not steam_id:return
+        folder=os.path.join(self.save_manager.BACKUP_DIR,steam_id)
+        os.makedirs(folder,exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
+
+    def _open_game_save_folder(self):
+        steam_id=self._get_current_steam_id()
+        if not steam_id:return
+        folder=os.path.dirname(self.save_manager.get_save_path(steam_id))
+        if os.path.isdir(folder):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
+        else:
+            QMessageBox.information(self,'未找到存档目录',folder)
 
     def _create_backup_card(self) -> CardWidget:
         """创建备份列表卡片"""
