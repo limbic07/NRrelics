@@ -32,7 +32,7 @@ def read_save_inventory(path):
     if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
         raise SaveReadError('游戏正在保存，请稍后重试')
     root = Path(get_resource_path('data/relic_validation'))
-    rules = RuleData.load(root)
+    rules = RuleData.load(root, validation=False)
     reader = ReadOnlySaveReader(rules)
     payloads = reader._read_bnd4_entries(raw)
     with (root/'AttachEffectParam.csv').open(encoding='utf-8-sig', newline='') as stream:

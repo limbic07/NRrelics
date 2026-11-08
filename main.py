@@ -127,14 +127,20 @@ class Application:
         self.ocr_engine = None
         self.ocr_thread = None
         self.ocr_worker = None
+        self.app.aboutToQuit.connect(self._stop_ocr_thread)
 
     def _load_config(self) -> dict:
         """加载配置"""
         config_path = Path(get_user_data_path("data/settings.json"))
-        if config_path.exists():
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        try:
+            if config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                return config if isinstance(config, dict) else {}
+        except (OSError, ValueError):
+            pass
         return {}
+
 
 
     def initialize(self):
@@ -158,8 +164,8 @@ class Application:
         self.ocr_thread.started.connect(self.ocr_worker.initialize)
         self.ocr_worker.finished.connect(self._on_ocr_initialized)
         self.ocr_worker.error.connect(self._on_ocr_error)
-        self.ocr_worker.finished.connect(self.ocr_thread.quit)
-        self.ocr_worker.error.connect(self.ocr_thread.quit)
+        self.ocr_worker.finished.connect(self.ocr_thread.quit, Qt.DirectConnection)
+        self.ocr_worker.error.connect(self.ocr_thread.quit, Qt.DirectConnection)
         self.ocr_thread.finished.connect(self.ocr_thread.deleteLater)
 
         # 启动线程
@@ -175,9 +181,20 @@ class Application:
             # 将引擎传递到 UI 层
             self.window.init_ocr_dependencies(self.ocr_engine)
 
-    def _on_ocr_error(self, _error_msg: str):
+    def _on_ocr_error(self, error_msg: str):
         """OCR 初始化失败"""
-        pass
+        self.window.log_manager.log(f"OCR 初始化失败：{error_msg}", "ERROR")
+
+
+    def _stop_ocr_thread(self):
+        """Keep the OCR worker alive until its initialization has returned."""
+        if self.ocr_thread is not None:
+            try:
+                self.ocr_thread.quit()
+                self.ocr_thread.wait()
+            except RuntimeError:  # Qt may already have deleted a finished thread.
+                pass
+
 
     def _show_welcome_if_needed(self):
         """首次启动时显示使用须知"""

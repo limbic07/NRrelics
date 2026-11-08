@@ -71,6 +71,7 @@ class SettingsPage(QWidget):
         layout.addWidget(shop_group)
 
         layout.addWidget(self._create_scoring_settings())
+        layout.addWidget(self._create_save_settings())
 
         # 开发者设置默认显示
         self.developer_card = self._create_developer_settings()
@@ -378,6 +379,10 @@ class SettingsPage(QWidget):
         hint.setStyleSheet("color: #e67e22;")
         card_layout.addWidget(hint)
 
+        debug_title = QLabel("运行调试")
+        debug_title.setStyleSheet("font-size: 11pt; font-weight: 600;")
+        card_layout.addWidget(debug_title)
+
         # OCR 调试模式
         ocr_debug_layout = QHBoxLayout()
         ocr_debug_label = QLabel("OCR调试模式:")
@@ -399,6 +404,26 @@ class SettingsPage(QWidget):
         ocr_debug_desc.setStyleSheet("color: gray;")
         ocr_debug_desc.setWordWrap(True)
         card_layout.addWidget(ocr_debug_desc)
+
+        # 商店耗时调试模式：与 OCR 采集开关集中管理，彼此独立。
+        timing_debug_layout = QHBoxLayout()
+        timing_debug_label = QLabel("耗时调试模式:")
+        timing_debug_label.setFixedWidth(150)
+        self.timing_debug_switch = SwitchButton()
+        self.timing_debug_switch.setChecked(self.settings.get("timing_debug", False))
+        self.timing_debug_switch.checkedChanged.connect(self._auto_save_settings)
+        timing_debug_layout.addWidget(timing_debug_label)
+        timing_debug_layout.addWidget(self.timing_debug_switch)
+        timing_debug_layout.addStretch()
+        card_layout.addLayout(timing_debug_layout)
+
+        timing_debug_desc = QLabel(
+            "开启后，商店筛选每轮十连输出一次各步骤耗时汇总；中途停止时输出已执行部分。"
+            "包含购买、截图、OCR、匹配、调试采集、结果处理、筛选按键和确认；与 OCR 调试模式独立。")
+        timing_debug_desc.setFont(QFont("Segoe UI", 8))
+        timing_debug_desc.setStyleSheet("color: gray;")
+        timing_debug_desc.setWordWrap(True)
+        card_layout.addWidget(timing_debug_desc)
 
         # 模板匹配阈值
         threshold_layout = QHBoxLayout()
@@ -437,6 +462,7 @@ class SettingsPage(QWidget):
         card_layout.addWidget(lum_desc)
 
         return card
+
 
     def _export_presets(self):
         """导出预设配置文件"""
@@ -631,6 +657,8 @@ class SettingsPage(QWidget):
             "shop_stop_on_perfect_relic": False,
             "steam_path": "",
             "ocr_debug": False,
+            "timing_debug": False,
+            "check_relic_id_consistency": False,
             "template_threshold": 0.7,
             "brightness_threshold": 45,
             "sl_mode_enabled": False,
@@ -644,6 +672,8 @@ class SettingsPage(QWidget):
 
         self.settings = {
             **self.settings,
+            "timing_debug": self.timing_debug_switch.isChecked(),
+            "check_relic_id_consistency": self.check_relic_id_switch.isChecked(),
             "allow_operate_favorited": self.allow_favorited_switch.isChecked(),
             "require_double_valid": not self.require_double_switch.isChecked(),
             "shop_require_double_valid": not self.shop_require_double_switch.isChecked(),
@@ -748,4 +778,32 @@ class SettingsPage(QWidget):
         )
         if dir_path:
             self.steam_path_input.setText(dir_path)
+
+
+    def _create_save_settings(self) -> CardWidget:
+        card = CardWidget()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(20, 20, 20, 20)
+        card_layout.setSpacing(12)
+        title = QLabel("存档管理设置")
+        title.setStyleSheet("font-size: 16pt; font-weight: bold;")
+        card_layout.addWidget(title)
+        row = QHBoxLayout()
+        label = QLabel("检查 ID 一致性:")
+        label.setFixedWidth(150)
+        self.check_relic_id_switch = SwitchButton()
+        self.check_relic_id_switch.setChecked(self.settings.get("check_relic_id_consistency", False))
+        self.check_relic_id_switch.checkedChanged.connect(self._auto_save_settings)
+        row.addWidget(label)
+        row.addWidget(self.check_relic_id_switch)
+        row.addStretch()
+        card_layout.addLayout(row)
+        description = QLabel(
+            "开启后，额外检查存档中的遗物 ID 所规定的正负词条数量和生成模板是否与实际词条对应。"
+            "ID 一致性结果单独显示，不影响词条组合的合法性判定。下次存档检查生效。")
+        description.setFont(QFont("Segoe UI", 8))
+        description.setStyleSheet("color: gray;")
+        description.setWordWrap(True)
+        card_layout.addWidget(description)
+        return card
 

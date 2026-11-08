@@ -4,6 +4,8 @@ The catalog is advisory only. Matching and manually entered requirement groups
 continue to work when the generated catalog is absent or incomplete.
 """
 import json
+from functools import lru_cache
+import xml.etree.ElementTree as ET
 import sys
 import unicodedata
 from pathlib import Path
@@ -89,3 +91,31 @@ class AffixCatalog:
                 if all(a is not None and b is not None and a == b for a, b in pairs):
                     warnings.append((index + 1, other_index + 1))
         return warnings
+
+
+@lru_cache(maxsize=1)
+def validation_affix_names():
+    """Return Chinese labels for the read-only save report, not legality rules."""
+    catalog = AffixCatalog()
+    names = {}
+    for effect in catalog.effects:
+        try:
+            names[int(effect["id"])] = effect["name"]
+        except (KeyError, TypeError, ValueError):
+            continue
+    root = catalog.path.parent / "relic_validation"
+    for filename in ("AttachEffectName.fmg.xml", "AttachEffectName_dlc01.fmg.xml"):
+        try:
+            for entry in ET.parse(root / filename).findall("./entries/text"):
+                text = (entry.text or "").strip()
+                if text and text != "%null%":
+                    names.setdefault(int(entry.attrib["id"]), text)
+        except (OSError, ET.ParseError, KeyError, ValueError):
+            continue
+    from core.save_inventory import _normalize
+    canonical = {}
+    for filename in ('normal.txt', 'normal_special.txt', 'deepnight_pos.txt', 'deepnight_neg.txt'):
+        for text in (catalog.path.parent / filename).read_text(encoding='utf-8-sig').splitlines():
+            if text.strip():
+                canonical[_normalize(text)] = text.strip()
+    return {key: canonical.get(_normalize(value), value) for key, value in names.items()}

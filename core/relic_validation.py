@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import csv
 import struct
-from dataclasses import dataclass, field
+from enum import Enum
+from itertools import permutations
+from typing import Iterable
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -25,28 +28,67 @@ class RelicRecord:
     name: str
     favorite: bool
     equipped: bool
-    handle: int = 0
-    acquisition: int = 0
     slot: str = ""
     player_name: str = ""
+    handle: int = 0
+    acquisition: int = 0
 
 
 @dataclass
 class RuleData:
     relics: dict[int, dict[str, object]] = field(default_factory=dict)
+    effects: dict[int, dict[str, int]] = field(default_factory=dict)
+    pools: dict[int, set[int]] = field(default_factory=dict)
+    pool_ids: set[int] = field(default_factory=set)
+    effect_pools: dict[int, set[int]] = field(default_factory=dict)
 
     @classmethod
-    def load(cls, root: Path | None = None) -> "RuleData":
+    def load(cls, root: Path | None = None, *, validation: bool = True) -> "RuleData":
         root = root or Path(__file__).resolve().parents[1] / "data" / "relic_validation"
+
+        def rows(name: str) -> Iterable[dict[str, str]]:
+            with (root / name).open("r", encoding="utf-8-sig", newline="") as handle:
+                yield from csv.DictReader(handle)
+
         data = cls()
-        with (root / "EquipParamAntique.csv").open(encoding="utf-8-sig", newline="") as stream:
-            for row in csv.DictReader(stream):
+        for row in rows("EquipParamAntique.csv"):
+            try:
                 relic_id = int(row["ID"])
-                data.relics[relic_id] = {
-                    "name": row.get("Name", "") or f"Relic {relic_id}",
-                    "color": _color_name(row.get("relicColor")),
-                }
+            except (KeyError, TypeError, ValueError):
+                continue
+            data.relics[relic_id] = {
+                "name": row.get("Name", "") or f"Relic {relic_id}",
+                "color": _color_name(row.get("relicColor")),
+                "is_deep": row.get("isDeepRelic") == "1",
+                "slots": tuple(_int(row.get(key), -1) for key in (
+                    "attachEffectTableId_1", "attachEffectTableId_2",
+                    "attachEffectTableId_3", "attachEffectTableId_curse1",
+                    "attachEffectTableId_curse2", "attachEffectTableId_curse3")),
+            }
+        if not validation:
+            return data
+        for row in rows("AttachEffectParam.csv"):
+            try:
+                effect_id = int(row["ID"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            data.effects[effect_id] = {
+                "conflict": _int(row.get("compatibilityId"), -1),
+                "sort": _int(row.get("overrideEffectId"), effect_id),
+            }
+        for row in rows("AttachEffectTableParam.csv"):
+            table_id = _int(row.get("ID"), -1)
+            effect_id = _int(row.get("attachEffectId"), -1)
+            if table_id >= 0:
+                data.pool_ids.add(table_id)
+            if (table_id >= 0 and effect_id >= 0
+                    and (_int(row.get("chanceWeight_dlc"), -1) > 0
+                         or (_int(row.get("chanceWeight"), 0) != 0
+                             and _int(row.get("chanceWeight_dlc"), -1) == -1))):
+                data.pools.setdefault(table_id, set()).add(effect_id)
+                data.effect_pools.setdefault(effect_id, set()).add(table_id)
         return data
+
 
 
 class SaveReadError(ValueError):
@@ -68,7 +110,7 @@ class ReadOnlySaveReader:
     UNIQUE_RANGES = (range(1000, 2101), range(10000, 20000))
 
     def __init__(self, rule_data: RuleData | None = None):
-        self.rule_data = rule_data or RuleData.load()
+        self.rule_data = rule_data or RuleData.load(validation=False)
 
 
     def _read_bnd4_entries(self, raw: bytes) -> dict[int, bytes]:
@@ -158,3 +200,280 @@ class ReadOnlySaveReader:
 def _color_name(value: str | None) -> str:
     return {"0": "Red", "1": "Blue", "2": "Yellow", "3": "Green", "4": "White"}.get(
         value or "", "Unknown")
+
+
+class ValidationStatus(str, Enum):
+    CONFORMS = "conforms"
+    VIOLATES = "violates"
+    UNKNOWN = "unknown"
+
+
+
+@dataclass(frozen=True)
+class RelicResult:
+    relic: RelicRecord
+    status: ValidationStatus
+    reasons: tuple[str, ...] = ()
+    id_status: ValidationStatus | None = None
+    id_reasons: tuple[str, ...] = ()
+
+
+
+@dataclass(frozen=True)
+class ValidationReport:
+    status: ValidationStatus
+    results: tuple[RelicResult, ...] = ()
+    reasons: tuple[str, ...] = ()
+    source: str = ""
+
+
+
+class ReadOnlySaveValidator(ReadOnlySaveReader):
+    DEEP_POOLS = frozenset({2000000, 2100000, 2200000})
+    ILLEGAL_RANGE = range(20000, 30036)
+    KNOWN_RANGE = range(100, 2013323)
+
+    def __init__(self, rule_data: RuleData | None = None, *, check_id_consistency: bool = False):
+        self.rule_data = rule_data or RuleData.load()
+        self.check_id_consistency = check_id_consistency
+        self._combination_groups: dict[tuple, set[tuple[int, ...]]] = {}
+        for meta in self.rule_data.relics.values():
+            key = self._random_template_key(meta)
+            if key is not None:
+                self._combination_groups.setdefault(key, set()).add(meta["slots"])
+
+    def _random_template_key(self, meta: dict) -> tuple | None:
+        """Only group known random templates; fixed/special effects stay exact."""
+        slots = meta["slots"]
+        pools = {pool for pool in slots[:3] if pool != -1}
+        normal_pools = {100, 110, 200, 210, 300, 310} | {
+            1000000 + tier * 1000 + slot for tier in range(10) for slot in range(3)
+        }
+        if not pools or "color" not in meta or "is_deep" not in meta:
+            return None
+        allowed = self.DEEP_POOLS if meta["is_deep"] else normal_pools
+        if not pools.issubset(allowed):
+            return None
+        return meta["color"], meta["is_deep"], sum(p != -1 for p in slots[:3])
+
+    def validate_path(self, path: str | Path) -> ValidationReport:
+        source = str(path)
+        try:
+            save_path = Path(path)
+            before = save_path.stat()
+            if before.st_size > self.MAX_SAVE_BYTES:
+                raise SaveReadError("存档超过安全读取大小上限")
+            with save_path.open("rb") as handle:
+                raw = handle.read(self.MAX_SAVE_BYTES + 1)
+            if len(raw) > self.MAX_SAVE_BYTES:
+                raise SaveReadError("存档超过安全读取大小上限")
+            after = save_path.stat()
+            if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                raise SaveReadError("游戏正在保存，请稍后重试")
+            payloads = self._read_bnd4_entries(raw)
+            relics = []
+            for slot, payload in payloads.items():
+                relics.extend(self._read_relics(payload, f"USERDATA_{slot}"))
+            return self._validate_relics(relics, source)
+        except (OSError, SaveReadError, struct.error, ValueError) as exc:
+            return ValidationReport(ValidationStatus.UNKNOWN, reasons=(str(exc),), source=source)
+
+
+
+
+
+
+
+    def _validate_relics(self, relics: list[RelicRecord], source: str) -> ValidationReport:
+        results = []
+        seen_unique: dict[tuple[str, int], int] = {}
+        for relic in relics:
+            result = self._validate_relic(relic)
+            results.append(result)
+            if relic.relic_id in self._unique_ids():
+                key = (relic.slot, relic.relic_id)
+                seen_unique[key] = seen_unique.get(key, 0) + 1
+        for result_index, result in enumerate(results):
+            key = (result.relic.slot, result.relic.relic_id)
+            if seen_unique.get(key, 0) > 1:
+                result = replace(result, status=ValidationStatus.VIOLATES,
+                                 reasons=result.reasons + ("唯一遗物重复出现",))
+                results[result_index] = result
+        statuses = {result.status for result in results}
+        status = (ValidationStatus.VIOLATES if ValidationStatus.VIOLATES in statuses
+                  else ValidationStatus.UNKNOWN if ValidationStatus.UNKNOWN in statuses
+                  else ValidationStatus.CONFORMS)
+        return ValidationReport(status, tuple(results), source=source)
+
+    def _validate_relic(self, relic: RelicRecord) -> RelicResult:
+        result = self._validate_combination(relic)
+        if not self.check_id_consistency:
+            return result
+        meta = self.rule_data.relics.get(relic.relic_id)
+        if meta is None or len(relic.effects) != 6:
+            return replace(result, id_status=ValidationStatus.UNKNOWN,
+                           id_reasons=("遗物 ID 或词条数据不足，无法检查 ID 一致性",))
+        exact = self._validate_template(relic, meta)
+        return replace(result, id_status=exact.status, id_reasons=exact.reasons)
+
+    def _validate_combination(self, relic: RelicRecord) -> RelicResult:
+        meta = self.rule_data.relics.get(relic.relic_id)
+        if relic.relic_id in self.ILLEGAL_RANGE:
+            return RelicResult(relic, ValidationStatus.VIOLATES, ("遗物 ID 位于已知非法范围",))
+        if relic.relic_id not in self.KNOWN_RANGE or meta is None:
+            return RelicResult(relic, ValidationStatus.UNKNOWN, ("遗物 ID 或版本数据未知",))
+        if len(relic.effects) != 6:
+            return RelicResult(relic, ValidationStatus.UNKNOWN, ("词条记录不是六个存档槽位",))
+        original = self._validate_template(relic, meta)
+        key = self._random_template_key(meta)
+        if key is None or original.status is ValidationStatus.CONFORMS:
+            return original
+        # Size, required curses, conflicts and stored order remain mandatory
+        # even when the original ID's particular generation pools are optional.
+        intrinsic = tuple(reason for reason in original.reasons if any(
+            text in reason for text in ("正面词条数量不匹配", "必须附带负面词条",
+                                       "没有对应的正面词条", "词条存在已知冲突", "顺序违反")))
+        if intrinsic:
+            return RelicResult(relic, ValidationStatus.VIOLATES, intrinsic)
+        uncertain = False
+        for slots in self._combination_groups[key]:
+            candidate = self._validate_template(relic, {**meta, "slots": slots})
+            if candidate.status is ValidationStatus.CONFORMS:
+                return RelicResult(relic, ValidationStatus.CONFORMS)
+            if candidate.status is ValidationStatus.UNKNOWN:
+                uncertain = True
+        if uncertain:
+            return RelicResult(relic, ValidationStatus.UNKNOWN,
+                               ("词条或生成池资料不足，无法确认完整组合是否合法",))
+        return RelicResult(relic, ValidationStatus.VIOLATES,
+                           ("词条组合不符合已知的同颜色、同大小、同类型遗物生成规则",))
+
+    def _validate_template(self, relic: RelicRecord, meta: dict) -> RelicResult:
+        reasons = []
+        uncertain_reasons = []
+        expected = meta["slots"]
+        # Item IDs encode both slot counts. A -1 pool means an absent slot,
+        # not missing documentation; see upstream issues #55, #115 and #129.
+        for start, label in ((0, "正面"), (3, "负面")):
+            wanted = sum(pool != -1 for pool in expected[start:start + 3])
+            actual = sum(effect not in self.EMPTY_EFFECTS
+                         for effect in relic.effects[start:start + 3])
+            if actual != wanted:
+                reasons.append(f"遗物 ID {relic.relic_id} 的{label}词条数量不匹配："
+                               f"应为 {wanted} 条，实际 {actual} 条")
+
+        # These requirements apply even if an incorrectly chosen item ID has
+        # no curse pools. Curses stay paired with effects after storage sorting.
+        for index, effect in enumerate(relic.effects[:3]):
+            curse = relic.effects[index + 3]
+            if effect in self.EMPTY_EFFECTS and curse not in self.EMPTY_EFFECTS:
+                reasons.append(f"第 {index + 1} 个负面词条没有对应的正面词条")
+            elif self._effect_needs_curse(effect) and curse in self.EMPTY_EFFECTS:
+                reasons.append(f"第 {index + 1} 条正面词条（ID: {effect}）必须附带负面词条，"
+                               "对应位置为空")
+
+        if self._metadata_known(expected, relic.effects):
+            pool_fit = self._effects_fit(expected, relic.effects)
+            if not pool_fit and not reasons:
+                reasons.append("词条与该遗物 ID 的生成池或正负词条配对不匹配")
+            elif pool_fit and any(pool in self.DEEP_POOLS for pool in expected[:3]):
+                if not self._effects_fit(expected, relic.effects, exact_deep_pools=True):
+                    uncertain_reasons.append("深夜正面词条仅匹配合并池，未匹配该遗物指定的生成池")
+        else:
+            uncertain_reasons.append("词条或生成池数据未知")
+        conflict = self._has_conflict(relic.effects)
+        if conflict:
+            reasons.append("词条存在已知冲突")
+        known_positives = all(effect in self.EMPTY_EFFECTS or effect in self.rule_data.effects
+                              for effect in relic.effects[:3])
+        if known_positives and not self._is_sorted(relic.effects):
+            reasons.append("正面词条顺序违反已知规则")
+        status = (ValidationStatus.VIOLATES if reasons else
+                  ValidationStatus.UNKNOWN if uncertain_reasons else ValidationStatus.CONFORMS)
+        return RelicResult(relic, status, tuple(reasons + uncertain_reasons))
+
+    def _effects_fit(self, slots: tuple[int, ...], effects: tuple[int, ...],
+                     *, exact_deep_pools: bool = False) -> bool:
+        """Match all three effect/curse pairs in the SAME permutation.
+
+        Broad mode follows the upstream combined deep pools; exact mode checks
+        each pool's own weights. A broad-only match remains uncertain.
+        """
+        for order in permutations(range(3)):
+            valid = True
+            for target, source in enumerate(order):
+                effect = effects[source]
+                pool = slots[target]
+                if pool == -1:
+                    valid &= effect in self.EMPTY_EFFECTS
+                else:
+                    allowed = (self.rule_data.pools.get(pool, set()) if exact_deep_pools
+                               else self._rollable_effects(pool))
+                    valid &= effect not in self.EMPTY_EFFECTS and effect in allowed
+            for target, source in enumerate(order):
+                curse = effects[source + 3]
+                effect = effects[source]
+                pool = slots[target + 3]
+                if pool == -1:
+                    valid &= curse in self.EMPTY_EFFECTS
+                else:
+                    valid &= (curse not in self.EMPTY_EFFECTS
+                              and curse in self.rule_data.pools.get(pool, set()))
+                if self._effect_needs_curse(effect) and curse in self.EMPTY_EFFECTS:
+                    valid = False
+            if valid:
+                return True
+        return False
+
+    def _rollable_effects(self, pool: int) -> set[int]:
+        if pool in self.DEEP_POOLS:
+            effects: set[int] = set()
+            for deep_pool in self.DEEP_POOLS:
+                effects.update(self.rule_data.pools.get(deep_pool, set()))
+            return effects
+        return self.rule_data.pools.get(pool, set())
+
+    def _metadata_known(self, slots: tuple[int, ...], effects: tuple[int, ...]) -> bool:
+        for effect in effects:
+            if effect not in self.EMPTY_EFFECTS and effect not in self.rule_data.effects:
+                return False
+        for pool in slots:
+            if (pool != -1 and pool not in self.rule_data.pool_ids
+                    and pool not in self.rule_data.pools):
+                return False
+        return True
+
+    def _effect_needs_curse(self, effect: int) -> bool:
+        pools = self.rule_data.effect_pools.get(effect, set()) - {effect}
+        if not pools:
+            return False
+        return 2000000 in pools and not pools.intersection({2100000, 2200000})
+
+    def _has_conflict(self, effects: tuple[int, ...]) -> bool | None:
+        conflicts = []
+        for effect in effects:
+            if effect in self.EMPTY_EFFECTS:
+                continue
+            meta = self.rule_data.effects.get(effect)
+            if meta is None:
+                return None
+            conflict = meta["conflict"]
+            if conflict != -1 and conflict in conflicts:
+                return True
+            conflicts.append(conflict)
+        return False
+
+    def _is_sorted(self, effects: tuple[int, ...]) -> bool:
+        values = [(float("inf"), effect) if effect in self.EMPTY_EFFECTS else
+                  (self.rule_data.effects[effect]["sort"], effect)
+                  for effect in effects[:3] if effect in self.EMPTY_EFFECTS or effect in self.rule_data.effects]
+        return len(values) == 3 and values == sorted(values)
+
+
+
+
+def _int(value: str | None, default: int) -> int:
+    try:
+        return int(value) if value not in (None, "") else default
+    except ValueError:
+        return default

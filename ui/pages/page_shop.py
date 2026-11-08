@@ -5,7 +5,8 @@
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QComboBox, QTabWidget,
-                               QScrollArea, QFrame, QSplitter, QGroupBox, QLineEdit)
+                               QScrollArea, QFrame, QSplitter, QGroupBox, QLineEdit,
+                               QDialog, QTreeWidget, QTreeWidgetItem)
 from PySide6.QtCore import Qt, Signal, QThread, QTimer
 from PySide6.QtGui import QFont, QIntValidator
 import keyboard
@@ -30,6 +31,7 @@ class ShopThread(QThread):
     log_signal = Signal(str, str)  # (message, level)
     finished_signal = Signal()
     qualified_relic_signal = Signal(dict)  # 合格遗物信息
+    triple_signal = Signal(dict)
     stats_signal = Signal(dict)  # 统计信息
 
     def __init__(self, shop_automation, mode, version, stop_currency, require_double,
@@ -61,7 +63,8 @@ class ShopThread(QThread):
                 sl_qualified_target=self.sl_qualified_target,
                 save_manager=self.save_manager,
                 steam_id=self.steam_id,
-                backup_path=self.backup_path
+                backup_path=self.backup_path,
+                triple_callback=self.triple_signal.emit
             )
 
             # 购买完成后，发送所有合格遗物信息
@@ -112,6 +115,7 @@ class PageShop(QWidget):
         }
 
         # 加载持久化的合格遗物
+        self.triple_relics = []
         self.qualified_relics = self._load_qualified_relics()
 
         # 加载设置
@@ -142,11 +146,16 @@ class PageShop(QWidget):
     def _load_settings(self) -> dict:
         """加载设置"""
         settings_file = get_user_data_path("data/settings.json")
-        if os.path.exists(settings_file):
-            with open(settings_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+        try:
+            if os.path.exists(settings_file):
+                with open(settings_file, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+                return settings if isinstance(settings, dict) else {}
+        except (OSError, ValueError):
+            pass
 
         return {}
+
 
     def update_settings(self, settings: dict):
         """外部更新设置（由设置页面信号触发）"""
@@ -405,6 +414,10 @@ class PageShop(QWidget):
         stats_layout.addWidget(sold_card)
 
         layout.addLayout(stats_layout)
+
+        self.triple_button = PushButton('查看本次三有效遗物（0）')
+        self.triple_button.clicked.connect(self._show_triples)
+        layout.addWidget(self.triple_button)
 
         # 合格遗物列表
         qualified_group = QGroupBox("合格遗物词条")
@@ -782,6 +795,9 @@ class PageShop(QWidget):
         }
         self._update_stats()
 
+        self.triple_relics.clear()
+        self.triple_button.setText('查看本次三有效遗物（0）')
+
         # 清空合格遗物列表和UI
         self.qualified_relics.clear()
         while self.qualified_relics_layout.count() > 1:  # 保留stretch
@@ -802,6 +818,7 @@ class PageShop(QWidget):
             steam_id=steam_id,
             backup_path=backup_path
         )
+        self.shop_thread.triple_signal.connect(self._add_triple)
         self.shop_thread.log_signal.connect(self._on_log)
         self.shop_thread.qualified_relic_signal.connect(self._add_qualified_relic)
         self.shop_thread.stats_signal.connect(self._update_stats_from_signal)
@@ -850,6 +867,54 @@ class PageShop(QWidget):
             "error": ("购买异常停止，请检查日志", "ERROR"),
         }
         self._on_log(*messages.get(reason, messages["error"]))
+
+    def _add_triple(self, result):
+        self.triple_relics.append(result)
+        self.triple_button.setText(f'查看本次三有效遗物（{len(self.triple_relics)}）')
+        if getattr(self, '_triple_tree', None) is not None:
+            self._append_triple_row(self._triple_tree, result)
+            self._triple_empty.hide()
+
+    @staticmethod
+    def _append_triple_row(tree, result):
+        item = QTreeWidgetItem([f"#{result['index']}", result['decision'], '、'.join(result['presets'])])
+        for affix in result['affixes']:
+            item.addChild(QTreeWidgetItem([
+                ('正面｜' if affix.get('is_positive') else '负面｜') + affix.get('cleaned_text', ''), '', '']))
+        tree.addTopLevelItem(item)
+        item.setExpanded(True)
+
+    def _show_triples(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle('本次抽卡的三有效遗物')
+        dialog.resize(820, 560)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 20, 24, 20)
+        note = QLabel('统计本次开始购买后的三有效结果，含评分未达标及 SL 还原前的结果；不代表当前库存。')
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        tree = QTreeWidget()
+        tree.setHeaderLabels(['遗物与词条', '筛选判定', '三有效匹配预设'])
+        tree.setColumnWidth(0, 460)
+        tree.setColumnWidth(1, 90)
+        tree.setStyleSheet('QTreeWidget { background: white; border: 1px solid #d8d8d8; border-radius: 8px; } QTreeWidget::item { padding: 6px; }')
+        layout.addWidget(tree, 1)
+        for result in self.triple_relics:
+            self._append_triple_row(tree, result)
+        empty = QLabel('尚未识别到三有效遗物。')
+        empty.setVisible(not self.triple_relics)
+        layout.addWidget(empty)
+        close = PrimaryPushButton('关闭')
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close, alignment=Qt.AlignRight)
+        self._triple_tree = tree
+        self._triple_empty = empty
+        try:
+            dialog.exec()
+        finally:
+            self._triple_tree = None
+            self._triple_empty = None
+            dialog.deleteLater()
 
     def _add_qualified_relic(self, relic_info: dict):
         """添加合格遗物到UI和持久化存储"""

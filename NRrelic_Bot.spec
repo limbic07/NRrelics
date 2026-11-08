@@ -4,7 +4,7 @@ from PyInstaller.utils.hooks import collect_data_files
 
 
 # Keep user settings, inventory and imported presets outside the executable.
-datas = [
+_static_data = [
     ('data/normal.txt', 'data'),
     ('data/normal_special.txt', 'data'),
     ('data/deepnight_pos.txt', 'data'),
@@ -16,9 +16,12 @@ datas = [
     ('data/vessels.json', 'data'),
     ('data/default_presets.json', 'data'),
     ('data/official_relics.json', 'data'),
+    ('data/relic_validation', 'data/relic_validation'),
+    ('resources/models/PP-OCRv6_rec_small.onnx', 'resources/models'),
 ]
-datas += [('data/relic_validation', 'data/relic_validation')]
-datas += collect_data_files('rapidocr')
+
+datas = list(_static_data)
+datas += collect_data_files('rapidocr', excludes=['**/*.onnx'])
 
 hiddenimports = [
     'rapidocr.inference_engine.onnxruntime',

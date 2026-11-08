@@ -265,3 +265,18 @@ def log_match(result, index, log):
                     f'缺少必须组: {len(match.missing_required_groups)}', 'INFO')
     for reason in result.uncertainty_reasons:
         log(f'{reason}；保留，禁止售出/取消收藏', 'WARNING')
+
+
+def preset_configuration_errors(general_preset, dedicated_presets, blacklist_preset=None,
+                                scoring_config=None, mode="normal"):
+    """Validate before purchasing, using the same rules as actual matching."""
+    result = match_relic({'success': True, 'affixes': []}, general_preset,
+                         dedicated_presets, blacklist_preset, general_fallback='always',
+                         scoring_config=scoring_config, mode=mode)
+    invalid = [m for m in result.preset_matches if not m.configuration_valid]
+    if result.candidate_match and not result.candidate_match.configuration_valid and result.candidate_match not in invalid:
+        invalid.append(result.candidate_match)
+    errors = [f'预设「{m.preset_name}」配置无效，请检查词条等级、继承排除及旧版必须词条组' for m in invalid]
+    if not errors and any('配置无效' in r or '格式' in r for r in result.uncertainty_reasons):
+        errors = list(result.uncertainty_reasons)
+    return errors
