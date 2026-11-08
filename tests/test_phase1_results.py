@@ -1,6 +1,4 @@
-import sqlite3
 
-from core.relic_inventory import RelicInventory
 from core.relic_matcher import match_relic
 
 
@@ -22,31 +20,19 @@ def test_rejected_relic_keeps_highest_candidate_and_reason():
     assert any('有效词条不足' in reason for reason in result.candidate_failure_reasons)
 
 
-def test_inventory_keeps_identical_relics_as_distinct_scan_rows(tmp_path):
-    db = RelicInventory(str(tmp_path / 'inventory.sqlite3'))
-    item = {'mode': 'normal', 'color': '蓝', 'color_confidence': .92,
-            'affixes': [{'cleaned_text': '甲'}], 'decision': '保留',
-            'action': '保留未动', 'action_confirmed': True, 'owned_verified': True,
-            'scoring_enabled': True, 'score': 12, 'score_details': [('甲', 12)],
-            'effective_count': 1, 'preset_id': 'p', 'preset_name': '测试'}
-    db.record('scan-a', 1, item, {'scoring': {}})
-    db.record('scan-a', 2, item, {'scoring': {}})
-    with sqlite3.connect(db.path) as connection:
-        assert connection.execute('SELECT COUNT(*) FROM relics').fetchone()[0] == 2
-        assert connection.execute('SELECT COUNT(*) FROM scans WHERE owned_verified=1').fetchone()[0] == 2
 
 
-def test_read_only_rescan_reuses_each_owned_copy_once(tmp_path):
-    db = RelicInventory(str(tmp_path / 'rescan.sqlite3'))
-    item = {'mode': 'normal', 'color': '蓝', 'color_confidence': .92,
-            'affixes': [{'cleaned_text': '甲'}], 'decision': '淘汰',
-            'action': '保留未动', 'action_confirmed': True,
-            'owned_verified': True, 'inventory_scan': True,
-            'scoring_enabled': True, 'score': 3, 'score_details': [('甲', 3)],
-            'effective_count': 1, 'preset_id': 'p', 'preset_name': '测试'}
-    for scan in ('scan-a', 'scan-b'):
-        db.record(scan, 1, item, {'scoring': {}})
-        db.record(scan, 2, item, {'scoring': {}})
-    with sqlite3.connect(db.path) as connection:
-        assert connection.execute('SELECT COUNT(*) FROM relics').fetchone()[0] == 2
-        assert connection.execute('SELECT COUNT(*) FROM scans').fetchone()[0] == 4
+
+
+def test_screening_result_does_not_write_inventory():
+    from unittest.mock import Mock
+    from core.repo_cleaner import RepoCleaner
+    cleaner = RepoCleaner.__new__(RepoCleaner)
+    cleaner.settings = {'scoring': {'enabled': False}}
+    cleaner.stats = {'total_detected': 1}
+    cleaner.results = []
+    log, callback = Mock(), Mock()
+    cleaner._publish_result('normal', None, None, '跳过', '无法确认', log, callback)
+    assert cleaner.results[0]['decision'] == '无法确认'
+    assert 'color' not in cleaner.results[0]
+    callback.assert_called_once()

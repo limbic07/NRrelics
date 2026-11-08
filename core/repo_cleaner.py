@@ -13,9 +13,6 @@ from typing import Dict, List, Optional
 
 from core.relic_matcher import match_relic, log_match
 from core.relic_scoring import normalize_scoring
-from core.relic_color import recognize_color
-from core.relic_inventory import RelicInventory
-from uuid import uuid4
 from core.repo_navigation import RepositoryNavigation
 from core.relic_recorder import RelicRecorder
 from core.ocr_diagnostics import create_capture_session  # OCR 自动采集调试代码
@@ -59,7 +56,6 @@ class RepoCleaner:
         self.repository_filter = RepositoryFilter(ocr_engine, settings)
 
         self.recorder = RelicRecorder()
-        self.inventory = RelicInventory()
         self.results = []
         self.ocr_debug_session = None  # OCR 自动采集调试代码
         self.stop_reason = None
@@ -105,7 +101,6 @@ class RepoCleaner:
         self.stop_reason = None
         self.matched_relics = []
         self.results = []
-        scan_id = uuid4().hex
         self.repository_filter.settings = self.settings
         self.is_running = True
         self.is_paused = False
@@ -278,7 +273,7 @@ class RepoCleaner:
                 if should_skip:
                     log("跳过该遗物", "INFO")
                     self.stats["skipped"] += 1
-                    self._publish_result(scan_id, mode, image, None, None, '跳过',
+                    self._publish_result(mode, None, None, '跳过',
                                          '特殊遗物' if official_marker else '遗物状态不可操作',
                                          log, result_callback)
                     if has_next:
@@ -302,7 +297,7 @@ class RepoCleaner:
                 log(f"识别词条完成 (截取ROI:{t_roi:.3f}s OCR:{t_ocr:.3f}s)", "INFO")
 
                 if not ocr_result["success"]:
-                    self._publish_result(scan_id, mode, image, ocr_result, None, '跳过',
+                    self._publish_result(mode, ocr_result, None, '跳过',
                                          'OCR识别失败', log, result_callback)
                     # ===== OCR 自动采集调试代码：失败样本也保留 =====
                     if self.ocr_debug_session:
@@ -361,27 +356,12 @@ class RepoCleaner:
                     self.stats["unqualified"] += 1
 
                 if not self.is_running:
-                    self._publish_result(scan_id, mode, image, ocr_result, match_result,
+                    self._publish_result(mode, ocr_result, match_result,
                                          '跳过', '清理已停止，未执行操作', log, result_callback)
                     break
-                if cleaning_mode == 'scan':
-                    # 只读取仓库，不触碰收藏和售出状态。识别可信的遗物均是已拥有库存。
-                    confirmed = match_result.destructive_action_allowed
-                    if not confirmed:
-                        self.stats['skipped'] += 1
-                    self._publish_result(
-                        scan_id, mode, image, ocr_result, match_result,
-                        '保留未动' if confirmed else '跳过',
-                        '' if confirmed else 'OCR或预设无法确认',
-                        log, result_callback, action_confirmed=confirmed,
-                        inventory_scan=True)
-                    if has_next:
-                        pydirectinput.press('right')
-                        navigation.expect_next(image, 'right')
-                    continue
                 if not match_result.destructive_action_allowed:
                     self.stats["skipped"] += 1
-                    self._publish_result(scan_id, mode, image, ocr_result, match_result,
+                    self._publish_result(mode, ocr_result, match_result,
                                          '跳过', 'OCR或预设无法确认', log, result_callback)
                     if has_next:
                         pydirectinput.press('right')
@@ -412,7 +392,7 @@ class RepoCleaner:
                         action_confirmed = verified_state in (RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE)
                     if not action_confirmed:
                         action = '待核实'
-                self._publish_result(scan_id, mode, image, ocr_result, match_result,
+                self._publish_result(mode, ocr_result, match_result,
                                      action, '' if action_confirmed else '游戏操作尚未确认',
                                      log, result_callback, action_confirmed)
 
@@ -454,11 +434,11 @@ class RepoCleaner:
             # 清理完成
             if self.stop_reason == "completed":
                 # 正常完成
-                log("仓库检索完成" if cleaning_mode == 'scan' else "清理完成", "SUCCESS")
+                log("清理完成", "SUCCESS")
                 self._print_stats(log, cleaning_mode)
             else:
                 # 手动停止
-                log("仓库检索已停止" if cleaning_mode == 'scan' else "清理已停止", "INFO")
+                log("清理已停止", "INFO")
                 self._print_stats(log, cleaning_mode)
 
             # 自动完成售出操作（仅在正常停止时执行）
@@ -482,10 +462,6 @@ class RepoCleaner:
                             continue
                         result['action'] = '已售出'
                         result['action_confirmed'] = True
-                        try:
-                            self.inventory.update_action(scan_id, result['index'], '已售出', confirmed=True)
-                        except Exception as exc:
-                            log(f'更新售出记录失败：{exc}', 'WARNING')
                         if result_callback:
                             result_callback(result.copy())
 
@@ -565,8 +541,6 @@ class RepoCleaner:
         if relic_state not in (RELIC_STATE_LIGHT, RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE,
                                RELIC_STATE_DARK_E, RELIC_STATE_DARK_O):
             return True
-        if cleaning_mode == 'scan':
-            return relic_state == RELIC_STATE_DARK_O
         if cleaning_mode == "sell":
             if relic_state == RELIC_STATE_LIGHT:
                 return False  # 自由状态，可售出
@@ -612,10 +586,9 @@ class RepoCleaner:
                            threshold=2 if require_double else 3, general_fallback="no_active",
                            scoring_config=self.settings.get("scoring"), mode=mode)
 
-    def _publish_result(self, scan_id, mode, image, observation, match, action,
-                        reason, log, callback, action_confirmed=False,
-                        inventory_scan=False):
-        """Persist and send one result after the current action is known."""
+    def _publish_result(self, mode, observation, match, action,
+                        reason, log, callback, action_confirmed=False):
+        """Report the screening result without changing the save-synchronized inventory."""
         scoring_enabled = normalize_scoring(self.settings.get('scoring'))['enabled']
         candidate = (match.best_match or match.candidate_match) if match else None
         affixes = (observation or {}).get('affixes') or []
@@ -627,10 +600,8 @@ class RepoCleaner:
         else:
             decision = '淘汰'
         points = dict(candidate.score_details) if candidate and scoring_enabled else {}
-        color, confidence = recognize_color(image) if observation else ('未知', 0.0)
         result = {
             'index': self.stats['total_detected'], 'mode': mode,
-            'color': color, 'color_confidence': confidence,
             'affixes': affixes,
             'affix_scores': [{'name': a.get('cleaned_text', ''),
                               'points': points.get(a.get('cleaned_text'), 0) if scoring_enabled else None}
@@ -642,24 +613,17 @@ class RepoCleaner:
             'preset_id': candidate.preset_id if candidate else None,
             'preset_name': candidate.preset_name if candidate else None,
             'decision': decision, 'action': action,
-            'inventory_scan': inventory_scan,
             'action_confirmed': action_confirmed,
-            'owned_verified': action_confirmed and action in ('保留未动', '已收藏')
-                              and (inventory_scan or decision in ('保留', '备选')),
             'reason': reason or ('；'.join(match.candidate_failure_reasons + match.uncertainty_reasons)
                                  if match else reason),
         }
         self.results.append(result)
         score_text = (str(result['score']) + ' 分' if scoring_enabled and candidate else
                       ('无候选分数' if scoring_enabled else '未启用评分'))
-        log(f"#{result['index']}｜{color}｜{score_text}｜{decision}｜{action}"
+        log(f"#{result['index']}｜{score_text}｜{decision}｜{action}"
             + (f"｜{result['reason']}" if result['reason'] else ''), 'INFO')
         if result['score_details']:
             log('评分明细：' + '、'.join(f'{name} {value:+d}' for name, value in result['score_details']), 'INFO')
-        try:
-            self.inventory.record(scan_id, result['index'], result, self.settings)
-        except Exception as exc:
-            log(f'遗物数据库写入失败：{exc}', 'WARNING')
         if callback:
             callback(result.copy())
 
@@ -718,7 +682,7 @@ class RepoCleaner:
     def _print_stats(self, log, cleaning_mode='sell'):
         """打印统计信息"""
         log("=" * 50, "INFO")
-        log("检索统计" if cleaning_mode == 'scan' else "清理统计", "INFO")
+        log("清理统计", "INFO")
         log("=" * 50, "INFO")
         log(f"总检测数: {self.stats['total_detected']}", "INFO")
         log(f"合格: {self.stats['qualified']}", "SUCCESS")

@@ -19,7 +19,6 @@ class SavePage(QWidget):
     """存档管理页面"""
 
     steam_path_selected = Signal(str)
-    inventory_restored = Signal()
 
     def __init__(self):
         super().__init__()
@@ -317,7 +316,7 @@ class SavePage(QWidget):
 
         # 文件大小
         size_mb = backup["size"] / (1024 * 1024)
-        size_label = QLabel(f"{size_mb:.1f} MB · {'含遗物库存' if backup['has_inventory'] else '仅存档'}")
+        size_label = QLabel(f"{size_mb:.1f} MB")
         size_label.setFont(QFont("Segoe UI", 8))
         size_label.setStyleSheet(f"color: {secondary_color};")
         size_label.setMinimumWidth(130)
@@ -408,8 +407,7 @@ class SavePage(QWidget):
         reply = QMessageBox.question(
             self, "确认恢复",
             (f"确定要恢复备份 \"{backup['display_name']}\" 吗？\n"
-             + ("当前存档和遗物库存将被覆盖。" if backup['has_inventory'] else
-                "当前存档将被覆盖；此旧备份不含遗物库存，当前库存不会变。")),
+             + "当前存档将被覆盖，遗物库存不会改动。"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -430,8 +428,6 @@ class SavePage(QWidget):
                 parent=self
             )
             self._refresh_save_info()
-            if backup['has_inventory']:
-                self.inventory_restored.emit()
         else:
             InfoBar.error(
                 title="恢复失败",

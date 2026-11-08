@@ -7,8 +7,6 @@ cryptography>=41.0.0
 
 numpy>=1.21.0
 scipy>=1.14.1  # 精确求解遗物组合
-scikit-learn==1.6.1
-joblib>=1.4.2
 
 # GUI 框架
 PySide6==6.8.3

@@ -465,7 +465,6 @@ class RepoPage(QWidget):
     presets_modified = Signal()
     preset_updated = Signal(str, str)
     preset_list_changed = Signal(str, str, str)
-    scan_requested = Signal()
     clean_requested = Signal()
     stop_requested = Signal()
 
@@ -500,7 +499,6 @@ class RepoPage(QWidget):
 
         self._presets_loaded = False
         self._init_ui()
-        self.scan_requested.connect(self._start_scanning, Qt.QueuedConnection)
         self.clean_requested.connect(self._start_cleaning, Qt.QueuedConnection)
         self.stop_requested.connect(self._stop_cleaning, Qt.QueuedConnection)
 
@@ -614,12 +612,7 @@ class RepoPage(QWidget):
         self.start_btn.clicked.connect(self._start_cleaning)
         layout.addWidget(self.start_btn)
 
-        self.scan_btn = PushButton("仓库检索(F9)")
-        self.scan_btn.setFixedHeight(36)
-        self.scan_btn.setFixedWidth(125)
-        self.scan_btn.setEnabled(False)
-        self.scan_btn.clicked.connect(self._start_scanning)
-        layout.addWidget(self.scan_btn)
+
 
         self.stop_btn = PushButton("停止 (F11)")
         self.stop_btn.setFixedHeight(36)
@@ -742,7 +735,7 @@ class RepoPage(QWidget):
         results_layout.addWidget(self.result_filter)
         self.results_tree = QTreeWidget()
         self.result_items = {}
-        self.results_tree.setHeaderLabels(['遗物', '颜色', '分数', '判定', '操作', '最佳预设'])
+        self.results_tree.setHeaderLabels(['遗物', '分数', '判定', '操作', '最佳预设'])
         self.results_tree.setMinimumHeight(230)
         results_layout.addWidget(self.results_tree)
         layout.addWidget(results_group)
@@ -1065,14 +1058,10 @@ class RepoPage(QWidget):
             # 取消勾选，显示输入框
             self.max_input.setVisible(True)
 
-    def _start_scanning(self):
-        self._start_cleaning(scan_only=True)
-
-    def _start_cleaning(self, scan_only=False):
+    def _start_cleaning(self):
         """开始清理"""
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
-        cleaning_mode = ("scan" if scan_only else
-                         "sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite")
+        cleaning_mode = ("sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite")
         self.active_cleaning_mode = cleaning_mode
 
         # 获取数量
@@ -1104,9 +1093,9 @@ class RepoPage(QWidget):
         self.logger.clear()
         if self.log_manager:
             self.log_manager.clear_all()  # 清空所有订阅者的日志
-            self.log_manager.log("开始仓库检索..." if scan_only else "开始清理...", "INFO")
+            self.log_manager.log("开始清理...", "INFO")
         else:
-            self.logger.log("开始仓库检索..." if scan_only else "开始清理...", "INFO")
+            self.logger.log("开始清理...", "INFO")
         self._clear_relics_records()
         self.results_tree.clear()
         self.result_items.clear()
@@ -1116,7 +1105,6 @@ class RepoPage(QWidget):
 
         # 禁用按钮
         self.start_btn.setEnabled(False)
-        self.scan_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
 
         # 创建并启动线程
@@ -1144,12 +1132,12 @@ class RepoPage(QWidget):
                 self.results_tree.takeTopLevelItem(position)
         score = (str(result['score']) if result['score'] is not None
                  else ('未启用评分' if not result['scoring_enabled'] else '无候选分数'))
-        item = QTreeWidgetItem([f"#{result['index']}", result['color'], score,
+        item = QTreeWidgetItem([f"#{result['index']}", score,
                                 result['decision'], result['action'], result['preset_name'] or '无'])
         item.setData(0, Qt.UserRole, result['decision'])
         for affix in result['affix_scores']:
             value = affix['points']
-            item.addChild(QTreeWidgetItem([affix['name'], '',
+            item.addChild(QTreeWidgetItem([affix['name'],
                 f'{value:+d}' if value is not None else '未启用评分', '', '', '']))
         if result['reason']:
             item.addChild(QTreeWidgetItem(['原因：' + result['reason']]))
@@ -1181,14 +1169,12 @@ class RepoPage(QWidget):
     def _on_cleaning_finished(self):
         """清理完成"""
         self.start_btn.setEnabled(True)
-        self.scan_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         reason = self.repo_cleaner.stop_reason
-        scanning = getattr(self, 'active_cleaning_mode', None) == 'scan'
         messages = {
-            "manual": ("检索已手动停止" if scanning else "清理已手动停止", "WARNING"),
-            "completed": ("检索已完成" if scanning else "清理已完成", "SUCCESS"),
-            "error": ("检索异常停止，请检查日志" if scanning else "清理异常停止，请检查日志", "ERROR"),
+            "manual": ("清理已手动停止", "WARNING"),
+            "completed": ("清理已完成", "SUCCESS"),
+            "error": ("清理异常停止，请检查日志", "ERROR"),
         }
         self._on_log(*messages.get(reason, messages["error"]))
         self.is_manual_stop = False
@@ -1396,7 +1382,6 @@ class RepoPage(QWidget):
 
         # 启用开始按钮
         self.start_btn.setEnabled(True)
-        self.scan_btn.setEnabled(True)
         self.start_btn.setText("开始清理(F10)")
         # 输出成功日志
         if self.log_manager:
@@ -1406,8 +1391,6 @@ class RepoPage(QWidget):
 
     def _setup_shortcuts(self):
         """设置全局快捷键"""
-        # F9 只扫描录库；F10 按所选清理模式操作。
-        keyboard.add_hotkey('F9', self._on_scan_shortcut, suppress=False)
         keyboard.add_hotkey('F10', self._on_start_shortcut, suppress=False)
         # F11 停止清理
         keyboard.add_hotkey('F11', self._on_stop_shortcut, suppress=False)
@@ -1416,10 +1399,6 @@ class RepoPage(QWidget):
         """F10 快捷键触发开始"""
         if self.isVisible() and self.start_btn.isEnabled():
             self.clean_requested.emit()
-
-    def _on_scan_shortcut(self):
-        if self.isVisible() and self.scan_btn.isEnabled():
-            self.scan_requested.emit()
 
     def _on_stop_shortcut(self):
         """F11 快捷键触发停止"""

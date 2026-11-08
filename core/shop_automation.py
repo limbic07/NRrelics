@@ -13,10 +13,6 @@ from typing import Optional
 
 from core.relic_matcher import match_relic, log_match
 from core.relic_recorder import RelicRecorder
-from core.relic_inventory import RelicInventory
-from core.relic_color import recognize_color
-from core.relic_scoring import normalize_scoring
-from uuid import uuid4
 from core.ocr_diagnostics import create_capture_session  # OCR 自动采集调试代码
 from core.preset_manager import PresetManager
 from core.utils import DEBUG_ENABLED, debug_timer, affix_recorder, log_debug
@@ -82,8 +78,6 @@ class ShopAutomation:
         self.repo_filter = repo_filter
         self.settings = settings
         self.recorder = RelicRecorder()
-        self.inventory = RelicInventory()
-        self.scan_id = uuid4().hex
         self.ocr_debug_session = None  # OCR 自动采集调试代码
         self.stop_reason = None
 
@@ -126,7 +120,6 @@ class ShopAutomation:
         self.is_running = True
         self.stats = {"total_purchased": 0, "qualified": 0, "unqualified": 0, "sold": 0}
         self.qualified_relics.clear()
-        self.scan_id = uuid4().hex
 
         # SL模式相关
         self.sl_mode_enabled = sl_mode_enabled
@@ -651,8 +644,6 @@ class ShopAutomation:
                     "affixes": ocr_result["affixes"]
                 }
                 self.qualified_relics.append(relic_info)
-                self._record_kept_relic(mode, relic_info['index'], ocr_result,
-                                        match_result, ocr_screen, log)
                 try:
                     if not self.recorder.record("shop", mode, relic_info["index"], ocr_result, match_result):
                         log(f"匹配记录写入失败，仍保留遗物: {self.recorder.last_error}", "WARNING")
@@ -689,31 +680,6 @@ class ShopAutomation:
             total_time = debug_timer.end("处理10个遗物总耗时")
             debug_timer.record("处理10个遗物总耗时", total_time)
 
-    def _record_kept_relic(self, mode, ordinal, observation, match, screen, log):
-        """购买结果已显示且决定不售出后，保存本件实物及评分。"""
-        try:
-            color, confidence = recognize_color(screen, layout='shop')
-            candidate = match.best_match
-            scoring = normalize_scoring(self.settings.get('scoring'))['enabled']
-            confirmed = bool(match.destructive_action_allowed)
-            result = {
-                'mode': mode, 'color': color, 'color_confidence': confidence,
-                'affixes': observation.get('affixes', []),
-                'scoring_enabled': scoring,
-                'score': candidate.score if scoring else None,
-                'score_details': candidate.score_details if scoring else [],
-                'effective_count': candidate.effective_count,
-                'preset_id': candidate.preset_id, 'preset_name': candidate.preset_name,
-                'decision': ('无法确认' if not confirmed else
-                             '备选' if scoring and candidate.score_grade == 'backup' else '保留'),
-                'action': '保留未动', 'action_confirmed': True,
-                'owned_verified': confirmed,
-                'reason': '' if confirmed else 'OCR或预设无法确认',
-            }
-            self.inventory.record(self.scan_id, ordinal, result, self.settings)
-            log(f"#{ordinal}｜{color}｜{'已录入库存' if confirmed else '已记录，待核实'}", 'INFO')
-        except Exception as exc:
-            log(f"遗物数据库写入失败：{exc}", 'WARNING')
 
     def _match_affixes(self, ocr_result, general_preset, dedicated_presets,
                        blacklist_preset, require_double, mode="normal"):

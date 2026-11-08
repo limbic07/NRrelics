@@ -72,13 +72,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(self.relic_page, FluentIcon.TILES, "遗物管理",
                              NavigationItemPosition.TOP)
         self.loadout_page = RelicPage(self.preset_manager, 'optimizer')
-        self.addSubInterface(self.loadout_page, FluentIcon.TILES, "配装优化",
+        self.addSubInterface(self.loadout_page, FluentIcon.ROBOT, "配装优化",
                              NavigationItemPosition.TOP)
 
         # 存档管理
         self.save_page = SavePage()
-        self.save_page.inventory_restored.connect(self.relic_page.refresh)
-        self.save_page.inventory_restored.connect(self.loadout_page.refresh)
         self.addSubInterface(
             self.save_page,
             FluentIcon.SAVE,
