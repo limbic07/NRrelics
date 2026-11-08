@@ -319,7 +319,7 @@ class SavePage(QWidget):
         size_label = QLabel(f"{size_mb:.1f} MB")
         size_label.setFont(QFont("Segoe UI", 8))
         size_label.setStyleSheet(f"color: {secondary_color};")
-        size_label.setFixedWidth(60)
+        size_label.setMinimumWidth(130)
         row_layout.addWidget(size_label)
 
         row_layout.addStretch()
@@ -406,7 +406,8 @@ class SavePage(QWidget):
 
         reply = QMessageBox.question(
             self, "确认恢复",
-            f"确定要恢复备份 \"{backup['display_name']}\" 吗？\n当前存档将被覆盖。",
+            (f"确定要恢复备份 \"{backup['display_name']}\" 吗？\n"
+             + "当前存档将被覆盖，遗物库存不会改动。"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )

@@ -20,6 +20,13 @@ VAMP = ('受到损伤的当下，能通过攻击恢复部分血量',
         '受到损伤的当下，能通过攻击恢复部分血量+2')
 
 
+def _initial_kind(name):
+    for kind in ('战技', '魔法', '祷告'):
+        if name.startswith('出击时，武器' + kind + '改为'):
+            return kind
+    return None
+
+
 def load_catalog():
     with open(get_resource_path('data/build_requirements.json'), encoding='utf-8') as f:
         builds = json.load(f)['builds']
@@ -81,6 +88,7 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
     if not 0 <= min_ratio <= 1:
         raise ValueError('最低比例须在 0% 到 100% 之间')
     from scipy.optimize import Bounds, LinearConstraint, milp
+    from scipy.sparse import csr_matrix, vstack
     groups = required_groups or []
     if not isinstance(groups, list) or any(not isinstance(g, list) or not g for g in groups):
         raise ValueError('必备条件格式无效')
@@ -132,7 +140,23 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             if points is not None and affix not in REPEATABLE:
                 effects.setdefault((mode, affix), (points, []))[1].append(i)
     effect_keys = list(effects)
-    length = n + len(effect_keys)
+    # Each group consumes one occurrence, independently from scoring deduplication.
+    allocations = []
+    for g, group in enumerate(groups):
+        seen = set()
+        for entry in group:
+            key = (entry['kind'], entry.get('id') if entry['kind'] == 'official' else entry.get('name'))
+            if key not in seen:
+                allocations.append((g, key, entry))
+                seen.add(key)
+    offset = n + len(effect_keys)
+    slot_offset = offset + len(allocations)
+    initial_keys = [j for j, (_,name) in enumerate(effect_keys) if _initial_kind(name)]
+    initial_offset = slot_offset + 3*n
+    length = initial_offset + 3*len(initial_keys)
+    def slot_var(i, position):
+        return slot_offset + 3*i + position
+
     cost = np.zeros(length)
     for j, key in enumerate(effect_keys):
         cost[n+j] = -effects[key][0]
@@ -154,19 +178,28 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
 
     base_rows, base_lows, base_highs = [], [], []
     def add(rows, lows, highs, coeff, lo=-np.inf, hi=np.inf):
-        rows.append(coeff); lows.append(lo); highs.append(hi)
+        rows.append(csr_matrix(coeff.reshape(1, -1))); lows.append(lo); highs.append(hi)
     for mode in active_modes:
         coeff = np.zeros(length)
         for i, relic in enumerate(candidates):
             if relic['relic_type'] == mode:
                 coeff[i] = 1
         add(base_rows, base_lows, base_highs, coeff, 3, 3)
-    for group in groups:
+    for g in range(len(groups)):
         coeff = np.zeros(length)
+        for j, (owner, _, _) in enumerate(allocations):
+            if owner == g:
+                coeff[offset+j] = 1
+        add(base_rows, base_lows, base_highs, coeff, 1, 1)
+    for key in {key for _, key, _ in allocations}:
+        coeff = np.zeros(length)
+        for j, (_, entry_key, _) in enumerate(allocations):
+            if entry_key == key:
+                coeff[offset+j] = 1
         for i, relic in enumerate(candidates):
-            if any(_satisfies(relic, item) for item in group):
-                coeff[i] = 1
-        add(base_rows, base_lows, base_highs, coeff, lo=1)
+            coeff[i] = -(relic['affixes'].count(key[1]) if key[0] == 'affix' else
+                         int(relic['relic_type'] == 'normal' and relic.get('official_id') == key[1]))
+        add(base_rows, base_lows, base_highs, coeff, hi=0)
     for j, key in enumerate(effect_keys):
         coeff = np.zeros(length); coeff[n+j] = 1
         for i in effects[key][1]:
@@ -191,18 +224,50 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
         coeff = np.zeros(length); coeff[weapon_buffs] = 1
         add(base_rows, base_lows, base_highs, coeff, hi=1)
 
+    # A chosen relic occupies one compatible slot; each slot holds one relic.
+    for i in range(n):
+        coeff = np.zeros(length); coeff[i] = -1
+        for pos in range(3): coeff[slot_var(i,pos)] = 1
+        add(base_rows, base_lows, base_highs, coeff, 0, 0)
+    for mode in active_modes:
+        for pos in range(3):
+            coeff = np.zeros(length)
+            for i,r in enumerate(candidates):
+                if r['relic_type'] == mode: coeff[slot_var(i,pos)] = 1
+            add(base_rows, base_lows, base_highs, coeff, 1, 1)
+    for k,j in enumerate(initial_keys):
+        mode,name = effect_keys[j]
+        kind = _initial_kind(name)
+        coeff = np.zeros(length); coeff[n+j] = -1
+        for pos in range(3): coeff[initial_offset+3*k+pos] = 1
+        add(base_rows, base_lows, base_highs, coeff, 0, 0)
+        for pos in range(3):
+            z = initial_offset+3*k+pos
+            coeff = np.zeros(length); coeff[z] = 1
+            for i in effects[(mode,name)][1]: coeff[slot_var(i,pos)] = -1
+            add(base_rows, base_lows, base_highs, coeff, hi=0)
+            # Any earlier replacement of this kind, even an unscored one, blocks it.
+            coeff = np.zeros(length); coeff[z] = 6
+            rank = (3 if mode == 'deepnight' else 0) + pos
+            for i,r in enumerate(candidates):
+                if not any(_initial_kind(a)==kind for a in r['affixes']): continue
+                for earlier in range(3):
+                    if (3 if r['relic_type']=='deepnight' else 0)+earlier < rank:
+                        coeff[slot_var(i,earlier)] = 1
+            add(base_rows, base_lows, base_highs, coeff, hi=6)
+    for kind in ('战技','魔法','祷告'):
+        coeff = np.zeros(length)
+        for j in initial_keys:
+            if _initial_kind(effect_keys[j][1])==kind: coeff[n+j]=1
+        add(base_rows, base_lows, base_highs, coeff, hi=1)
+
     def solve_vessel(vessel, excluded=(), minimum=None):
         rows = list(base_rows); lows = list(base_lows); highs = list(base_highs)
-        for mode in active_modes:
-            slots = _slots(vessel['normal_en' if mode == 'normal' else 'deep_en'])
-            for size in range(1, 5):
-                for subset in itertools.combinations(COLORS.values(), size):
-                    coeff = np.zeros(length)
-                    for i, relic in enumerate(candidates):
-                        if relic['relic_type'] == mode and relic['color'] in subset:
-                            coeff[i] = 1
-                    add(rows, lows, highs, coeff,
-                        hi=sum(slot == '*' or slot in subset for slot in slots))
+        upper = np.ones(length)
+        for i,relic in enumerate(candidates):
+            slots = _slots(vessel['normal_en' if relic['relic_type']=='normal' else 'deep_en'])
+            for pos,color in enumerate(slots):
+                if color != '*' and color != relic['color']: upper[slot_var(i,pos)] = 0
         for selected_ids in excluded:
             coeff = np.zeros(length)
             for i, relic in enumerate(candidates):
@@ -211,22 +276,26 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             add(rows, lows, highs, coeff, hi=3 * len(active_modes) - 1)
         if minimum is not None:
             add(rows, lows, highs, cost.copy(), hi=-minimum)
-        result = milp(cost, integrality=np.ones(length), bounds=Bounds(0, 1),
-                      constraints=LinearConstraint(np.vstack(rows), lows, highs),
+        result = milp(cost, integrality=np.ones(length), bounds=Bounds(0, upper),
+                      constraints=LinearConstraint(vstack(rows, format='csc'), lows, highs),
                       options={'time_limit': time_limit, 'mip_rel_gap': 0.0})
         if result.status == 2:
             return None
         if result.status != 0 or result.x is None:
             raise RuntimeError(f"高脚杯 {vessel['name_en']} 未能证明最优：{result.message}")
-        selected_indices = [i for i in range(n) if result.x[i] > 0.5]
+        selected_indices = [i for i in range(n) if result.x[i]>0.5]
+        positions = {i:next(pos for pos in range(3) if result.x[slot_var(i,pos)]>0.5)
+                     for i in selected_indices}
+        display_order = [candidates[i] for i in sorted(selected_indices,
+                         key=lambda i:(candidates[i]['relic_type']=='deepnight',positions[i]))]
         breakdown = {i: {affix: 0 for affix in candidates[i]['affixes']}
                      for i in selected_indices}
         adjustments = {i: 0 for i in selected_indices}
         for j, (mode, affix) in enumerate(effect_keys):
             if result.x[n+j] <= 0.5:
                 continue
-            owner = next((i for i in effects[(mode, affix)][1]
-                          if i in breakdown), None)
+            owner = next((i for r in display_order for i in effects[(mode, affix)][1]
+                          if i in breakdown and candidates[i]['id'] == r['id']), None)
             if owner is not None:
                 breakdown[owner][affix] += effects[(mode, affix)][0]
         selected = []
@@ -248,19 +317,23 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             selected.append(dict(relic, affix_points=breakdown[i],
                                  official_adjustment=adjustments[i],
                                  score_contribution=sum(breakdown[i].values()) + adjustments[i]))
-        # 求解不区分槽位次序，但展示必须按器皿从左到右的颜色排列。
+        # Use the feasible order that actually activates the scored initial effects.
+        by_id = {item['id']: item for item in selected}
         for mode in active_modes:
-            mode_items = sorted((item for item in selected if item['relic_type'] == mode),
-                                key=lambda item: item['id'])
             slots = _slots(vessel['normal_en' if mode == 'normal' else 'deep_en'])
-            assignment = next((order for order in itertools.permutations(mode_items)
-                               if all(slot == '*' or item['color'] == slot
-                                      for slot, item in zip(slots, order))), None)
-            if assignment is None:
-                raise RuntimeError('器皿槽位与遗物颜色无法对应')
+            assignment = [by_id[r['id']] for r in display_order if r['relic_type'] == mode]
             for position, item in enumerate(assignment):
                 item['slot_index'] = position
                 item['slot_color'] = slots[position]
+        first_initial = {}
+        for original in display_order:
+            item = by_id[original['id']]
+            item['initial_effect_status'] = {}
+            for name in item['affixes']:
+                kind = _initial_kind(name)
+                if kind:
+                    item['initial_effect_status'][name] = '生效' if kind not in first_initial else '被左侧覆盖，不计分'
+                    first_initial.setdefault(kind,name)
         selected.sort(key=lambda item: (item['relic_type'] == 'deepnight', item['slot_index']))
         assert sum(item['score_contribution'] for item in selected) == round(-result.fun)
         return {'score': round(-result.fun), 'vessel': vessel['name_en'],

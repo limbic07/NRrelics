@@ -273,7 +273,8 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
 
         # 检查是否需要尝试合并：当前行未被纠正、存在下一行、且该行未曾尝试过合并
         should_try_merge = (
-            not is_corrected and  # 当前行未被纠正
+            (not is_corrected or
+             (entry != corrected_text and corrected_text.startswith(entry))) and
             i + 1 < len(entries) and  # 存在下一行
             i not in merge_attempted  # 该行未曾尝试过合并
         )
@@ -289,10 +290,13 @@ def correct_entries(entries: list, corrector: EntryCorrector) -> list:
                 merged_candidate = entry + cleaned_next
 
                 # 计算合并后的相似度
-                merged_text, merged_similarity, _ = corrector.correct_entry(merged_candidate)
+                merged_text, merged_similarity, merged_is_corrected = corrector.correct_entry(merged_candidate)
 
                 # 决策：仅当合并后相似度更高时才合并
-                if merged_similarity > similarity:
+                if (merged_is_corrected and merged_similarity > similarity and
+                        (not is_corrected or
+                         (merged_text == corrected_text and
+                          merged_candidate == corrected_text))):
                     log_debug(f"    [动态合并] {entry}")
                     log_debug(f"             + {next_entry}")
                     log_debug(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")
@@ -368,6 +372,7 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector, original
     for i, entry in enumerate(entries):
         # 如果这一行已经被合并过，跳过它
         if i in merged_indices:
+            skip_next = False
             continue
 
         if skip_next:
@@ -379,7 +384,8 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector, original
 
         # 检查是否需要尝试合并：当前行未被纠正、存在下一行、且该行未曾尝试过合并
         should_try_merge = (
-            not is_corrected and  # 当前行未被纠正
+            (not is_corrected or
+             (entry != corrected_text and corrected_text.startswith(entry))) and
             i + 1 < len(entries) and  # 存在下一行
             i not in merge_attempted  # 该行未曾尝试过合并
         )
@@ -398,7 +404,10 @@ def correct_entries_with_info(entries: list, corrector: EntryCorrector, original
                 merged_text, merged_similarity, merged_is_corrected = correct_with_trace(merged_candidate)
 
                 # 决策：仅当合并后相似度更高时才合并
-                if merged_similarity > similarity:
+                if (merged_is_corrected and merged_similarity > similarity and
+                        (not is_corrected or
+                         (merged_text == corrected_text and
+                          merged_candidate == corrected_text))):
                     log_debug(f"    [动态合并] {entry}")
                     log_debug(f"             + {next_entry}")
                     log_debug(f"             -> {merged_text} (原始: {similarity:.2%}, 合并: {merged_similarity:.2%})")

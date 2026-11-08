@@ -45,42 +45,8 @@ class RelicInventory:
             ''')
             if 'official_id' not in {row[1] for row in db.execute('PRAGMA table_info(relics)')}:
                 db.execute('ALTER TABLE relics ADD COLUMN official_id INTEGER')
-        if path is None:
-            self.ensure_official_owned()
-
-    def ensure_official_owned(self):
-        """Add every bundled official relic once and keep its canonical data locked."""
-        from core.official_relics import load_official_relics
-        now = datetime.now(timezone.utc).isoformat()
-        with self._connect() as db:
-            for official in load_official_relics():
-                identifier = official['id']
-                affixes = official['affixes']
-                fingerprint = hashlib.sha256(json.dumps(
-                    ['normal', official['color'], sorted(affixes)],
-                    ensure_ascii=False).encode()).hexdigest()
-                existing = db.execute('SELECT id FROM relics WHERE official_id=? ORDER BY id LIMIT 1',
-                                      (identifier,)).fetchone()
-                if existing:
-                    relic_id = existing[0]
-                    db.execute('''UPDATE relics SET fingerprint=?,relic_type='normal',color=?,
-                        affixes_json=?,confidence=1.0 WHERE id=?''',
-                        (fingerprint, official['color'], json.dumps(affixes, ensure_ascii=False), relic_id))
-                    db.execute('DELETE FROM inventory_hidden WHERE relic_id=?', (relic_id,))
-                else:
-                    cursor = db.execute('''INSERT INTO relics
-                        (fingerprint,relic_type,color,affixes_json,confidence,first_seen,official_id)
-                        VALUES(?,'normal',?,?,1.0,?,?)''',
-                        (fingerprint, official['color'], json.dumps(affixes, ensure_ascii=False),
-                         now, identifier))
-                    relic_id = cursor.lastrowid
-                db.execute('INSERT OR REPLACE INTO manual_relic_names(relic_id,name) VALUES(?,?)',
-                           (relic_id, official['name']))
-                db.execute('''INSERT OR IGNORE INTO scans
-                    (scan_id,relic_id,scanned_at,ordinal,decision,action,action_confirmed,
-                     owned_verified,reason) VALUES(?,?,?,?,?,?,?,?,?)''',
-                    (f'official:{identifier}', relic_id, now, 1, '保留', '保留未动',
-                     1, 1, '内置官方遗物'))
+            # 旧版内置官方候选不再作为实际拥有的库存。
+            db.execute("UPDATE scans SET owned_verified=0 WHERE scan_id LIKE 'official:%'")
 
     @contextmanager
     def _connect(self):
@@ -94,40 +60,37 @@ class RelicInventory:
         finally:
             db.close()
 
-    def record(self, scan_id, ordinal, result, settings):
+
+    def sync_save(self, snapshot, slot):
+        """Replace the active owned set atomically; keep scan history and physical duplicates."""
+        from uuid import uuid4
+        if slot['errors'] or not slot['items']:
+            raise ValueError('存档存在未识别数据，当前库存未更改：' + '；'.join(slot['errors'][:8]))
         now = datetime.now(timezone.utc).isoformat()
-        affixes = [str(a.get('cleaned_text') or '') for a in result.get('affixes', [])]
-        normalized = sorted(affixes)
-        fingerprint = hashlib.sha256(json.dumps([result['mode'], result['color'], normalized], ensure_ascii=False).encode()).hexdigest()
-        settings_hash = hashlib.sha256(json.dumps(settings.get('scoring', {}), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        scan_id = 'save:' + uuid4().hex
         with self._connect() as db:
-            relic_id = None
-            if result.get('inventory_scan') and result.get('owned_verified'):
-                # 同一轮中每件实物只能复用一次；两件完全相同的遗物仍保留两行。
-                existing = db.execute('''SELECT r.id FROM relics r
-                    WHERE r.fingerprint=?
-                      AND EXISTS(SELECT 1 FROM scans s WHERE s.relic_id=r.id AND s.owned_verified=1)
-                      AND NOT EXISTS(SELECT 1 FROM inventory_hidden h WHERE h.relic_id=r.id)
-                      AND NOT EXISTS(SELECT 1 FROM scans s WHERE s.relic_id=r.id AND s.scan_id=?)
-                    ORDER BY r.id LIMIT 1''', (fingerprint, scan_id)).fetchone()
+            db.execute('CREATE TABLE IF NOT EXISTS save_items(source TEXT, slot TEXT, handle INTEGER, acquisition INTEGER, relic_id INTEGER, PRIMARY KEY(source,slot,handle,acquisition))')
+            db.execute('UPDATE scans SET owned_verified=0 WHERE owned_verified=1')
+            for ordinal, item in enumerate(slot['items'], 1):
+                key = (snapshot['source'], slot['slot'], item['handle'], item['acquisition'])
+                existing = db.execute('SELECT relic_id FROM save_items WHERE source=? AND slot=? AND handle=? AND acquisition=?', key).fetchone()
+                affixes = json.dumps(item['affixes'], ensure_ascii=False)
+                fingerprint = hashlib.sha256(json.dumps([item['relic_type'],item['color'],sorted(item['affixes'])],ensure_ascii=False).encode()).hexdigest()
+                values = (fingerprint,item['relic_type'],item['color'],affixes,1.0,item.get('official_id'))
                 if existing:
                     relic_id = existing[0]
-            if relic_id is None:
-                cursor = db.execute('INSERT INTO relics(fingerprint,relic_type,color,affixes_json,confidence,first_seen) VALUES(?,?,?,?,?,?)',
-                    (fingerprint, result['mode'], result['color'], json.dumps(affixes, ensure_ascii=False), result['color_confidence'], now))
-                relic_id = cursor.lastrowid
-            db.execute('INSERT INTO scans(scan_id,relic_id,scanned_at,ordinal,decision,action,action_confirmed,owned_verified,reason) VALUES(?,?,?,?,?,?,?,?,?)',
-                (scan_id, relic_id, now, ordinal, result['decision'], result['action'],
-                 int(result.get('action_confirmed', False)), int(result.get('owned_verified', False)), result.get('reason', '')))
-            db.execute('INSERT INTO score_snapshots VALUES(?,?,?,?,?,?,?,?,?)',
-                (scan_id, ordinal, int(result['scoring_enabled']), result['score'],
-                 json.dumps(result['score_details'], ensure_ascii=False), result['effective_count'],
-                 result.get('preset_id'), result.get('preset_name'), settings_hash))
+                    db.execute('UPDATE relics SET fingerprint=?,relic_type=?,color=?,affixes_json=?,confidence=?,official_id=? WHERE id=?',values+(relic_id,))
+                else:
+                    cursor = db.execute('INSERT INTO relics(fingerprint,relic_type,color,affixes_json,confidence,official_id,first_seen) VALUES(?,?,?,?,?,?,?)',values+(now,))
+                    relic_id = cursor.lastrowid
+                    db.execute('INSERT INTO save_items VALUES(?,?,?,?,?)',key+(relic_id,))
+                db.execute('DELETE FROM inventory_hidden WHERE relic_id=?',(relic_id,))
+                db.execute('INSERT OR REPLACE INTO manual_relic_names VALUES(?,?)',(relic_id,item.get('name','')))
+                db.execute('INSERT INTO scans(scan_id,relic_id,scanned_at,ordinal,decision,action,action_confirmed,owned_verified,reason) VALUES(?,?,?,?,?,?,?,?,?)',
+                           (scan_id,relic_id,now,ordinal,'保留','保留未动',1,1,
+                            '存档同步：'+slot['slot']+'；'+snapshot['digest']))
+        return len(slot['items'])
 
-    def update_action(self, scan_id, ordinal, action, confirmed=False, owned=False):
-        with self._connect() as db:
-            db.execute('UPDATE scans SET action=?, action_confirmed=?, owned_verified=? WHERE scan_id=? AND ordinal=?',
-                       (action, int(confirmed), int(owned), scan_id, ordinal))
 
     def list_owned(self):
         """Return distinct physical relic rows confirmed as owned, including manual entries."""

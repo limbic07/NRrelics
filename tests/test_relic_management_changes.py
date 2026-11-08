@@ -5,21 +5,9 @@ from core.official_relics import load_official_relics
 from core.relic_inventory import RelicInventory
 
 
-def test_all_official_relics_are_owned_once_and_locked(tmp_path):
+def test_official_relics_are_not_assumed_owned(tmp_path):
     inventory = RelicInventory(str(tmp_path / 'official.sqlite3'))
-    inventory.ensure_official_owned()
-    inventory.ensure_official_owned()
-    officials = [row for row in inventory.list_owned() if row['official_id'] is not None]
-    assert len(officials) == len(load_official_relics()) == 118
-    assert len({row['official_id'] for row in officials}) == 118
-    with sqlite3.connect(inventory.path) as db:
-        assert db.execute("SELECT COUNT(*) FROM scans WHERE scan_id LIKE 'official:%'").fetchone()[0] == 118
-    import pytest
-    with pytest.raises(ValueError, match='不可删除'):
-        inventory.delete_owned([officials[0]['id']])
-    with pytest.raises(ValueError, match='不可修改'):
-        inventory.save_manual(officials[0]['id'], 'normal', officials[0]['color'],
-                              officials[0]['affixes'])
+    assert inventory.list_owned() == []
 
 
 def test_same_named_requirement_matches_either_relic_type():
@@ -79,7 +67,10 @@ def test_relic_inventory_and_optimizer_are_separate_pages(monkeypatch, tmp_path)
 
     app = QApplication.instance() or QApplication([])
     inventory = RelicInventory(str(tmp_path / 'layout.sqlite3'))
-    inventory.ensure_official_owned()
+    official = load_official_relics()[0]
+    inventory.sync_save({'source': 'test.sl2', 'digest': 'test'}, {
+        'slot': 'USERDATA_0', 'errors': [], 'items': [dict(official,
+        official_id=official['id'], relic_type='normal', handle=1, acquisition=1)]})
     monkeypatch.setattr(page_relics, 'RelicInventory', lambda: inventory)
 
     class Presets:

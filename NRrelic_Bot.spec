@@ -12,21 +12,16 @@ datas = [
     ('data/affix_catalog.json', 'data'),
     ('data/icon_cup.png', 'data'),
     ('data/icon_bookmark.png', 'data'),
-    ('data/relic_color_model.joblib', 'data'),
     ('data/build_requirements.json', 'data'),
     ('data/vessels.json', 'data'),
     ('data/default_presets.json', 'data'),
     ('data/official_relics.json', 'data'),
 ]
+datas += [('data/relic_validation', 'data/relic_validation')]
 datas += collect_data_files('rapidocr')
 
 hiddenimports = [
     'rapidocr.inference_engine.onnxruntime',
-    # The trained colour model loads these classes dynamically via joblib.
-    'sklearn.pipeline',
-    'sklearn.preprocessing._data',
-    'sklearn.svm._classes',
-    'sklearn.svm._libsvm',
 ]
 
 a = Analysis(
@@ -40,6 +35,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         'matplotlib', 'pandas', 'tkinter', 'pytest',
+        'sklearn', 'joblib', 'threadpoolctl',
         'PySide6.QtQml', 'PySide6.QtQuick', 'PySide6.QtPdf',
         'PySide6.QtMultimedia', 'PySide6.QtMultimediaWidgets',
         'PIL._avif',

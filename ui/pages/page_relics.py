@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QEvent
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                                QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QAbstractItemView,
-                               QPushButton, QSpinBox, QTableWidget,
+                               QPushButton, QSpinBox, QTableWidget, QFileDialog, QInputDialog,
                                QTableWidgetItem, QVBoxLayout, QWidget, QFrame, QScrollArea, QHeaderView,
                                )
 
@@ -16,7 +16,7 @@ from core.relic_inventory import RelicInventory
 from core.loadout_optimizer import load_catalog, optimize
 from core.relic_scoring import POSITIVE_TIERS, normalize_affix_tiers
 from core.utils import get_user_data_path, get_resource_path
-from ui.dialogs.optimizer_constraint_dialog import ConstraintGroupDialog, describe_requirement
+from ui.dialogs.optimizer_constraint_dialog import ConstraintGroupDialog, describe_requirement, add_rule_help, show_constraint_details
 from qfluentwidgets import CardWidget, PushButton, PrimaryPushButton
 
 
@@ -290,6 +290,8 @@ class LoadoutResultDialog(QDialog):
                 affix=names[index]
                 points=relic.get('affix_points',{}).get(affix,0)
                 text=QLabel(f"{'负面' if is_negative else '正面'}｜{affix}　{points:+d} 分")
+                status = relic.get('initial_effect_status', {}).get(affix)
+                if status: text.setText(text.text() + '（' + status + '）')
                 text.setWordWrap(True)
                 text.setStyleSheet('font-size:9pt;color:#a05050;' if is_negative
                                    else 'font-size:11pt;')
@@ -354,7 +356,7 @@ class RelicPage(QWidget):
         for label,handler in (('添加遗物',self._add),('按词条筛选',self._filter_by_affix),
                               ('清除筛选',self._clear_affix_filter),
                               ('删除勾选遗物',self._delete),('全选',self._select_all),
-                              ('全部取消',self._clear_all),('刷新库存',self.refresh)):
+                              ('全部取消',self._clear_all),('刷新库存',self._sync_from_save)):
             button=PushButton(label);button.clicked.connect(handler);controls.addWidget(button)
         inventory_layout.addLayout(controls)
         self.table=QTableWidget(0,4)
@@ -373,7 +375,7 @@ class RelicPage(QWidget):
         self.table.cellEntered.connect(self._highlight_row)
         self.table.cellDoubleClicked.connect(self._edit_row)
         inventory_layout.addWidget(self.table,1)
-        inventory_layout.addWidget(QLabel('官方遗物已全部内置并默认拥有；表格左侧为当前行号，官方遗物不可编辑或删除。'))
+        inventory_layout.addWidget(QLabel('刷新库存从存档同步实际拥有的遗物；同步后按所选存档槽位显示。官方遗物不可编辑或删除。'))
         inventory_layout.addWidget(QLabel('右键可勾选或取消；双击普通遗物可编辑。“锁”表示不可修改的官方遗物。'))
 
         section_title=QLabel('选择角色和流派')
@@ -422,7 +424,7 @@ class RelicPage(QWidget):
         conditions_title=QLabel('本次优化的必备条件')
         conditions_title.setStyleSheet('font-size: 13pt; font-weight: bold;')
         optimizer_layout.addWidget(conditions_title)
-        optimizer_layout.addWidget(QLabel('各组都须满足；同组任选一项。'))
+        add_rule_help(optimizer_layout, self)
         self.group_list=QListWidget();self.group_list.setMinimumHeight(140)
         self.group_list.setSelectionMode(QAbstractItemView.NoSelection)
         self.group_list.setWordWrap(True)
@@ -496,6 +498,31 @@ class RelicPage(QWidget):
     def _clear_affix_filter(self):
         self.affix_filter=''
         self.refresh()
+
+    def _sync_from_save(self):
+        from core.save_manager import SaveManager
+        from core.save_inventory import read_save_inventory
+        path, _ = QFileDialog.getOpenFileName(self, '选择要同步的游戏存档',
+                                              SaveManager.SAVE_DIR_BASE, '游戏存档 (*.sl2 *.co2)')
+        if not path: return
+        try:
+            snapshot = read_save_inventory(path)
+            slots = snapshot['slots']
+            labels = [f"{s['name'] or '未命名'} · {s['slot']} · {len(s['items'])} 件" for s in slots]
+            selected, ok = QInputDialog.getItem(self,'选择库存','存档槽位',labels,0,False)
+            if not ok: return
+            slot = slots[labels.index(selected)]
+            if slot['errors']:
+                raise ValueError('无法完整映射词条，未修改库存：\n'+'\n'.join(slot['errors'][:12]))
+            if QMessageBox.question(self,'同步库存',
+                    f"将当前可用库存替换为所选存档中的 {len(slot['items'])} 件遗物。\n"
+                    '未拥有的官方遗物和存档中不存在的旧记录将不再参与配装。历史记录保留。',
+                    QMessageBox.Yes|QMessageBox.No,QMessageBox.No)!=QMessageBox.Yes: return
+            count = self.inventory.sync_save(snapshot,slot)
+            self.refresh()
+            QMessageBox.information(self,'同步完成',f'已从存档同步 {count} 件遗物。')
+        except Exception as exc:
+            QMessageBox.warning(self,'同步失败',str(exc))
 
     def refresh(self):
         self.items=self.inventory.list_owned()
@@ -643,7 +670,7 @@ class RelicPage(QWidget):
         return choices
 
     def _add_group(self):
-        dialog=ConstraintGroupDialog(self._choices(),parent=self)
+        dialog=ConstraintGroupDialog(self._choices(),parent=self, other_groups=list(enumerate(self.groups, 1)))
         if dialog.exec()==QDialog.Accepted:
             self.groups.append(dialog.selected());self._save_groups()
 
@@ -652,7 +679,8 @@ class RelicPage(QWidget):
         if len(checked)!=1:
             QMessageBox.information(self,'编辑条件组','请只勾选一个条件组。');return
         index=checked[0]
-        dialog=ConstraintGroupDialog(self._choices(),self.groups[index],self)
+        dialog=ConstraintGroupDialog(self._choices(),self.groups[index],self,
+                                     other_groups=[(i+1,g) for i,g in enumerate(self.groups) if i!=index])
         if dialog.exec()==QDialog.Accepted:
             self.groups[index]=dialog.selected();self._save_groups()
 
@@ -666,10 +694,7 @@ class RelicPage(QWidget):
                 if self.group_list.item(index).checkState()==Qt.Checked]
 
     def _show_logic(self):
-        text=('没有必备条件。' if not self.groups else
-              '\n并且\n'.join('（'+' 或 '.join(describe_requirement(x) for x in group)+'）'
-                              for group in self.groups))
-        QMessageBox.information(self,'当前必备条件逻辑',text)
+        show_constraint_details(self, self.groups)
 
     def _solve(self):
         if self.normal.currentData() == self.deep.currentData() == 'none':

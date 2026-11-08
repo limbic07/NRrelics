@@ -6,6 +6,7 @@
 import os
 import re
 import shutil
+import tempfile
 from datetime import datetime
 from core.utils import get_user_data_path, log_debug
 
@@ -25,6 +26,11 @@ class SaveManager:
 
     # 备份目录
     BACKUP_DIR = get_user_data_path("data/save_backups")
+    @staticmethod
+    def _temporary_path(directory: str) -> str:
+        fd, path = tempfile.mkstemp(prefix=".nrrelic_backup_", dir=directory)
+        os.close(fd)
+        return path
 
     def __init__(self, steam_path: str = ""):
         configured_path = self._normalize_steam_path(steam_path)
@@ -247,32 +253,40 @@ class SaveManager:
         if os.path.exists(backup_path):
             return False, f"已存在同名备份: {backup_name}"
 
+        temp_save = None
         try:
-            shutil.copy2(save_path, backup_path)
+            temp_save = self._temporary_path(backup_dir)
+            shutil.copy2(save_path, temp_save)
+            os.replace(temp_save, backup_path)
+            temp_save = None
             return True, f"备份成功: {backup_name}"
         except Exception as e:
             return False, f"备份失败: {e}"
+        finally:
+            if temp_save and os.path.exists(temp_save):
+                os.remove(temp_save)
 
     def restore_save(self, steam_id: str, backup_path: str) -> tuple:
-        """恢复存档"""
+        """仅恢复游戏存档，不读取或修改遗物数据库。"""
         if not os.path.exists(backup_path):
             return False, "备份文件不存在"
-
         save_path = self.get_save_path(steam_id)
         save_dir = os.path.dirname(save_path)
-        os.makedirs(save_dir, exist_ok=True)
-
+        temp_save = None
         try:
-            # 如果当前存档存在，先备份到游戏存档目录（.sl2.bak）
+            os.makedirs(save_dir, exist_ok=True)
+            temp_save = self._temporary_path(save_dir)
+            shutil.copy2(backup_path, temp_save)
             if os.path.exists(save_path):
-                bak_path = save_path + ".bak"
-                shutil.copy2(save_path, bak_path)
-
-            # 恢复备份
-            shutil.copy2(backup_path, save_path)
-            return True, "存档恢复成功"
+                shutil.copy2(save_path, save_path + ".bak")
+            os.replace(temp_save, save_path)
+            temp_save = None
+            return True, "存档恢复成功；如需更新遗物库存，请在遗物管理中点击刷新库存"
         except Exception as e:
             return False, f"恢复失败: {e}"
+        finally:
+            if temp_save and os.path.exists(temp_save):
+                os.remove(temp_save)
 
     def rename_backup(self, old_path: str, new_name: str) -> tuple:
         """重命名备份"""

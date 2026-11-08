@@ -546,11 +546,7 @@ class ShopAutomation:
                 debug_timer.start(f"relic_{i+1}_capture")
 
             # ===== OCR 自动采集调试代码：采集与 OCR 使用完全相同的一次截图 =====
-            ocr_screen = None
-            if self.ocr_debug_session:
-                line_images, ocr_screen = self._capture_shop_line_rois(with_screen=True)
-            else:
-                line_images = self._capture_shop_line_rois()
+            line_images, ocr_screen = self._capture_shop_line_rois(with_screen=True)
             ocr_trace = {} if self.ocr_debug_session else None
             # ===== OCR 自动采集调试代码结束 =====
 
@@ -683,6 +679,7 @@ class ShopAutomation:
         if DEBUG_ENABLED:
             total_time = debug_timer.end("处理10个遗物总耗时")
             debug_timer.record("处理10个遗物总耗时", total_time)
+
 
     def _match_affixes(self, ocr_result, general_preset, dedicated_presets,
                        blacklist_preset, require_double, mode="normal"):
