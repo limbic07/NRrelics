@@ -218,20 +218,6 @@ class Application:
 
 def main():
     """主函数"""
-    if len(sys.argv) == 3 and sys.argv[1] == '--diagnose-color':
-        import cv2
-        from core.relic_color import recognize_color, _model
-        report = Path(get_user_data_path('data/color_diagnostic.txt'))
-        try:
-            image = cv2.imread(sys.argv[2])
-            result = recognize_color(image)
-            report.write_text(f'image={None if image is None else image.shape}\n'
-                              f'color={result}\nmodel={type(_model()).__name__}\n',
-                              encoding='utf-8')
-        except Exception as exc:
-            import traceback
-            report.write_text(traceback.format_exc(), encoding='utf-8')
-        return
     app = Application()
     sys.exit(app.run())
 

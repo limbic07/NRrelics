@@ -16,7 +16,7 @@ from core.relic_inventory import RelicInventory
 from core.loadout_optimizer import load_catalog, optimize
 from core.relic_scoring import POSITIVE_TIERS, normalize_affix_tiers
 from core.utils import get_user_data_path, get_resource_path
-from ui.dialogs.optimizer_constraint_dialog import ConstraintGroupDialog, describe_requirement
+from ui.dialogs.optimizer_constraint_dialog import ConstraintGroupDialog, describe_requirement, add_rule_help, show_constraint_details
 from qfluentwidgets import CardWidget, PushButton, PrimaryPushButton
 
 
@@ -290,6 +290,8 @@ class LoadoutResultDialog(QDialog):
                 affix=names[index]
                 points=relic.get('affix_points',{}).get(affix,0)
                 text=QLabel(f"{'负面' if is_negative else '正面'}｜{affix}　{points:+d} 分")
+                status = relic.get('initial_effect_status', {}).get(affix)
+                if status: text.setText(text.text() + '（' + status + '）')
                 text.setWordWrap(True)
                 text.setStyleSheet('font-size:9pt;color:#a05050;' if is_negative
                                    else 'font-size:11pt;')
@@ -422,7 +424,7 @@ class RelicPage(QWidget):
         conditions_title=QLabel('本次优化的必备条件')
         conditions_title.setStyleSheet('font-size: 13pt; font-weight: bold;')
         optimizer_layout.addWidget(conditions_title)
-        optimizer_layout.addWidget(QLabel('各组都须满足；同组任选一项。'))
+        add_rule_help(optimizer_layout, self)
         self.group_list=QListWidget();self.group_list.setMinimumHeight(140)
         self.group_list.setSelectionMode(QAbstractItemView.NoSelection)
         self.group_list.setWordWrap(True)
@@ -668,7 +670,7 @@ class RelicPage(QWidget):
         return choices
 
     def _add_group(self):
-        dialog=ConstraintGroupDialog(self._choices(),parent=self)
+        dialog=ConstraintGroupDialog(self._choices(),parent=self, other_groups=list(enumerate(self.groups, 1)))
         if dialog.exec()==QDialog.Accepted:
             self.groups.append(dialog.selected());self._save_groups()
 
@@ -677,7 +679,8 @@ class RelicPage(QWidget):
         if len(checked)!=1:
             QMessageBox.information(self,'编辑条件组','请只勾选一个条件组。');return
         index=checked[0]
-        dialog=ConstraintGroupDialog(self._choices(),self.groups[index],self)
+        dialog=ConstraintGroupDialog(self._choices(),self.groups[index],self,
+                                     other_groups=[(i+1,g) for i,g in enumerate(self.groups) if i!=index])
         if dialog.exec()==QDialog.Accepted:
             self.groups[index]=dialog.selected();self._save_groups()
 
@@ -691,10 +694,7 @@ class RelicPage(QWidget):
                 if self.group_list.item(index).checkState()==Qt.Checked]
 
     def _show_logic(self):
-        text=('没有必备条件。' if not self.groups else
-              '\n并且\n'.join('（'+' 或 '.join(describe_requirement(x) for x in group)+'）'
-                              for group in self.groups))
-        QMessageBox.information(self,'当前必备条件逻辑',text)
+        show_constraint_details(self, self.groups)
 
     def _solve(self):
         if self.normal.currentData() == self.deep.currentData() == 'none':
