@@ -64,11 +64,11 @@ class PresetEditDialog(QDialog):
         self.resize(820, 690)
         self.setMinimumSize(700, 560)
         self.setStyleSheet('''
-            QDialog { background: #f5f5f5; }
-            QListWidget { background: white; border: 1px solid #d8d8d8;
+            QDialog { background: palette(window); }
+            QListWidget { background: palette(base); border: 1px solid palette(mid);
                           border-radius: 9px; padding: 4px; }
             QListWidget::item { min-height: 30px; padding: 4px 8px; }
-            QListWidget::item:selected { background: #dceffc; color: #111; border-radius: 5px; }
+            QListWidget::item:selected { background: palette(highlight); color: palette(highlighted-text); border-radius: 5px; }
             QPushButton#tierButton { min-height: 30px; }
             QPushButton#tierButton:checked { background: #009eaa; color: white;
                 border: 1px solid #009eaa; border-radius: 5px; }
@@ -106,8 +106,8 @@ class PresetEditDialog(QDialog):
                 self.tier_buttons[tier] = button
             positive_row.addStretch()
             layout.addLayout(positive_row)
-            if self.mode == "deepnight":
-                layout.addWidget(QLabel("深夜负面词条也可在上方选为正面效果；或在这里指定扣分等级"))
+            if not self.is_blacklist:
+                layout.addWidget(QLabel("可将正面词条设为扣分等级；深夜原生负面词条优先显示"))
                 negative_row = QHBoxLayout()
                 for tier in NEGATIVE_TIERS:
                     button = QPushButton(TIER_NAMES[tier])
@@ -199,8 +199,8 @@ class PresetEditDialog(QDialog):
             names = self.positive_vocabulary
             label = "黑名单词条"
         elif self.current_tier in NEGATIVE_TIERS:
-            names = self.negative_vocabulary
-            label = f"{TIER_NAMES[self.current_tier]}：选择深夜负面词条"
+            names = list(dict.fromkeys(self.negative_vocabulary + self.positive_vocabulary))
+            label = f"{TIER_NAMES[self.current_tier]}：选择扣分词条"
         else:
             names = self.positive_vocabulary + self.negative_vocabulary
             label = f"{TIER_NAMES[self.current_tier]}：选择正面词条"

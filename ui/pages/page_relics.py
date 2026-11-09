@@ -17,7 +17,7 @@ from core.loadout_optimizer import load_catalog, optimize
 from core.relic_scoring import POSITIVE_TIERS, normalize_affix_tiers
 from core.utils import get_user_data_path, get_resource_path
 from ui.dialogs.optimizer_constraint_dialog import ConstraintGroupDialog, describe_requirement, add_rule_help, show_constraint_details
-from qfluentwidgets import CardWidget, PushButton, PrimaryPushButton
+from qfluentwidgets import CardWidget, PushButton, PrimaryPushButton, isDarkTheme
 
 
 def _vocabulary(mode, negative=False):
@@ -35,7 +35,7 @@ class AffixPickerDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('查询并选择词条')
         self.resize(700, 540)
-        self.setStyleSheet('QDialog { background: #f5f5f5; } QListWidget { background: white; border: 1px solid #d8d8d8; border-radius: 8px; padding: 5px; } QListWidget::item { min-height: 30px; padding: 4px 8px; } QPushButton { min-height: 30px; }')
+        self.setStyleSheet('QDialog { background: palette(window); } QListWidget { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; padding: 5px; } QListWidget::item { min-height: 30px; padding: 4px 8px; } QPushButton { min-height: 30px; }')
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24,20,24,20)
         layout.setSpacing(8)
@@ -91,7 +91,7 @@ class EditRelicDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('编辑遗物' if relic else '添加遗物')
         self.resize(740, 550 if relic and relic.get('relic_type')=='deepnight' else 420)
-        self.setStyleSheet('QDialog { background: #f5f5f5; } QPushButton { min-height: 30px; } QComboBox { min-height: 30px; } QFrame#affixCard { background: white; border: 1px solid #dedede; border-radius: 8px; }')
+        self.setStyleSheet('QDialog { background: palette(window); } QPushButton { min-height: 30px; } QComboBox { min-height: 30px; } QFrame#affixCard { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }')
         layout=QVBoxLayout(self)
         layout.setContentsMargins(24,20,24,20)
         layout.setSpacing(12)
@@ -276,7 +276,7 @@ class LoadoutResultDialog(QDialog):
         layout.addWidget(title)
         row=rows_by_id.get(relic['id'])
         location=QLabel(f"遗物表格第 {row} 行" if row else '当前表格中未找到')
-        location.setStyleSheet('font-size:11pt;color:#176b8b;')
+        location.setStyleSheet('font-size:11pt;color:palette(link);')
         layout.addWidget(location)
         if relic.get('name'):
             name=QLabel(relic['name']);name.setWordWrap(True)
@@ -293,14 +293,14 @@ class LoadoutResultDialog(QDialog):
                 status = relic.get('initial_effect_status', {}).get(affix)
                 if status: text.setText(text.text() + '（' + status + '）')
                 text.setWordWrap(True)
-                text.setStyleSheet('font-size:9pt;color:#a05050;' if is_negative
+                text.setStyleSheet(('font-size:9pt;color:#f19c9c;' if isDarkTheme() else 'font-size:9pt;color:#a05050;') if is_negative
                                    else 'font-size:11pt;')
                 layout.addWidget(text)
         adjustment=relic.get('official_adjustment',0)
         if adjustment:
             correction=QLabel(f'官方遗物整体评分修正　{adjustment:+d} 分')
             correction.setWordWrap(True)
-            correction.setStyleSheet('font-size:10pt;color:#8b6b17;')
+            correction.setStyleSheet('font-size:10pt;color:#dfc36f;' if isDarkTheme() else 'font-size:10pt;color:#8b6b17;')
             layout.addWidget(correction)
         layout.addStretch()
         total=QLabel(f"本件贡献 {relic.get('score_contribution',0):+d} 分")
@@ -363,7 +363,7 @@ class RelicPage(QWidget):
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setHorizontalHeaderLabels(['选择','类别','颜色','词条'])
         self.table.setShowGrid(False)
-        self.table.setStyleSheet('QTableWidget { background: white; border: 1px solid #dedede; border-radius: 8px; } QTableWidget::item { border-bottom: 1px solid #eaeaea; padding: 5px; }')
+        self.table.setStyleSheet('QTableWidget { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; } QTableWidget::item { border-bottom: 1px solid palette(mid); padding: 5px; }')
         for column,width in enumerate((35,82,40)):
             self.table.horizontalHeader().setSectionResizeMode(column,QHeaderView.Fixed)
             self.table.setColumnWidth(column,width)
@@ -476,7 +476,7 @@ class RelicPage(QWidget):
 
     def _highlight_row(self,row,*_):
         if row==self.hovered_row:return
-        for index,color in ((self.hovered_row,QBrush()),(row,QBrush(QColor('#e7f3f8')))):
+        for index,color in ((self.hovered_row,QBrush()),(row,QBrush(self.table.palette().highlight().color()))):
             if 0<=index<self.table.rowCount():
                 for column in range(self.table.columnCount()):
                     cell=self.table.item(index,column)
@@ -650,7 +650,7 @@ class RelicPage(QWidget):
                    if pid!='general' else general)
         inherited,_=normalize_affix_tiers(general)
         local,_=normalize_affix_tiers(dedicated or {'affixes':[]})
-        names=set(inherited)|set(local)
+        names={name for name,tier in {**inherited,**local}.items() if tier in POSITIVE_TIERS}
         names-=set((dedicated or {}).get('excluded_affixes',[]))
         if mode=='deepnight':
             for source in (general,dedicated or {}):

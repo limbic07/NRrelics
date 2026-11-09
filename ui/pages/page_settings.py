@@ -182,6 +182,7 @@ class SettingsPage(QWidget):
                 layout.addLayout(row)
                 self.score_inputs[(mode, sign, key)] = field
 
+        layout.addWidget(QLabel("负面等级分数同时适用于普通、深夜预设中被设为负面的正面词条。"))
         layout.addWidget(QLabel("深夜负面词条等级（选择词条后修改）"))
         neg_row = QHBoxLayout()
         self.negative_combo = QComboBox()

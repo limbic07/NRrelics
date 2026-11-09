@@ -61,7 +61,7 @@ class WelcomeDialog(QDialog):
             b = QLabel(body_text)
             b.setFont(QFont("Segoe UI", 9))
             b.setWordWrap(True)
-            b.setStyleSheet("color: #555;")
+            b.setStyleSheet("color: palette(text);")
             card_layout.addWidget(b)
 
             layout.addWidget(card)

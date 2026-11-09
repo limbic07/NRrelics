@@ -13,7 +13,7 @@ class PresetCharacterDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('选择流派角色')
         self.setFixedWidth(520)
-        self.setStyleSheet('QDialog { background: #f5f5f5; }')
+        self.setStyleSheet('QDialog { background: palette(window); }')
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)

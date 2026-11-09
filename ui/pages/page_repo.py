@@ -191,7 +191,8 @@ class PresetCard(CardWidget):
         if self.preset_data.get("type") == "deepnight_blacklist":
             return affix
         tier = self.preset_data.get("affix_tiers", {}).get(affix, "secondary")
-        label = {"core": "重要", "secondary": "次要", "bonus": "锦上添花"}.get(tier, "次要")
+        label = {"core": "重要", "secondary": "次要", "bonus": "锦上添花",
+                 "unacceptable": "不可接受", "harmful": "很伤", "negligible": "几乎无负面"}.get(tier, "次要")
         return f"【{label}】{affix}"
 
     @staticmethod

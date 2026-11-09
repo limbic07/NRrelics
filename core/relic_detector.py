@@ -81,8 +81,13 @@ class RelicDetector:
             log_debug(f"[警告] 模板不存在: {abs_path}")
             return None
 
-        img = cv2.imread(abs_path)
+        try:
+            img = cv2.imdecode(np.frombuffer(Path(abs_path).read_bytes(), dtype=np.uint8), cv2.IMREAD_COLOR)
+        except (OSError, cv2.error) as exc:
+            log_debug(f"[警告] 模板读取失败: {abs_path}: {exc}")
+            return None
         if img is None:
+            log_debug(f"[警告] 模板无法解码: {abs_path}")
             return None
 
         return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

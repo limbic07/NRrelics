@@ -15,7 +15,7 @@ class MainWindow(FluentWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NRrelic Bot v3.0.0")
+        self.setWindowTitle("NRrelic Bot v3.0.1")
 
         # 应用窗口配置
         self.resize(WINDOW_CONFIG["width"], WINDOW_CONFIG["height"])
@@ -24,9 +24,29 @@ class MainWindow(FluentWindow):
         # 设置主题
         theme = Theme.LIGHT if THEME_CONFIG["theme"] == "light" else Theme.DARK
         setTheme(theme)
+        # Native Qt dialogs and tables must use the same palette as Fluent widgets.
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QPalette, QColor
+        app = QApplication.instance()
+        palette = app.style().standardPalette()
+        if theme == Theme.DARK:
+            colors = {"Window": "#202020", "WindowText": "#eeeeee",
+                      "Base": "#2b2b2b", "AlternateBase": "#323232",
+                      "Text": "#eeeeee", "Button": "#333333", "ButtonText": "#eeeeee",
+                      "Mid": "#555555", "Highlight": "#285361", "HighlightedText": "#ffffff",
+                      "ToolTipBase": "#333333", "ToolTipText": "#eeeeee",
+                      "Link": "#66c5dd", "PlaceholderText": "#aaaaaa"}
+            for role, color in colors.items():
+                palette.setColor(getattr(QPalette.ColorRole, role), QColor(color))
+            for role in (QPalette.Text, QPalette.ButtonText, QPalette.WindowText):
+                palette.setColor(QPalette.Disabled, role, QColor("#999999"))
+        app.setPalette(palette)
+        app.setStyleSheet(app.styleSheet() + "\nQDialog, QMessageBox { color: palette(window-text); background: palette(window); }\n"
+                          "QTableWidget, QTreeWidget, QListWidget, QTextBrowser { color: palette(text); background: palette(base); }\n"
+                          "QHeaderView::section { color: palette(button-text); background: palette(button); }\n")
 
-        # 禁用亚克力效果，防止背景跟随系统主题变化
-        self.windowEffect.removeBackgroundEffect(self.winId())
+        # 通过 Fluent 的开关禁用云母，避免背景仍透明、showEvent 再次启用系统背景。
+        self.setMicaEffectEnabled(False)
 
         # 创建中央日志管理器
         self.log_manager = LogManager()

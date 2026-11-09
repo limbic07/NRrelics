@@ -45,7 +45,8 @@ def _score_map(preset, general, scoring, mode):
     tiers = {**inherited, **local}
     for name in (preset or {}).get('excluded_affixes', []):
         tiers.pop(name, None)
-    return {name: scoring[mode]['positive'][tier] for name, tier in tiers.items()}
+    return {name: (scoring[mode]['positive'][tier] if tier in scoring[mode]['positive']
+                   else scoring['deepnight']['negative'][tier]) for name, tier in tiers.items()}
 
 
 def _find_preset(presets, mode, identifier):
@@ -137,7 +138,7 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             if mode == 'deepnight' and affix in negatives:
                 continue
             points = score_maps[mode].get(affix)
-            if points is not None and affix not in REPEATABLE:
+            if points is not None and points >= 0 and affix not in REPEATABLE:
                 effects.setdefault((mode, affix), (points, []))[1].append(i)
     effect_keys = list(effects)
     # Each group consumes one occurrence, independently from scoring deduplication.
@@ -163,7 +164,8 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
     for i, relic in enumerate(candidates):
         mode = relic['relic_type']
         for affix in relic['affixes']:
-            if affix in REPEATABLE:
+            if affix in REPEATABLE or (score_maps[mode].get(affix, 0) < 0
+                        and not (mode == 'deepnight' and affix in negatives)):
                 cost[i] -= score_maps[mode].get(affix, 0)
             if mode == 'deepnight':
                 tier = negatives.get(affix)
@@ -303,7 +305,8 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             relic = candidates[i]
             mode = relic['relic_type']
             for affix in relic['affixes']:
-                if affix in REPEATABLE:
+                if affix in REPEATABLE or (score_maps[mode].get(affix, 0) < 0
+                        and not (mode == 'deepnight' and affix in negatives)):
                     breakdown[i][affix] += score_maps[mode].get(affix, 0)
                 if mode == 'deepnight':
                     tier = negatives.get(affix)

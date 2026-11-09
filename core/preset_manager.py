@@ -275,7 +275,7 @@ class PresetManager:
             return None
         allowed = set(affixes) | set(inherited)
         if not isinstance(tiers, dict) or any(
-                name not in allowed or tier not in POSITIVE_TIERS
+                name not in allowed or tier not in POSITIVE_TIERS + NEGATIVE_TIERS
                 for name, tier in tiers.items()):
             raise ValueError("词条等级配置无效")
         return {**{name: tiers.get(name, "secondary") for name in affixes},

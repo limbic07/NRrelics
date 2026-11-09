@@ -170,7 +170,12 @@ def match_relic(observation, general_preset, dedicated_presets, blacklist_preset
             reclassified = (sorted(name for name in negatives
                                    if negative_tiers.get(name) in POSITIVE_TIERS)
                             if mode == 'deepnight' else [])
-            matched = sorted(set(matched) | set(reclassified))
+            penalized = [name for name in matched if tiers.get(name) not in POSITIVE_TIERS]
+            for name in penalized:
+                points = scoring['deepnight']['negative'][tiers[name]]
+                score += points
+                score_details.append((name, points))
+            matched = sorted((set(matched) - set(penalized)) | set(reclassified))
             for name in matched:
                 tier = negative_tiers[name] if name in reclassified else tiers[name]
                 points = scoring[mode]['positive'][tier]
@@ -197,6 +202,10 @@ def match_relic(observation, general_preset, dedicated_presets, blacklist_preset
                        and not any(negative_tiers.get(name) == 'unacceptable'
                                    for name in negatives))
         else:
+            inherited_tiers, _ = normalize_affix_tiers(general_preset or {})
+            local_tiers, _ = normalize_affix_tiers(preset)
+            effective_tiers = {**inherited_tiers, **local_tiers} if dedicated else local_tiers
+            matched = [name for name in matched if effective_tiers.get(name, 'secondary') in POSITIVE_TIERS]
             qualified = valid and not missing_groups and not hits and len(matched) >= threshold
             perfect = qualified and dedicated and len(matched) >= 3 and observation_certain
         return PresetMatch(str(preset.get('id', preset.get('name', ''))), preset.get('name', ''),

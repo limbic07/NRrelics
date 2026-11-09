@@ -117,6 +117,10 @@ class RepoCleaner:
                 log_debug(f"[{level}] {message}")
 
         try:
+            if self.relic_detector.template_cup is None or self.relic_detector.template_bookmark is None:
+                log("遗物状态模板加载失败，请检查程序资源 data/icon_cup.png 和 data/icon_bookmark.png；已停止清理。", "ERROR")
+                self.stop_reason = "error"
+                return
             # ===== OCR 自动采集调试代码：每次清理建立独立会话；删除时移除此块及下方标记块 =====
             self.ocr_debug_session = create_capture_session(self.settings, "repo", mode, log)
             # ===== OCR 自动采集调试代码结束 =====

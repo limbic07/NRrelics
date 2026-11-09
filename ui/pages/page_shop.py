@@ -897,7 +897,7 @@ class PageShop(QWidget):
         tree.setHeaderLabels(['遗物与词条', '筛选判定', '三有效匹配预设'])
         tree.setColumnWidth(0, 460)
         tree.setColumnWidth(1, 90)
-        tree.setStyleSheet('QTreeWidget { background: white; border: 1px solid #d8d8d8; border-radius: 8px; } QTreeWidget::item { padding: 6px; }')
+        tree.setStyleSheet('QTreeWidget { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; } QTreeWidget::item { padding: 6px; }')
         layout.addWidget(tree, 1)
         for result in self.triple_relics:
             self._append_triple_row(tree, result)

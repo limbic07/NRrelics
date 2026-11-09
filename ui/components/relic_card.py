@@ -20,7 +20,7 @@ class RelicCard(CardWidget):
         # 遗物名称
         name_label = QLabel(name)
         name_label.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        name_label.setStyleSheet("color: #1a1a1a;")
+        name_label.setStyleSheet("color: palette(text);")
         name_label.setWordWrap(True)
         layout.addWidget(name_label)
 
@@ -34,7 +34,7 @@ class RelicCard(CardWidget):
         # 数量
         count_label = QLabel(f"数量: {count}")
         count_label.setFont(QFont("Segoe UI", 10))
-        count_label.setStyleSheet("color: #666666;")
+        count_label.setStyleSheet("color: palette(text);")
         layout.addWidget(count_label)
 
         layout.addStretch()
@@ -47,15 +47,15 @@ class RelicCard(CardWidget):
         delete_btn.setFixedHeight(32)
         delete_btn.setStyleSheet("""
             QPushButton {
-                background-color: #f3f3f3;
-                color: #333333;
+                background-color: palette(button);
+                color: palette(button-text);
                 border: none;
                 border-radius: 4px;
                 font-size: 11pt;
                 font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #e8e8e8;
+                background-color: palette(highlight);
             }
         """)
         button_layout.addWidget(delete_btn)

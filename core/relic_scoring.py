@@ -85,7 +85,7 @@ def normalize_affix_tiers(preset):
         return {}, False
     if not isinstance(affixes, list):
         return {}, False
-    if any(not isinstance(name, str) or tier not in POSITIVE_TIERS
+    if any(not isinstance(name, str) or tier not in POSITIVE_TIERS + NEGATIVE_TIERS
            for name, tier in mapping.items()):
         return {}, False
     return {**{name: "secondary" for name in affixes}, **mapping}, True

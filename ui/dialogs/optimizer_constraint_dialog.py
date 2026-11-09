@@ -22,7 +22,7 @@ class ConstraintGroupDialog(QDialog):
         self.other_groups = other_groups or []
         self.setWindowTitle('编辑一组必备条件')
         self.resize(740, 560)
-        self.setStyleSheet('QDialog { background: #f5f5f5; } QTreeWidget { background: white; border: 1px solid #d8d8d8; border-radius: 8px; padding: 5px; } QTreeWidget::item { min-height: 30px; padding: 4px 8px; } QPushButton { min-height: 30px; }')
+        self.setStyleSheet('QDialog { background: palette(window); } QTreeWidget { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; padding: 5px; } QTreeWidget::item { min-height: 30px; padding: 4px 8px; } QPushButton { min-height: 30px; }')
         layout=QVBoxLayout(self)
         layout.setContentsMargins(24,20,24,20)
         layout.setSpacing(8)
@@ -121,7 +121,7 @@ def show_constraint_details(parent, groups=None, example=False):
     dialog = QDialog(parent)
     dialog.setWindowTitle('完整示例' if example else '当前必备条件逻辑')
     dialog.resize(740, 580)
-    dialog.setStyleSheet('QDialog { background: #f5f5f5; } QTextBrowser { background: white; border: 1px solid #d8d8d8; border-radius: 8px; padding: 14px; }')
+    dialog.setStyleSheet('QDialog { background: palette(window); } QTextBrowser { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; padding: 14px; }')
     layout = QVBoxLayout(dialog)
     layout.setContentsMargins(24, 20, 24, 20)
     layout.setSpacing(12)
@@ -137,15 +137,15 @@ def show_constraint_details(parent, groups=None, example=False):
                        f'<tr><td style="padding:8px">{x} ×1 ＋ {y} ×1</td></tr>' for x,y in pairs)
         body = f'<p><b>条件 1：</b>{a} 或 {b} 或 {c}</p><p><b>并且</b></p><p><b>条件 2：</b>{a} 或 {b} 或 {d}</p>'
         body += '<p>两组都需要满足。一条词条只能分给一组：只带一条物理攻击力＋3不够；带两条＋3，或者带＋3和大剑加攻，就可以。</p>'
-        body += '<p><b>下面 8 种搭配，满足其中一种即可：</b></p><table width="100%" bgcolor="#f0f7f8">'+rows+'</table>'
+        body += '<p><b>下面 8 种搭配，满足其中一种即可：</b></p><table width="100%">'+rows+'</table>'
         body += '<p>不计前后顺序，可以多带其他词条。这里计算携带数量，不改变词条的评分叠加规则。</p>'
     else:
         cards = []
         for i, group in enumerate(groups or [], 1):
             entries = '<br><span style="color:#008c95">或</span><br>'.join(escape(describe_requirement(x)) for x in group)
-            cards.append(f'<table width="100%" bgcolor="#f2f7f8" cellpadding="12"><tr><td><b>条件 {i}</b><p>（{entries}）</p></td></tr></table>')
+            cards.append(f'<table width="100%" cellpadding="12"><tr><td><b>条件 {i}</b><p>（{entries}）</p></td></tr></table>')
         body = '<p style="color:#008c95"><b>并且</b></p>'.join(cards) or '<p>没有必备条件。</p>'
-        body += '<p style="color:#666">'+RULE_TEXT+'</p>'
+        body += '<p style="color:#888">'+RULE_TEXT+'</p>'
     browser.setHtml(body)
     layout.addWidget(browser, 1)
     bottom = QHBoxLayout()
