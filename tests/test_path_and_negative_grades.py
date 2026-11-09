@@ -68,6 +68,23 @@ class RegressionTests(unittest.TestCase):
             widget.close()
         window.close()
 
+    def test_light_background_after_dark(self):
+        from PySide6.QtGui import QPalette
+        from PySide6.QtWidgets import QScrollArea, QWidget
+        from ui.main_window import MainWindow
+        for theme, expected in [('dark','#202020'),('light','#f5f5f5')]:
+            with patch('ui.main_window.THEME_CONFIG', {'theme':theme}), patch.object(MainWindow, '_init_pages'), patch('ui.main_window.PresetManager'):
+                window=MainWindow()
+            scroll=QScrollArea()
+            content=QWidget()
+            scroll.setWidget(content)
+            self.assertEqual(content.palette().color(QPalette.Window).name(),expected)
+            if theme=='light':
+                self.assertEqual(content.palette().color(QPalette.Text).name(),'#202020')
+                self.assertEqual(content.palette().color(QPalette.Base).name(),'#ffffff')
+            scroll.close()
+            window.close()
+
     def test_negative_positive_in_both_modes(self):
         for mode in ('normal','deepnight'):
             for tier, points in [('harmful',-4),('unacceptable',-12),('negligible',0)]:

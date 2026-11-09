@@ -40,6 +40,19 @@ class MainWindow(FluentWindow):
                 palette.setColor(getattr(QPalette.ColorRole, role), QColor(color))
             for role in (QPalette.Text, QPalette.ButtonText, QPalette.WindowText):
                 palette.setColor(QPalette.Disabled, role, QColor("#999999"))
+        else:
+            # Windows standardPalette may use a beige system background rather
+            # than the light Fluent surface used by the rest of the application.
+            colors = {"Window": "#f5f5f5", "WindowText": "#202020",
+                      "Base": "#ffffff", "AlternateBase": "#f5f5f5",
+                      "Text": "#202020", "Button": "#fafafa", "ButtonText": "#202020",
+                      "Mid": "#d8d8d8", "Highlight": "#dceffc", "HighlightedText": "#202020",
+                      "ToolTipBase": "#ffffff", "ToolTipText": "#202020",
+                      "Link": "#176b8b", "PlaceholderText": "#777777"}
+            for role, color in colors.items():
+                palette.setColor(getattr(QPalette.ColorRole, role), QColor(color))
+            for role in (QPalette.Text, QPalette.ButtonText, QPalette.WindowText):
+                palette.setColor(QPalette.Disabled, role, QColor("#888888"))
         app.setPalette(palette)
         app.setStyleSheet(app.styleSheet() + "\nQDialog, QMessageBox { color: palette(window-text); background: palette(window); }\n"
                           "QTableWidget, QTreeWidget, QListWidget, QTextBrowser { color: palette(text); background: palette(base); }\n"
