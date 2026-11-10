@@ -26,6 +26,10 @@ class NoWheelSelectionEdit(QObject):
             return False
         widget = watched
         while widget is not None:
+            # An expanded combo owns a scrollable item view. Let that view
+            # handle browsing before the parent combo's wheel guard is reached.
+            if isinstance(widget, QAbstractScrollArea):
+                return False
             if isinstance(widget, (QAbstractSpinBox, QComboBox, FluentComboBox)):
                 parent = widget.parentWidget()
                 while parent is not None and not isinstance(parent, QAbstractScrollArea):
