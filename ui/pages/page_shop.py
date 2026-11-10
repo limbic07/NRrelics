@@ -85,6 +85,7 @@ from ui.pages.page_repo import (PresetCard, DragDropContainer, refresh_one_prese
 class PageShop(QWidget):
     """商店筛选页面"""
     settings_changed = Signal()
+    preset_activation_changed = Signal(str)
     presets_modified = Signal()  # 预设修改信号
     preset_updated = Signal(str, str)
     preset_list_changed = Signal(str, str, str)
@@ -161,7 +162,7 @@ class PageShop(QWidget):
         """外部更新设置（由设置页面信号触发）"""
         self.settings = settings
         self._update_stop_condition_ui()
-        self._refresh_presets()
+        self.refresh_scoring_display(settings)
 
     def _update_stop_condition_ui(self):
         """根据SL模式设置切换停止条件UI"""
@@ -326,6 +327,11 @@ class PageShop(QWidget):
         header = QHBoxLayout()
         header.addWidget(title)
         header.addStretch()
+        for label, active in (('全部启用', True), ('全部停用', False)):
+            button = PushButton(label)
+            button.setToolTip('设置当前普通／深夜模式下的全部专属流派，不更改通用预设和黑名单')
+            button.clicked.connect(lambda checked=False, value=active: self._set_all_presets_active(value))
+            header.addWidget(button)
         restore = PushButton('恢复默认预设')
         restore.clicked.connect(self._restore_default_presets)
         header.addWidget(restore)
@@ -477,6 +483,8 @@ class PageShop(QWidget):
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         score_enabled = normalize_scoring(self.settings.get("scoring"))["enabled"]
 
+        self._displayed_score_enabled = score_enabled
+
         # 通用预设
         general_preset = self.preset_manager.get_general_preset(mode)
         if general_preset:
@@ -542,9 +550,17 @@ class PageShop(QWidget):
         self._refresh_presets()
         self.presets_modified.emit()  # 发出预设修改信号
 
+    def refresh_scoring_display(self, settings):
+        enabled = normalize_scoring(settings.get('scoring'))['enabled']
+        if getattr(self, '_presets_loaded', False) and enabled != self._displayed_score_enabled:
+            self._refresh_presets()
+
     def refresh_presets_ui(self):
         """外部调用：刷新预设UI（当其他页面修改预设时）"""
-        self._refresh_presets()
+        if self.isVisible():
+            self._refresh_presets()
+        else:
+            self._presets_loaded = False
 
     def _on_mode_changed(self):
         """模式切换"""
@@ -691,10 +707,21 @@ class PageShop(QWidget):
             InfoBar.success("删除成功", f"预设 \"{preset['name']}\" 已删除", parent=self)
 
     def _toggle_preset(self, preset_id: str):
-        """切换预设启用状态"""
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         self.preset_manager.toggle_preset_active(mode, preset_id)
-        self._refresh_presets()
+        self.preset_activation_changed.emit(mode)
+
+    def _set_all_presets_active(self, active):
+        mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
+        presets = self.preset_manager.get_dedicated_presets(mode)
+        if not any(p.get('is_active', True) != active for p in presets.values()):
+            return
+        for preset in presets.values():
+            preset['is_active'] = active
+        self.preset_manager.save_presets()
+        from ui.pages.page_repo import sync_preset_activation
+        sync_preset_activation(self, mode)
+        self.preset_activation_changed.emit(mode)
 
     def _edit_blacklist_preset(self, preset_id: str):
         """编辑黑名单预设"""

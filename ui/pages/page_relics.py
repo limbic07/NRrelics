@@ -525,7 +525,13 @@ class RelicPage(QWidget):
             QMessageBox.warning(self,'同步失败',str(exc))
 
     def refresh(self):
-        self.items=self.inventory.list_owned()
+        items=self.inventory.list_owned()
+        if getattr(self, '_table_items', None) == items:
+            for row,item in enumerate(items):
+                self.table.setRowHidden(row,bool(self.affix_filter and self.affix_filter not in item['affixes']))
+            return
+        self.items=items
+        self._table_items=copy.deepcopy(items)
         self.hovered_row=-1
         self.table.setRowCount(len(self.items))
         self.table.setVerticalHeaderLabels([str(index+1) for index in range(len(self.items))])
@@ -587,6 +593,13 @@ class RelicPage(QWidget):
     def _refresh_preset_choices(self,*_):
         hero=self.hero.currentData()
         show_all=self.show_other_builds.isChecked()
+        signature=(hero,show_all,tuple(
+            (mode,tuple((pid,p.get('name',''),p.get('is_active',True)) for pid,p in
+                        self.presets.get_dedicated_presets(mode).items()))
+            for mode in ('normal','deepnight')))
+        if getattr(self,'_preset_choices_signature',None)==signature:
+            return
+        self._preset_choices_signature=signature
         for combo,mode in ((self.normal,'normal'),(self.deep,'deepnight')):
             prior=combo.currentData()
             combo.blockSignals(True);combo.clear()

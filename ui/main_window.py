@@ -142,9 +142,14 @@ class MainWindow(FluentWindow):
         # 连接设置变更信号 → 商店页面更新设置
         self.settings_page.settings_changed.connect(self.shop_page.update_settings)
         self.settings_page.settings_changed.connect(
-            lambda settings: self.repo_page._refresh_presets())
+            self.repo_page.refresh_scoring_display)
 
         # 连接预设变更信号：当任一页面修改预设时，通知另一页面刷新
+        from ui.pages.page_repo import sync_preset_activation
+        self.shop_page.preset_activation_changed.connect(
+            lambda mode: sync_preset_activation(self.repo_page, mode))
+        self.repo_page.preset_activation_changed.connect(
+            lambda mode: sync_preset_activation(self.shop_page, mode))
         self.shop_page.presets_modified.connect(self._on_presets_changed)
         self.repo_page.presets_modified.connect(self._on_presets_changed)
         self.shop_page.preset_updated.connect(
@@ -166,13 +171,11 @@ class MainWindow(FluentWindow):
 
     def _on_presets_changed(self):
         """预设变更时，通知所有页面刷新"""
-        # 重新加载预设
-        self.preset_manager.load_presets()
-        # 通知两个页面刷新UI
-        if hasattr(self.shop_page, 'refresh_presets_ui'):
-            self.shop_page.refresh_presets_ui()
-        if hasattr(self.repo_page, 'refresh_presets_ui'):
-            self.repo_page.refresh_presets_ui()
+        # Both pages share the manager; the emitting page already refreshed itself.
+        source = self.sender()
+        for page in (self.shop_page, self.repo_page):
+            if page is not source:
+                page.refresh_presets_ui()
 
     def _on_one_preset_updated(self, page, mode, preset_id):
         from ui.pages.page_repo import refresh_one_preset_card
