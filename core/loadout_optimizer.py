@@ -13,8 +13,104 @@ COLORS = {'Red': '红', 'Blue': '蓝', 'Green': '绿', 'Yellow': '黄'}
 HEROES = {'追踪者':'Wylder','守护者':'Guardian','铁之眼':'Ironeye','女爵':'Duchess',
           '无赖':'Raider','复仇者':'Revenant','隐士':'Recluse','执行者':'Executor',
           '学者':'Scholar','送葬者':'Undertaker'}
-REPEATABLE = {'血量偏低时，能提升减伤率', '出击时，会持有小型随身包包',
-              '出击时，会持有振奋香'}
+# Same-name effects confirmed stackable in the 1.03.5 reference table.
+REPEATABLE = {
+    '减少专注值消耗',
+    '减少专注值消耗+1',
+    '减少专注值消耗+2',
+    '出击时，会持有小型随身包包',
+    '出击时，会持有振奋香',
+    '受到损伤时，会累积催眠量表',
+    '受到损伤时，会累积冻伤量表',
+    '受到损伤时，会累积出血量表',
+    '受到损伤时，会累积发狂量表',
+    '强化卡利亚剑的魔法',
+    '强化巨人火焰的祷告',
+    '强化挖石的魔法',
+    '强化狩猎神祇的祷告',
+    '强化王城古龙信仰的祷告',
+    '强化癫火的祷告',
+    '强化祷告',
+    '强化祷告+1',
+    '强化祷告+2',
+    '强化结晶人的魔法',
+    '强化荆棘的魔法',
+    '强化轻攻击的第一记攻击',
+    '强化辉剑的魔法',
+    '强化重力的魔法',
+    '强化野兽的祷告',
+    '强化防御反击',
+    '强化防御反击+1',
+    '强化防御反击+2',
+    '强化隐形的魔法',
+    '强化魔法',
+    '强化魔法+1',
+    '强化魔法+2',
+    '强化黄金律法基本主义的祷告',
+    '强化龙飨的祷告',
+    '提升刀的攻击力',
+    '提升双头剑的攻击力',
+    '提升圣属性攻击力',
+    '提升圣属性攻击力+1',
+    '提升圣属性攻击力+2',
+    '提升圣属性攻击力+3',
+    '提升圣属性攻击力+4',
+    '提升大剑的攻击力',
+    '提升大槌的攻击力',
+    '提升大矛的攻击力',
+    '提升属性减伤率',
+    '提升属性减伤率+1',
+    '提升属性减伤率+2',
+    '提升属性攻击力',
+    '提升属性攻击力+1',
+    '提升属性攻击力+2',
+    '提升弓的攻击力',
+    '提升戟的攻击力',
+    '提升投掷壶的攻击力',
+    '提升投掷壶的攻击力+1',
+    '提升拳头的攻击力',
+    '提升曲剑的攻击力',
+    '提升火属性攻击力',
+    '提升火属性攻击力+1',
+    '提升火属性攻击力+2',
+    '提升火属性攻击力+3',
+    '提升火属性攻击力+4',
+    '提升物理减伤率+1',
+    '提升物理减伤率+2',
+    '提升物理攻击力',
+    '提升物理攻击力+1',
+    '提升物理攻击力+2',
+    '提升物理攻击力+3',
+    '提升物理攻击力+4',
+    '提升特大剑的攻击力',
+    '提升特大武器的攻击力',
+    '提升直剑的攻击力',
+    '提升矛的攻击力',
+    '提升短剑的攻击力',
+    '提升雷属性攻击力',
+    '提升雷属性攻击力+1',
+    '提升雷属性攻击力+2',
+    '提升雷属性攻击力+3',
+    '提升雷属性攻击力+4',
+    '提升魔力属性攻击力',
+    '提升魔力属性攻击力+1',
+    '提升魔力属性攻击力+2',
+    '提升魔力属性攻击力+3',
+    '提升魔力属性攻击力+4',
+    '血量偏低时，能提升减伤率',
+    '血量没有全满时，累积中毒量表',
+    '血量没有全满时，累积猩红腐败量表',
+    '降低对所有异常状态的抵抗力',
+}
+DEEP_REPEATABLE = {
+    '提升专注值上限',
+    '提升精力上限',
+    '提升血量上限',
+}
+
+def _is_repeatable(mode, affix):
+    return affix in REPEATABLE or (mode == "deepnight" and affix in DEEP_REPEATABLE)
+
 VAMP = ('受到损伤的当下，能通过攻击恢复部分血量',
         '受到损伤的当下，能通过攻击恢复部分血量+1',
         '受到损伤的当下，能通过攻击恢复部分血量+2')
@@ -93,6 +189,10 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
     groups = required_groups or []
     if not isinstance(groups, list) or any(not isinstance(g, list) or not g for g in groups):
         raise ValueError('必备条件格式无效')
+    if any(len({bool(e.get('exclude', False)) for e in g}) != 1 for g in groups):
+        raise ValueError('同一条件组不能混合正向和反向条件')
+    excluded_entries = [e for g in groups for e in g if e.get('exclude', False)]
+    groups = [g for g in groups if not g[0].get('exclude', False)]
     scoring = normalize_scoring(scoring_config)
     normal_preset_id = normal_preset_id or 'build_' + build['id'] + '_normal'
     deepnight_preset_id = deepnight_preset_id or 'build_' + build['id'] + '_deepnight'
@@ -104,6 +204,8 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
     candidates = [dict(r, official_id=identify_official_relic(r)) for r in relics
                   if r.get('relic_type') in active_modes and
                   r.get('color') in COLORS.values()]
+    candidates = [r for r in candidates
+                  if not any(_satisfies(r, e) for e in excluded_entries)]
     if any(sum(r['relic_type'] == mode for r in candidates) < 3 for mode in active_modes):
         return None
     matching_vessels = [v for v in vessels if v['hero_en'] in
@@ -138,7 +240,7 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             if mode == 'deepnight' and affix in negatives:
                 continue
             points = score_maps[mode].get(affix)
-            if points is not None and points >= 0 and affix not in REPEATABLE:
+            if points is not None and points >= 0 and not _is_repeatable(mode, affix):
                 effects.setdefault((mode, affix), (points, []))[1].append(i)
     effect_keys = list(effects)
     # Each group consumes one occurrence, independently from scoring deduplication.
@@ -164,7 +266,7 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
     for i, relic in enumerate(candidates):
         mode = relic['relic_type']
         for affix in relic['affixes']:
-            if affix in REPEATABLE or (score_maps[mode].get(affix, 0) < 0
+            if _is_repeatable(mode, affix) or (score_maps[mode].get(affix, 0) < 0
                         and not (mode == 'deepnight' and affix in negatives)):
                 cost[i] -= score_maps[mode].get(affix, 0)
             if mode == 'deepnight':
@@ -305,7 +407,7 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             relic = candidates[i]
             mode = relic['relic_type']
             for affix in relic['affixes']:
-                if affix in REPEATABLE or (score_maps[mode].get(affix, 0) < 0
+                if _is_repeatable(mode, affix) or (score_maps[mode].get(affix, 0) < 0
                         and not (mode == 'deepnight' and affix in negatives)):
                     breakdown[i][affix] += score_maps[mode].get(affix, 0)
                 if mode == 'deepnight':

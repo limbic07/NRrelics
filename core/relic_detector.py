@@ -63,6 +63,7 @@ class RelicDetector:
         # Canny边缘检测参数
         self.canny_threshold1 = canny_threshold1
         self.canny_threshold2 = canny_threshold2
+        self.experimental_navigation = False
         self.brightness_threshold = 45
         self.brightness_center_ratio = 0.55
         self.template_match_threshold = 0.60
@@ -142,7 +143,13 @@ class RelicDetector:
             approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
 
             if len(approx) != 4:
-                continue
+                if not self.experimental_navigation:
+                    continue
+                # 高亮边框可能与图标边缘粘连；只接受接近完整格子的轮廓。
+                if not (0.85 * 92 * unit_x <= cw <= 1.15 * 92 * unit_x
+                        and 0.85 * 94 * unit_y <= ch <= 1.15 * 94 * unit_y
+                        and area / (cw * ch) >= 0.75):
+                    continue
 
             if not (self.shape_aspect_ratio_min <= asp <= self.shape_aspect_ratio_max):
                 continue

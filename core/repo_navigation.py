@@ -34,7 +34,8 @@ class RepositoryNavigation:
     # 平时滚动让光标停在第 4 行；到仓库最后一行时滚动到头，光标进入第 5 行。
     CURSOR_ROWS = 4
 
-    def __init__(self, total_items: int | None = None):
+    def __init__(self, total_items: int | None = None, experimental=False):
+        self.experimental = experimental
         self.index = 0
         self.total_items = total_items if total_items and total_items > 0 else None
         self.previous_detail = None
@@ -104,9 +105,18 @@ class RepositoryNavigation:
         if not self._cursor_at_expected(detected, box):
             return NavigationCheck(False, box, "光标未到预计下一格", detail_change,
                                    detail_icon_change, sale_change, card_change, detected, True)
+        # 相邻遗物可能仅一行短词条不同，整块均值会被空白稀释。
+        current_detail = self._crop_gray(image, self.DETAIL_REGION)
+        local_change = 0.0
+        if self.experimental and self.previous_detail is not None and self.previous_detail.shape == current_detail.shape:
+            difference = cv2.absdiff(self.previous_detail, current_detail)
+            band = max(1, round(24 * image.shape[0] / 1080))
+            local_change = max(float(np.mean(difference[y:y + band]))
+                               for y in range(0, difference.shape[0], band))
         if card_change >= self.CARD_CHANGE_MIN:
             if (detail_change < self.DETAIL_CHANGE_MIN
-                    and detail_icon_change < self.DETAIL_ICON_CHANGE_MIN):
+                    and detail_icon_change < self.DETAIL_ICON_CHANGE_MIN
+                    and local_change < 3.0):
                 # 光标已前进，但详情仍显示旧内容；暂不使用这帧做 OCR。
                 return NavigationCheck(False, box, "详情尚未刷新", detail_change,
                                        detail_icon_change, sale_change, card_change, detected, True)

@@ -19,6 +19,22 @@ class RepoNavigationTests(unittest.TestCase):
         self.cleaner.stats = {"sold": 0, "favorited": 0}
         self.log = lambda message, level: None
 
+    def test_short_affix_change_is_not_diluted_by_blank_detail_area(self):
+        nav = RepositoryNavigation(experimental=True)
+        before = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        after = before.copy()
+        nav.expect_next(before, "right")
+        x, y, w, h = nav.expected_box(after)
+        after[y:y+h, x:x+w] = 20
+        after[770:794, 1070:1700] = 5
+        detector = Mock()
+        detector.detect_cursor.return_value = (nav.expected_box(after), w)
+        result = nav.check(after, detector)
+        self.assertLess(result.detail_change, nav.DETAIL_CHANGE_MIN)
+        self.assertTrue(result.confirmed)
+        nav.experimental = False
+        self.assertFalse(nav.check(after, detector).confirmed)
+
     def test_sale_marks_once_without_requesting_right(self):
         with patch("core.repo_cleaner.pydirectinput.press") as press:
             need_right = self.cleaner._execute_action(

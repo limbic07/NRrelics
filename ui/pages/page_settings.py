@@ -384,6 +384,20 @@ class SettingsPage(QWidget):
         debug_title.setStyleSheet("font-size: 11pt; font-weight: 600;")
         card_layout.addWidget(debug_title)
 
+        navigation_layout = QHBoxLayout()
+        navigation_layout.addWidget(QLabel("仓库清理实验识别:"))
+        self.navigation_experiment_switch = SwitchButton()
+        self.navigation_experiment_switch.setChecked(self.settings.get("experimental_repo_navigation", True))
+        self.navigation_experiment_switch.checkedChanged.connect(self._auto_save_settings)
+        navigation_layout.addWidget(self.navigation_experiment_switch)
+        navigation_layout.addStretch()
+        card_layout.addLayout(navigation_layout)
+        navigation_desc = QLabel("默认开启。使用测试版光标检测、局部词条变化判断，并在补拍前等待150毫秒；下次开始仓库清理时生效。")
+        navigation_desc.setWordWrap(True)
+        navigation_desc.setFont(QFont("Segoe UI", 8))
+        navigation_desc.setStyleSheet("color: gray;")
+        card_layout.addWidget(navigation_desc)
+
         # OCR 调试模式
         ocr_debug_layout = QHBoxLayout()
         ocr_debug_label = QLabel("OCR调试模式:")
@@ -657,6 +671,7 @@ class SettingsPage(QWidget):
             "shop_require_double_valid": True,
             "shop_stop_on_perfect_relic": False,
             "steam_path": "",
+            "experimental_repo_navigation": True,
             "ocr_debug": False,
             "timing_debug": False,
             "check_relic_id_consistency": False,
@@ -680,6 +695,7 @@ class SettingsPage(QWidget):
             "shop_require_double_valid": not self.shop_require_double_switch.isChecked(),
             "shop_stop_on_perfect_relic": self.shop_stop_on_perfect_switch.isChecked(),
             "steam_path": self.steam_path_input.text(),
+            "experimental_repo_navigation": self.navigation_experiment_switch.isChecked() if hasattr(self, "navigation_experiment_switch") else self.settings.get("experimental_repo_navigation", True),
             "ocr_debug": self.ocr_debug_switch.isChecked() if hasattr(self, 'ocr_debug_switch') else self.settings.get("ocr_debug", False),
             "template_threshold": self._get_threshold_value(),
             "brightness_threshold": self._get_brightness_threshold_value(),

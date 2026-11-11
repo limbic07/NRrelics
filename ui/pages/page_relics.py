@@ -212,6 +212,9 @@ class SolveWorker(QThread):
     def run(self):
         try:self.finished_result.emit(optimize(*self.args,**self.kwargs))
         except Exception as exc:self.failed.emit(str(exc))
+        finally:
+            self.args = ()
+            self.kwargs = {}
 
 
 class LoadoutResultDialog(QDialog):
@@ -452,6 +455,7 @@ class RelicPage(QWidget):
         result_buttons.addWidget(self.next_results)
         optimizer_layout.addLayout(result_buttons)
         self.latest_result=None
+        self.worker=None
         self.search_snapshot=None
         self.seen_combinations=[]
         self.page_offset=0
@@ -644,7 +648,9 @@ class RelicPage(QWidget):
     def _render_groups(self):
         self.group_list.clear()
         for index,group in enumerate(self.groups,1):
-            item=QListWidgetItem(f"条件 {index}："+' 或 '.join(describe_requirement(x) for x in group))
+            negative = bool(group[0].get('exclude', False))
+            label = '反向（均不得出现）' if negative else '正向（至少一项）'
+            item=QListWidgetItem(f"条件 {index}｜{label}："+('、' if negative else ' 或 ').join(describe_requirement(x) for x in group))
             item.setFlags(item.flags()|Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Unchecked)
             self.group_list.addItem(item)
@@ -671,19 +677,23 @@ class RelicPage(QWidget):
                              if tier in POSITIVE_TIERS)
         return sorted(names)
 
-    def _choices(self):
+    def _choices(self, negative=False):
         names=set()
         for mode in ('normal','deepnight'):
             names.update(self._effective_affixes(mode))
+        if negative:
+            names.update(_vocabulary('normal'))
+            names.update(_vocabulary('deepnight'))
+            names.update(_vocabulary('deepnight', negative=True))
         choices=[{'kind':'affix','name':name} for name in sorted(names)]
-        if self.normal.currentData() != 'none':
+        if negative or self.normal.currentData() != 'none':
             choices += [{'kind':'official','id':entry['id'],
                          'label':f"{entry['name']}（{entry['color']}）"}
                         for entry in load_official_relics()]
         return choices
 
     def _add_group(self):
-        dialog=ConstraintGroupDialog(self._choices(),parent=self, other_groups=list(enumerate(self.groups, 1)))
+        dialog=ConstraintGroupDialog(self._choices(),negative_choices=self._choices(True),parent=self, other_groups=list(enumerate(self.groups, 1)))
         if dialog.exec()==QDialog.Accepted:
             self.groups.append(dialog.selected());self._save_groups()
 
@@ -692,7 +702,7 @@ class RelicPage(QWidget):
         if len(checked)!=1:
             QMessageBox.information(self,'编辑条件组','请只勾选一个条件组。');return
         index=checked[0]
-        dialog=ConstraintGroupDialog(self._choices(),self.groups[index],self,
+        dialog=ConstraintGroupDialog(self._choices(),self.groups[index],self, negative_choices=self._choices(True),
                                      other_groups=[(i+1,g) for i,g in enumerate(self.groups) if i!=index])
         if dialog.exec()==QDialog.Accepted:
             self.groups[index]=dialog.selected();self._save_groups()
@@ -710,6 +720,7 @@ class RelicPage(QWidget):
         show_constraint_details(self, self.groups)
 
     def _solve(self):
+        if self.worker is not None:return
         if self.normal.currentData() == self.deep.currentData() == 'none':
             QMessageBox.information(self,'选择流派','请至少选择普通或深夜流派中的一种。')
             return
@@ -748,6 +759,7 @@ class RelicPage(QWidget):
         self.worker.start()
 
     def _next_page(self):
+        if self.worker is not None:return
         if not self.search_snapshot or not self.latest_result:return
         if self.current_page + 1 < len(self.result_pages):
             self._display_page(self.current_page + 1)
@@ -776,10 +788,15 @@ class RelicPage(QWidget):
             + ('可继续查找。' if self.result_pages[-1]['has_more'] else '已找完达标方案。'))
         self.view_result.setEnabled(True)
         self.prev_results.setEnabled(index>0)
-        self.next_results.setEnabled(index+1<len(self.result_pages) or
-                                     self.result_pages[-1]['has_more'])
+        self.next_results.setEnabled(self.worker is None and
+                                     (index+1<len(self.result_pages) or
+                                      self.result_pages[-1]['has_more']))
 
     def _search_finished(self):
+        worker = self.worker
+        self.worker = None
+        if worker is not None:
+            worker.deleteLater()
         self.solve.setEnabled(True)
         if self.result_pages and not self.search_error:
             self._display_page(self.current_page)
@@ -796,14 +813,18 @@ class RelicPage(QWidget):
         else:
             result['page_offset']=0
         self.page_offset+=len(result['solutions'])
-        self.seen_combinations=result['excluded_combinations']
+        self.seen_combinations=result.pop('excluded_combinations', [])
         self.result_pages.append(result)
         self._display_page(len(self.result_pages)-1)
 
     def _open_result(self):
         if self.latest_result is None:return
         rows_by_id=self.search_snapshot[2]
-        LoadoutResultDialog(self.latest_result,rows_by_id,self).exec()
+        dialog=LoadoutResultDialog(self.latest_result,rows_by_id,self)
+        try:
+            dialog.exec()
+        finally:
+            dialog.deleteLater()
 
     def _show_error(self,error):
         self.search_error=True

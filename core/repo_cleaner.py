@@ -102,6 +102,8 @@ class RepoCleaner:
         self.matched_relics = []
         self.results = []
         self.repository_filter.settings = self.settings
+        experimental = bool(self.settings.get("experimental_repo_navigation", True))
+        self.relic_detector.experimental_navigation = experimental
         self.is_running = True
         self.is_paused = False
         self.pending_sell_count = 0
@@ -192,7 +194,8 @@ class RepoCleaner:
             log(f"通用预设: {len((general_preset or {}).get('affixes', []))}条词条", "INFO")
             log(f"专用预设: {len(dedicated_presets)}个", "INFO")
 
-            navigation = RepositoryNavigation(total_items=navigation_total)
+            navigation = RepositoryNavigation(total_items=navigation_total, experimental=experimental)
+            log("仓库导航识别：" + ("实验模式" if experimental else "标准模式"), "INFO")
             if navigation_total is not None:
                 log(f"仓库导航末行适配已启用（库存 {navigation_total} 件）", "INFO")
 
@@ -230,6 +233,8 @@ class RepoCleaner:
                                  and check.detail_icon_change < navigation.DETAIL_ICON_CHANGE_MIN))):
                     # 光标呼吸暗帧或两件详情相同/详情尚未刷新时，只补拍一次。
                     # 不重按 F/右键；相同详情再次确认光标后可继续。
+                    if experimental:
+                        time.sleep(0.15)
                     retry_start = time.time()
                     retry_image = self.repository_filter._capture_game_window()
                     t_capture += time.time() - retry_start
