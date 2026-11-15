@@ -398,6 +398,20 @@ class SettingsPage(QWidget):
         navigation_desc.setStyleSheet("color: gray;")
         card_layout.addWidget(navigation_desc)
 
+        relative_layout = QHBoxLayout()
+        relative_layout.addWidget(QLabel("实验：相对亮度识别:"))
+        self.relative_brightness_switch = SwitchButton()
+        self.relative_brightness_switch.setChecked(self.settings.get("experimental_relative_brightness", False))
+        self.relative_brightness_switch.checkedChanged.connect(self._auto_save_settings)
+        relative_layout.addWidget(self.relative_brightness_switch)
+        relative_layout.addStretch()
+        card_layout.addLayout(relative_layout)
+        relative_desc = QLabel("默认关闭。以勾号与框内背景的亮度差判断筛选框，适用于空框偏亮导致筛选失败的情况。商店与仓库共用此设置；当前商店流程不检测筛选框。下次启动任务时生效，不改变词条OCR与遗物状态检测。")
+        relative_desc.setWordWrap(True)
+        relative_desc.setFont(QFont("Segoe UI", 8))
+        relative_desc.setStyleSheet("color: gray;")
+        card_layout.addWidget(relative_desc)
+
         # OCR 调试模式
         ocr_debug_layout = QHBoxLayout()
         ocr_debug_label = QLabel("OCR调试模式:")
@@ -672,6 +686,7 @@ class SettingsPage(QWidget):
             "shop_stop_on_perfect_relic": False,
             "steam_path": "",
             "experimental_repo_navigation": True,
+            "experimental_relative_brightness": False,
             "ocr_debug": False,
             "timing_debug": False,
             "check_relic_id_consistency": False,
@@ -696,6 +711,7 @@ class SettingsPage(QWidget):
             "shop_stop_on_perfect_relic": self.shop_stop_on_perfect_switch.isChecked(),
             "steam_path": self.steam_path_input.text(),
             "experimental_repo_navigation": self.navigation_experiment_switch.isChecked() if hasattr(self, "navigation_experiment_switch") else self.settings.get("experimental_repo_navigation", True),
+            "experimental_relative_brightness": self.relative_brightness_switch.isChecked() if hasattr(self, "relative_brightness_switch") else self.settings.get("experimental_relative_brightness", False),
             "ocr_debug": self.ocr_debug_switch.isChecked() if hasattr(self, 'ocr_debug_switch') else self.settings.get("ocr_debug", False),
             "template_threshold": self._get_threshold_value(),
             "brightness_threshold": self._get_brightness_threshold_value(),

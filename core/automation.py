@@ -572,6 +572,19 @@ class RepositoryFilter:
         # 输出调试信息
         log_debug(f"[调试] 勾选框尺寸: {w}x{h}, 内部区域尺寸: {inner_region.shape[1]}x{inner_region.shape[0]}, 平均灰度值: {mean_val:.2f}")
 
+        if self.settings.get("experimental_relative_brightness", False):
+            # 使用框内背景作基准，避免整体曝光偏亮时把空框当成勾选。
+            # 排除边框后，真实勾号应形成足够面积、明显亮于背景的连通区域。
+            background = float(np.percentile(gray, 20))
+            contrast = float(np.percentile(gray, 90)) - background
+            mask = (gray.astype(np.float32) - background >= max(20.0, contrast * 0.5)).astype(np.uint8)
+            count, _, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+            largest = int(stats[1:, cv2.CC_STAT_AREA].max()) if count > 1 else 0
+            fraction = largest / gray.size
+            is_checked = contrast >= 25.0 and 0.10 <= fraction <= 0.80
+            log_debug(f"[调试] 相对亮度勾选检测: 背景={background:.2f}, 对比差={contrast:.2f}, 勾号占比={fraction:.3f}, 已勾选={is_checked}")
+            return is_checked
+
         # 框内有√：平均灰度值较高（约109）
         # 框内是空的：平均灰度值较低（约58）
         # 使用动态阈值：(109 + 58) / 2 = 83.5，取85为阈值
