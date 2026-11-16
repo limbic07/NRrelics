@@ -3,7 +3,7 @@ import json
 import copy
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal, QEvent
+from PySide6.QtCore import Qt, QThread, Signal, QEvent, QTimer, QSemaphore
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                                QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QAbstractItemView,
@@ -210,11 +210,35 @@ class SolveWorker(QThread):
         self.args=args; self.kwargs=kwargs
 
     def run(self):
-        try:self.finished_result.emit(optimize(*self.args,**self.kwargs))
+        try:self.finished_result.emit(optimize(*self.args,**self.kwargs, cancelled=self.isInterruptionRequested))
         except Exception as exc:self.failed.emit(str(exc))
         finally:
             self.args = ()
             self.kwargs = {}
+
+
+class DeepSolveWorker(SolveWorker):
+    progress = Signal(str)
+
+    def __init__(self, args, kwargs):
+        super().__init__(args, kwargs)
+        self.pending = QSemaphore(4)
+
+    def run(self):
+        def publish(result):
+            while not self.pending.tryAcquire(1, 100):
+                if self.isInterruptionRequested():
+                    raise InterruptedError('搜索已停止，已有结果保留。')
+            self.finished_result.emit(result)
+        try:
+            from core.optimizer_process import run_isolated
+            run_isolated(self.args, self.kwargs, self.isInterruptionRequested,
+                         publish, self.progress.emit,
+                         get_user_data_path('logs/optimizer_resources.jsonl'))
+        except Exception as exc:
+            self.failed.emit(str(exc))
+        finally:
+            self.args = (); self.kwargs = {}
 
 
 class LoadoutResultDialog(QDialog):
@@ -247,27 +271,27 @@ class LoadoutResultDialog(QDialog):
             solutions.extend((f'第二阶段｜达标组合 {index}',solution)
                              for index,solution in enumerate(result['alternatives'],1))
         for caption,solution in solutions:
-            section=QFrame();section.setFrameShape(QFrame.StyledPanel)
-            section_layout=QVBoxLayout(section)
-            heading=QLabel(f"{caption}　{solution.get('vessel_name',solution['vessel'])}　"
-                           f"总得分 {solution['score']} 分")
-            heading.setStyleSheet('font-size:15pt;font-weight:bold;padding:6px;')
-            section_layout.addWidget(heading)
-            cards=QHBoxLayout();cards.setSpacing(10)
-            for mode,label in (('normal','普通遗物'),('deepnight','深夜遗物')):
-                mode_items=sorted((item for item in solution['relics']
-                                   if item['relic_type']==mode),
-                                  key=lambda item:item.get('slot_index',0))
-                for relic in mode_items:
-                    cards.addWidget(self._relic_card(relic,label,rows_by_id,negatives))
-            cards.addStretch()
-            section_layout.addLayout(cards)
-            vertical.addWidget(section)
+            vertical.addWidget(self.solution_widget(solution, rows_by_id, caption, negatives))
         vertical.addStretch()
         scroll.setWidget(content);root.addWidget(scroll)
         close=QDialogButtonBox(QDialogButtonBox.Close)
         close.rejected.connect(self.reject)
         root.addWidget(close)
+
+    @classmethod
+    def solution_widget(cls, solution, rows_by_id, caption='', negatives=None):
+        if negatives is None: negatives=set(_vocabulary('deepnight',negative=True))
+        section=QFrame();section.setFrameShape(QFrame.StyledPanel)
+        layout=QVBoxLayout(section)
+        heading=QLabel(f"{caption}　{solution.get('vessel_name',solution['vessel'])}　总得分 {solution['score']} 分")
+        heading.setStyleSheet('font-size:15pt;font-weight:bold;padding:6px;')
+        layout.addWidget(heading)
+        cards=QHBoxLayout();cards.setSpacing(10)
+        for mode,label in (('normal','普通遗物'),('deepnight','深夜遗物')):
+            for relic in sorted((r for r in solution['relics'] if r['relic_type']==mode), key=lambda r:r.get('slot_index',0)):
+                cards.addWidget(cls._relic_card(relic,label,rows_by_id,negatives))
+        cards.addStretch();layout.addLayout(cards)
+        return section
 
     @staticmethod
     def _relic_card(relic, label, rows_by_id, negatives):
@@ -418,6 +442,20 @@ class RelicPage(QWidget):
         self.ratio=QSpinBox();self.ratio.setRange(0,100);self.ratio.setValue(75)
         self.ratio.setSuffix('%')
         threshold.addWidget(self.ratio)
+        self.optimization_mode=QComboBox()
+        self.optimization_mode.addItems(['普通优化', '深度优化'])
+        threshold.addWidget(self.optimization_mode)
+        self.deep_limit=QSpinBox()
+        self.deep_limit.setRange(100, 5000); self.deep_limit.setSingleStep(100); self.deep_limit.setValue(300)
+        self.deep_limit.setPrefix('搜索上限 '); self.deep_limit.setSuffix(' 套')
+        self.deep_limit.setToolTip('默认最多300套；独立求解进程最多2线程、2GB内存、30分钟。触发限制后保留部分结果，不宣称已穷尽。')
+        self.deep_limit.setVisible(False)
+        self.optimization_mode.currentIndexChanged.connect(lambda index: self.deep_limit.setVisible(index==1))
+        threshold.addWidget(self.deep_limit)
+        self.stop_search=PushButton('停止搜索')
+        self.stop_search.setEnabled(False)
+        self.stop_search.clicked.connect(self._stop_deep_search)
+        threshold.addWidget(self.stop_search)
         threshold.addStretch()
         self.solve=PrimaryPushButton('计算最优与达标组合')
         self.solve.clicked.connect(self._solve)
@@ -456,11 +494,18 @@ class RelicPage(QWidget):
         optimizer_layout.addLayout(result_buttons)
         self.latest_result=None
         self.worker=None
+        self.deep_dialog=None
+        self.deep_search=False
+        self.deep_running=False
+        self.deep_anchor=None
+        self.deep_limit_value=self.deep_limit.value()
+        self.deep_more=False
         self.search_snapshot=None
         self.seen_combinations=[]
         self.page_offset=0
         self.result_pages=[]
         self.current_page=-1
+        self.deep_limit.valueChanged.connect(self._update_deep_resume)
         self._refresh_preset_choices()
         if self.section=='inventory':
             self.refresh()
@@ -728,9 +773,21 @@ class RelicPage(QWidget):
         path=get_user_data_path('data/settings.json')
         try:settings=json.loads(Path(path).read_text(encoding='utf-8'))
         except (OSError,ValueError):settings={}
+        if self.deep_dialog is not None:
+            self.deep_dialog.release()
+            self.deep_dialog=None
+        self.deep_search=self.optimization_mode.currentIndex()==1
+        self.deep_running=self.deep_search
+        self.deep_stop_requested=False
+        self.deep_anchor=None
+        self.deep_more=self.deep_search
+        self.deep_limit_value=self.deep_limit.value()
+        self.stop_search.setEnabled(self.deep_search)
+        self.optimization_mode.setEnabled(False)
         self.solve.setEnabled(False)
         self.view_result.setEnabled(False)
         self.next_results.setEnabled(False)
+        self.next_results.setText('继续搜索至上限' if self.deep_search else '继续寻找下 10 套')
         self.latest_result=None
         self.page_offset=0
         self.seen_combinations=[]
@@ -747,19 +804,45 @@ class RelicPage(QWidget):
                 'page_size':10, 'time_limit':30}
         self.search_snapshot=(args,kwargs,
                               {item['id']:index for index,item in enumerate(self.items,1)})
+        if self.deep_search:
+            from core.loadout_metrics import Metrics
+            from ui.dialogs.deep_results import DeepResultsDialog
+            metrics=Metrics(args[3], args[4], kwargs['normal_preset_id'], kwargs['deepnight_preset_id'], build['hero'])
+            self.deep_dialog=DeepResultsDialog(metrics, self.search_snapshot[2], LoadoutResultDialog, self)
+            self.deep_dialog.stop_requested.connect(self._stop_deep_search)
+            self.deep_dialog.resume_requested.connect(self._resume_deep_search)
+            self.deep_dialog.show()
         self.pending_next=False
         self.search_error=False
         self._start_worker(args,kwargs)
 
     def _start_worker(self,args,kwargs):
-        self.worker=SolveWorker(args,kwargs)
-        self.worker.finished_result.connect(self._show_result)
+        if self.deep_search:
+            self.worker=DeepSolveWorker(args,dict(kwargs,page_size=self.deep_limit_value-self.page_offset))
+            self.worker.finished_result.connect(self._accept_deep_result)
+            self.worker.progress.connect(self._search_progress)
+        else:
+            self.worker=SolveWorker(args,kwargs)
+            self.worker.finished_result.connect(self._show_result)
         self.worker.failed.connect(self._show_error)
         self.worker.finished.connect(self._search_finished)
         self.worker.start()
 
+    def _accept_deep_result(self, result):
+        worker=self.sender()
+        try:
+            self._show_result(result)
+        finally:
+            worker.pending.release()
+
+    def _search_progress(self, message):
+        if self.deep_dialog is not None and self.deep_running:
+            self.deep_dialog.status.setText(f'已找到 {self.page_offset} 套；{message}。可随时查看已有结果。')
+
     def _next_page(self):
         if self.worker is not None:return
+        if self.deep_search:
+            self._resume_deep_search();return
         if not self.search_snapshot or not self.latest_result:return
         if self.current_page + 1 < len(self.result_pages):
             self._display_page(self.current_page + 1)
@@ -773,6 +856,28 @@ class RelicPage(QWidget):
         self.next_results.setEnabled(False)
         self.result_status.setText('正在证明下 10 套的排名…')
         self._start_worker(args,kwargs)
+
+    def _resume_deep_search(self):
+        if (self.worker is not None or not self.deep_search or not self.search_snapshot
+                or not self.deep_more or self.page_offset>=self.deep_limit.value()):return
+        self.deep_limit_value=self.deep_limit.value()
+        args,base_kwargs,_=self.search_snapshot
+        kwargs=dict(base_kwargs,excluded_combinations=list(self.seen_combinations),anchor_score=self.deep_anchor)
+        self.deep_stop_requested=False;self.deep_running=True;self.search_error=False
+        self.deep_dialog.prune_reason=None;self.deep_dialog.prune_pending=False
+        self.deep_dialog.set_search_state(True)
+        self.solve.setEnabled(False);self.optimization_mode.setEnabled(False)
+        self.stop_search.setEnabled(True);self.next_results.setEnabled(False)
+        message=f'沿用本次库存、流派与条件继续搜索，已搜索 {self.page_offset} 套，上限 {self.deep_limit_value} 套。'
+        self.result_status.setText(message);self.deep_dialog.status.setText(message)
+        self._start_worker(args,kwargs)
+
+    def _update_deep_resume(self):
+        if not self.deep_search or self.worker is not None:return
+        can_resume=bool(self.search_snapshot and self.deep_more and self.page_offset<self.deep_limit.value())
+        self.deep_dialog.set_search_state(False,can_resume)
+        self.next_results.setEnabled(can_resume)
+        self.next_results.setToolTip('沿用本次库存、流派和条件，继续搜索到当前上限；已清理的组合也不会重复搜索。' if can_resume else '')
 
     def _previous_page(self):
         if self.current_page > 0:
@@ -797,11 +902,53 @@ class RelicPage(QWidget):
         self.worker = None
         if worker is not None:
             worker.deleteLater()
+        if getattr(self, 'deep_search', False):
+            self.deep_running=False
+            self.stop_search.setEnabled(False)
+            self.optimization_mode.setEnabled(True)
+            self.solve.setEnabled(True)
+            # A cap is a pause: retain exclusions and the immutable search inputs.
+            if not self.deep_more or (self.search_error and not self.deep_stop_requested):
+                self.seen_combinations=[]
+                self.search_snapshot=None
+            self._update_deep_resume()
+            if getattr(self, 'deep_stop_requested', False):
+                self.deep_dialog.prune_dominated()
+            elif not self.search_error and self.deep_more and self.page_offset >= self.deep_limit_value:
+                self.deep_dialog.prune_dominated('达到搜索上限')
+            elif not self.search_error:
+                self.deep_dialog.prune_dominated('已找完达标方案')
+            else:
+                self.deep_dialog.prune_dominated(self.deep_dialog.status.text())
+            return
         self.solve.setEnabled(True)
+        if hasattr(self, 'optimization_mode'): self.optimization_mode.setEnabled(True)
         if self.result_pages and not self.search_error:
             self._display_page(self.current_page)
 
     def _show_result(self,result):
+        if getattr(self, 'deep_search', False):
+            self.deep_more=bool(result and result.get('has_more'))
+            if result and result.get('solutions'):
+                self.deep_anchor=result['score']
+                try:
+                    self.deep_dialog.append(result)
+                except Exception as exc:
+                    if self.worker is not None: self.worker.requestInterruption()
+                    self._show_error('结果保存失败：'+str(exc))
+                    return
+                self.seen_combinations.extend(sorted(r['id'] for r in solution['relics']) for solution in result['solutions'])
+                self.page_offset+=len(result['solutions'])
+                self.view_result.setEnabled(True)
+            at_limit=self.page_offset>=self.deep_limit_value and self.deep_more
+            if at_limit: self.deep_running=False
+            text=(f'已找到 {self.page_offset} 套，合并为 {len(self.deep_dialog.model.rows)} 组。' +
+                  ('达到搜索上限，当前为部分结果；提高上限后可继续搜索。' if at_limit else
+                   '后台继续搜索；当前为部分结果。' if self.deep_more and self.deep_running else
+                   '搜索已停止，当前为部分结果。' if self.deep_more else '已找完达标方案。'))
+            self.result_status.setText(text)
+            self.deep_dialog.status.setText(text)
+            return
         if result is None or not result.get('solutions'):
             self.result_status.setText('没有更多达标组合。' if self.pending_next else
                                        '没有可行组合。请检查库存、器皿颜色和必备条件。')
@@ -818,6 +965,9 @@ class RelicPage(QWidget):
         self._display_page(len(self.result_pages)-1)
 
     def _open_result(self):
+        if getattr(self, 'deep_search', False) and self.deep_dialog is not None:
+            self.deep_dialog.show(); self.deep_dialog.raise_()
+            return
         if self.latest_result is None:return
         rows_by_id=self.search_snapshot[2]
         dialog=LoadoutResultDialog(self.latest_result,rows_by_id,self)
@@ -828,4 +978,23 @@ class RelicPage(QWidget):
 
     def _show_error(self,error):
         self.search_error=True
-        self.result_status.setText('计算失败：'+error)
+        stopped = self.worker is not None and self.worker.isInterruptionRequested()
+        self.result_status.setText(('已停止搜索：' if stopped else '计算失败：')+error)
+        if getattr(self, 'deep_search', False) and self.deep_dialog is not None:
+            self.deep_dialog.status.setText('搜索结束，已完成的结果保留：'+error)
+
+    def _stop_deep_search(self):
+        self.deep_running=False
+        self.deep_stop_requested=True
+        self.stop_search.setEnabled(False)
+        self.result_status.setText('正在停止搜索并保留结果；随后清理严格占优方案。')
+        if self.deep_dialog is not None:
+            self.deep_dialog.stop.setEnabled(False)
+        if self.worker is not None: self.worker.requestInterruption()
+
+    def release_results(self):
+        if self.deep_dialog is not None:
+            self.deep_dialog.release(); self.deep_dialog=None
+        self.search_snapshot=None
+        self.result_pages=[]
+        self.seen_combinations=[]

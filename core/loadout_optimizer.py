@@ -2,6 +2,7 @@
 import itertools
 import json
 import math
+from collections import Counter
 
 import numpy as np
 
@@ -117,6 +118,8 @@ VAMP = ('受到损伤的当下，能通过攻击恢复部分血量',
 
 
 def _initial_kind(name):
+    if name.startswith('通过潜在能力，能比较容易找到'):
+        return '武器池'
     for kind in ('战技', '魔法', '祷告'):
         if name.startswith('出击时，武器' + kind + '改为'):
             return kind
@@ -160,10 +163,36 @@ def _satisfies(relic, entry):
             entry.get('name') in relic['affixes'])
 
 
+def _prefilter_candidates(candidates, vessels, modes, groups):
+    """Only remove impossible cups/items; zero-score fillers remain eligible.
+
+    Tests here are necessary conditions, not a substitute for joint constraint
+    solving. In particular, equal-color slots and initial effects keep their order.
+    """
+    counts = {mode: Counter(r['color'] for r in candidates if r['relic_type'] == mode)
+              for mode in modes}
+    group_matches = [{i for i, r in enumerate(candidates)
+                      if any(_satisfies(r, entry) for entry in group)} for group in groups]
+    possible = []; usable = set()
+    for vessel in vessels:
+        palettes = {mode: _slots(vessel['normal_en' if mode == 'normal' else 'deep_en']) for mode in modes}
+        if any(sum(counts[mode].values()) < 3 or
+               any(counts[mode][color] < needed for color, needed in Counter(
+                   c for c in palettes[mode] if c != '*').items()) for mode in modes):
+            continue
+        fitting = {i for i, r in enumerate(candidates)
+                   if '*' in palettes[r['relic_type']] or r['color'] in palettes[r['relic_type']]}
+        if any(not (matched & fitting) for matched in group_matches):
+            continue
+        possible.append(vessel); usable.update(fitting)
+    return [r for i, r in enumerate(candidates) if i in usable], possible
+
+
 def optimize(build, relics, vessels, presets, scoring_config, *,
              normal_preset_id=None, deepnight_preset_id=None,
              required_groups=None, min_ratio=0.75, max_alternatives=5,
-             time_limit=5, page_size=None, excluded_combinations=(), anchor_score=None):
+             time_limit=5, page_size=None, excluded_combinations=(), anchor_score=None,
+             cancelled=None, solution_callback=None, progress=None, solver_threads=None):
     """Find the optimum and alternatives meeting a fraction of its score.
 
     Requirement groups are joined by AND; entries within a group use OR.
@@ -175,7 +204,7 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
             build, relics, vessels, presets, scoring_config,
             normal_preset_id=normal_preset_id, deepnight_preset_id=deepnight_preset_id,
             required_groups=required_groups, min_ratio=min_ratio, time_limit=time_limit,
-            page_size=max(0, max_alternatives) + 1)
+            page_size=max(0, max_alternatives) + 1, solver_threads=solver_threads)
         if not page or not page['solutions']:
             return None
         best, *alternatives = page['solutions']
@@ -210,6 +239,12 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
         return None
     matching_vessels = [v for v in vessels if v['hero_en'] in
                         (HEROES[build['hero']], 'Any Nightfarer')]
+    original_count, original_cups = len(candidates), len(matching_vessels)
+    candidates, matching_vessels = _prefilter_candidates(candidates, matching_vessels, active_modes, groups)
+    if progress is not None:
+        progress(f'预筛选：候选遗物 {original_count}→{len(candidates)} 件，器皿 {original_cups}→{len(matching_vessels)} 个')
+    if not matching_vessels:
+        return None
     general = {'normal': presets.normal_general, 'deepnight': presets.deepnight_general}
     selected_presets = {
         'normal': (_find_preset(presets, 'normal', normal_preset_id)
@@ -234,14 +269,19 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
 
     n = len(candidates)
     effects = {}
+    required_initials = {entry['name'] for group in groups for entry in group
+                         if entry.get('kind') == 'affix' and _initial_kind(entry.get('name', ''))}
     for i, relic in enumerate(candidates):
         mode = relic['relic_type']
         for affix in set(relic['affixes']):
-            if mode == 'deepnight' and affix in negatives:
+            required_initial = affix in required_initials
+            if mode == 'deepnight' and affix in negatives and not required_initial:
                 continue
             points = score_maps[mode].get(affix)
-            if points is not None and points >= 0 and not _is_repeatable(mode, affix):
-                effects.setdefault((mode, affix), (points, []))[1].append(i)
+            if required_initial or (points is not None and points >= 0 and not _is_repeatable(mode, affix)):
+                # Unscored required replacements still need an activation
+                # variable; their presence alone cannot satisfy the condition.
+                effects.setdefault((mode, affix), (max(0, points or 0), []))[1].append(i)
     effect_keys = list(effects)
     # Each group consumes one occurrence, independently from scoring deduplication.
     allocations = []
@@ -300,9 +340,13 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
         for j, (_, entry_key, _) in enumerate(allocations):
             if entry_key == key:
                 coeff[offset+j] = 1
-        for i, relic in enumerate(candidates):
-            coeff[i] = -(relic['affixes'].count(key[1]) if key[0] == 'affix' else
-                         int(relic['relic_type'] == 'normal' and relic.get('official_id') == key[1]))
+        if key[0] == 'affix' and _initial_kind(key[1]):
+            for j, (_, name) in enumerate(effect_keys):
+                if name == key[1]:coeff[n+j] = -1
+        else:
+            for i, relic in enumerate(candidates):
+                coeff[i] = -(relic['affixes'].count(key[1]) if key[0] == 'affix' else
+                             int(relic['relic_type'] == 'normal' and relic.get('official_id') == key[1]))
         add(base_rows, base_lows, base_highs, coeff, hi=0)
     for j, key in enumerate(effect_keys):
         coeff = np.zeros(length); coeff[n+j] = 1
@@ -359,30 +403,54 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
                     if (3 if r['relic_type']=='deepnight' else 0)+earlier < rank:
                         coeff[slot_var(i,earlier)] = 1
             add(base_rows, base_lows, base_highs, coeff, hi=6)
-    for kind in ('战技','魔法','祷告'):
+    for kind in ('战技','魔法','祷告','武器池'):
         coeff = np.zeros(length)
         for j in initial_keys:
             if _initial_kind(effect_keys[j][1])==kind: coeff[n+j]=1
         add(base_rows, base_lows, base_highs, coeff, hi=1)
 
+    # Retain immutable constraints and sparse exclusions for this search session.
+    base_matrix = vstack(base_rows, format='csc')
+    candidate_index = {r['id']: i for i, r in enumerate(candidates)}
+    exclusion_rows = {}
+    vessel_bounds = {}
+
     def solve_vessel(vessel, excluded=(), minimum=None):
-        rows = list(base_rows); lows = list(base_lows); highs = list(base_highs)
-        upper = np.ones(length)
-        for i,relic in enumerate(candidates):
-            slots = _slots(vessel['normal_en' if relic['relic_type']=='normal' else 'deep_en'])
-            for pos,color in enumerate(slots):
-                if color != '*' and color != relic['color']: upper[slot_var(i,pos)] = 0
+        if cancelled is not None and cancelled():
+            raise InterruptedError('搜索已停止，已完成的批次仍可查看。')
+        if progress is not None:
+            progress('正在求解：' + vessel.get('name', vessel['name_en']))
+        rows = [base_matrix]; lows = list(base_lows); highs = list(base_highs)
+        name = vessel['name_en']
+        if name not in vessel_bounds:
+            upper = np.ones(length)
+            for i,relic in enumerate(candidates):
+                slots = _slots(vessel['normal_en' if relic['relic_type']=='normal' else 'deep_en'])
+                for pos,color in enumerate(slots):
+                    if color != '*' and color != relic['color']: upper[slot_var(i,pos)] = 0
+            vessel_bounds[name] = upper
+        upper = vessel_bounds[name]
         for selected_ids in excluded:
-            coeff = np.zeros(length)
-            for i, relic in enumerate(candidates):
-                if relic['id'] in selected_ids:
-                    coeff[i] = 1
-            add(rows, lows, highs, coeff, hi=3 * len(active_modes) - 1)
+            key = frozenset(selected_ids)
+            if key not in exclusion_rows:
+                indices = [candidate_index[i] for i in key if i in candidate_index]
+                exclusion_rows[key] = csr_matrix((np.ones(len(indices)),
+                    ([0]*len(indices), indices)), shape=(1, length))
+            rows.append(exclusion_rows[key]); lows.append(-np.inf); highs.append(3 * len(active_modes) - 1)
         if minimum is not None:
             add(rows, lows, highs, cost.copy(), hi=-minimum)
-        result = milp(cost, integrality=np.ones(length), bounds=Bounds(0, upper),
-                      constraints=LinearConstraint(vstack(rows, format='csc'), lows, highs),
-                      options={'time_limit': time_limit, 'mip_rel_gap': 0.0})
+        options = {'time_limit': time_limit, 'mip_rel_gap': 0.0}
+        if solver_threads is not None:
+            options['threads'] = solver_threads
+        # SciPy forwards this native HiGHS option, while emitting a warning.
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message="Unrecognized options detected:.*threads.*", category=RuntimeWarning)
+            result = milp(cost, integrality=np.ones(length), bounds=Bounds(0, upper),
+                          constraints=LinearConstraint(vstack(rows, format='csc'), lows, highs),
+                          options=options)
+        if cancelled is not None and cancelled():
+            raise InterruptedError('搜索已停止，已完成的批次仍可查看。')
         if result.status == 2:
             return None
         if result.status != 0 or result.x is None:
@@ -456,7 +524,8 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
                     for v in matching_vessels}
         vessel_by_name = {v['name_en']: v for v in matching_vessels}
         solutions = []
-        while len(solutions) < page_size:
+        count = 0
+        while count < page_size:
             available = [item for item in frontier.values() if item is not None]
             if not available:
                 break
@@ -469,8 +538,18 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
                 break
             key = frozenset(relic['id'] for relic in current['relics'])
             if key not in seen:
-                solutions.append(current)
                 seen.add(key)
+                count += 1
+                if solution_callback is None:
+                    solutions.append(current)
+                else:
+                    # Publish before the next native solve: stop/timeout cannot
+                    # discard already proven solutions from an unfinished batch.
+                    solution_callback({'score': anchor_score, 'min_ratio': min_ratio,
+                        'min_score': minimum, 'solutions': [current], 'has_more': True})
+                    if count >= page_size:
+                        return {'score': anchor_score, 'min_ratio': min_ratio,
+                            'min_score': minimum, 'solutions': [], 'has_more': True}
             # 同一遗物组可能适配多只器皿；过期的器皿候选再次弹出时也会被跳过。
             name = current['vessel']
             frontier[name] = solve_vessel(vessel_by_name[name], seen, minimum)
@@ -482,6 +561,6 @@ def optimize(build, relics, vessels, presets, scoring_config, *,
                         for item in frontier.values()) if anchor_score is not None else False)
         return {'score': anchor_score, 'min_ratio': min_ratio, 'min_score': minimum,
                 'solutions': solutions, 'has_more': has_more,
-                'excluded_combinations': [sorted(ids) for ids in seen],
+                'excluded_combinations': [sorted(ids) for ids in seen] if solution_callback is None else [],
                 'normal_preset_id': normal_preset_id,
                 'deepnight_preset_id': deepnight_preset_id}

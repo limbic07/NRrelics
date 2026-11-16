@@ -184,6 +184,7 @@ def show_constraint_details(parent, groups=None, example=False):
             cards.append(f'<table width="100%" cellpadding="12"><tr><td><b>条件 {i}｜{"反向：均不得出现" if negative else "正向：至少一项"}</b><p>（{entries}）</p></td></tr></table>')
         body = '<p style="color:#008c95"><b>并且</b></p>'.join(cards) or '<p>没有必备条件。</p>'
         body += '<p>正向组：'+RULE_TEXT+'</p><p>反向组：每一项均不得出现；分组或重复添加不改变效果。</p>'
+    body += '<p>初始战技、魔法、祷告替换，以及更容易找到某类武器，各自只生效最左侧的一条。被覆盖的词条不能满足正向必备条件；即使左侧词条不计分，也会覆盖右侧同类词条。</p>'
     negative_body = '<p><b>反向条件 1：</b>物理攻击力＋3、物理攻击力＋4、提升大剑攻击力</p>'
     negative_body += '<p><b>反向条件 2：</b>物理攻击力＋3、强化防御反击</p>'
     negative_body += '<p>这四种词条在整套配装中都不能出现，出现任意一条就不符合条件。</p>'

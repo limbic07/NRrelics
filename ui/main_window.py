@@ -15,7 +15,7 @@ class MainWindow(FluentWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NRrelic Bot v3.0.4_beta")
+        self.setWindowTitle("NRrelic Bot v3.1.0_beta")
 
         # 应用窗口配置
         self.resize(WINDOW_CONFIG["width"], WINDOW_CONFIG["height"])
@@ -200,3 +200,15 @@ class MainWindow(FluentWindow):
             self.repo_page.set_ocr_engine(engine)
         if self.shop_page:
             self.shop_page.set_ocr_engine(engine)
+
+    def closeEvent(self, event):
+        page = getattr(self, 'loadout_page', None)
+        if page is not None and page.worker is not None:
+            event.ignore()
+            page._stop_deep_search()
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(250, self.close)
+            return
+        if page is not None:
+            page.release_results()
+        super().closeEvent(event)

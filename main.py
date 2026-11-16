@@ -4,11 +4,16 @@ NRrelic Bot v2 - 主程序入口
 """
 
 import sys
+import multiprocessing
+
+# Frozen child processes must dispatch before importing Qt or constructing UI.
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
 import json
 from pathlib import Path
 
 from PySide6.QtWidgets import (QApplication, QAbstractItemView, QAbstractScrollArea,
-                               QAbstractSpinBox, QComboBox, QTableWidget)
+                               QAbstractSpinBox, QComboBox, QTableWidget, QHeaderView)
 from PySide6.QtCore import Signal, QObject, QThread, QEvent, Qt
 from PySide6.QtGui import QFont, QWheelEvent
 from qfluentwidgets import ComboBox as FluentComboBox
@@ -56,6 +61,9 @@ class RightClickChecks(QObject):
         view = watched.parentWidget() if hasattr(watched, 'parentWidget') else None
         if not isinstance(view, QAbstractItemView) or watched is not view.viewport():
             return False
+        # Header right-clicks open column filters, never toggle data rows.
+        if isinstance(view, QHeaderView):
+            return False
         if event.type() == QEvent.ContextMenu:
             return True
         if event.button() != Qt.RightButton:
@@ -65,7 +73,7 @@ class RightClickChecks(QObject):
         index = view.indexAt(event.position().toPoint())
         if not index.isValid():
             return False
-        if isinstance(view, QTableWidget):
+        if isinstance(view, QTableWidget) or view.property('rightClickCheckColumn') == 0:
             index = index.siblingAtColumn(0)
         flags = view.model().flags(index)
         if not (flags & Qt.ItemIsEnabled and flags & Qt.ItemIsUserCheckable):
