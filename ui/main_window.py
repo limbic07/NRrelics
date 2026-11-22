@@ -1,7 +1,11 @@
 """主窗口 - Fluent Design 简洁框架"""
+from ctypes.wintypes import MSG
+import pywintypes
+import win32con
+import win32gui
 
 from qfluentwidgets import FluentWindow, NavigationItemPosition, FluentIcon, setTheme, Theme
-from PySide6.QtCore import QSize, Signal
+from PySide6.QtCore import QSize, Signal, QTimer
 from .config import NAVIGATION_CONFIG, WINDOW_CONFIG, THEME_CONFIG
 from ui.components.log_manager import LogManager
 from core.preset_manager import PresetManager
@@ -15,7 +19,7 @@ class MainWindow(FluentWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NRrelic Bot v3.1.0_beta")
+        self.setWindowTitle("NRrelic Bot v3.1.1")
 
         # 应用窗口配置
         self.resize(WINDOW_CONFIG["width"], WINDOW_CONFIG["height"])
@@ -71,7 +75,34 @@ class MainWindow(FluentWindow):
         self._optimize_navigation()
 
         # 初始化页面
+        self._repo_hotkeys = set()
         self._init_pages()
+
+    def _sync_repo_hotkeys(self):
+        # 以所选页面而非可见性决定 F10 目标，最小化或切回游戏后仍可接收。
+        needed = self.stackedWidget.currentWidget() is self.repo_page or self.repo_page.stop_btn.isEnabled()
+        hwnd = int(self.winId())
+        for key in (win32con.VK_F10, win32con.VK_F11):
+            if needed and key not in self._repo_hotkeys:
+                try:
+                    win32gui.RegisterHotKey(hwnd, key, 0x4000, key)  # MOD_NOREPEAT
+                    self._repo_hotkeys.add(key)
+                except pywintypes.error:
+                    label = "F10" if key == win32con.VK_F10 else "F11"
+                    self.repo_page._on_log(f"{label} 全局快捷键注册失败，请使用仓库清理页按钮。", "WARNING")
+            elif not needed and key in self._repo_hotkeys:
+                win32gui.UnregisterHotKey(hwnd, key)
+                self._repo_hotkeys.remove(key)
+
+    def nativeEvent(self, event_type, message):
+        msg = MSG.from_address(int(message))
+        if msg.message == win32con.WM_HOTKEY and msg.wParam in getattr(self, "_repo_hotkeys", ()):
+            if msg.wParam == win32con.VK_F10:
+                self.repo_page._on_start_shortcut()
+            elif self.repo_page.stop_btn.isEnabled():
+                self.repo_page._stop_cleaning()
+            return True, 0
+        return super().nativeEvent(event_type, message)
 
     def _optimize_navigation(self):
         """优化导航栏配置"""
@@ -169,6 +200,10 @@ class MainWindow(FluentWindow):
         if detected_path and not self.save_page.save_manager.is_valid_steam_path(configured_path):
             self.settings_page.set_steam_path(detected_path)
 
+        self.stackedWidget.currentChanged.connect(self._sync_repo_hotkeys)
+        self.repo_page.cleaning_finished.connect(self._sync_repo_hotkeys)
+        self._sync_repo_hotkeys()
+
     def _on_presets_changed(self):
         """预设变更时，通知所有页面刷新"""
         # Both pages share the manager; the emitting page already refreshed itself.
@@ -202,13 +237,21 @@ class MainWindow(FluentWindow):
             self.shop_page.set_ocr_engine(engine)
 
     def closeEvent(self, event):
+        repo = getattr(self, "repo_page", None)
+        if repo and repo.cleaning_thread and repo.cleaning_thread.isRunning():
+            event.ignore()
+            repo._stop_cleaning()
+            QTimer.singleShot(250, self.close)
+            return
         page = getattr(self, 'loadout_page', None)
         if page is not None and page.worker is not None:
             event.ignore()
             page._stop_deep_search()
-            from PySide6.QtCore import QTimer
             QTimer.singleShot(250, self.close)
             return
         if page is not None:
             page.release_results()
+        for key in self._repo_hotkeys:
+            win32gui.UnregisterHotKey(int(self.winId()), key)
+        self._repo_hotkeys.clear()
         super().closeEvent(event)

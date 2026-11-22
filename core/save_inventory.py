@@ -58,8 +58,15 @@ def read_save_inventory(path):
     unique_ids = reader._unique_ids()
     colors = {'Red':'红','Blue':'蓝','Yellow':'黄','Green':'绿'}
     slots = []
+    slot_errors = []
     for slot, payload in payloads.items():
-        records = reader._read_relics(payload, f'USERDATA_{slot}')
+        try:
+            records = reader._read_relics(payload, f'USERDATA_{slot}')
+        except SaveReadError as exc:
+            # A variable-length record cannot be safely resynchronized within
+            # this slot. Other BND4 slots have independent, validated bounds.
+            slot_errors.append(f'USERDATA_{slot}：{exc}')
+            continue
         if not records: continue
         converted, errors = [], []
         for record in records:
@@ -91,5 +98,7 @@ def read_save_inventory(path):
                     item['name'] = next(o['name'] for o in officials if o['id']==item['official_id'])
             converted.append(item)
         slots.append(dict(slot=f'USERDATA_{slot}',name=records[0].player_name,items=converted,errors=errors))
-    if not slots: raise SaveReadError('未读取到有遗物的存档槽位，当前库存未更改')
-    return dict(source=str(path), digest=hashlib.sha256(raw).hexdigest(),slots=slots)
+    if not slots:
+        raise SaveReadError('\n'.join(['未读取到有遗物的存档槽位，当前库存未更改', *slot_errors]))
+    return dict(source=str(path), digest=hashlib.sha256(raw).hexdigest(), slots=slots,
+                slot_errors=slot_errors)

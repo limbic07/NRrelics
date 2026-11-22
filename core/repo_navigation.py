@@ -43,6 +43,8 @@ class RepositoryNavigation:
         self.previous_sale = None
         self.previous_card = None
         self.pending_action = None
+        self.manual_cell = None
+        self.previous_box = None
 
     @staticmethod
     def _crop_gray(image, region):
@@ -58,17 +60,35 @@ class RepositoryNavigation:
             return 0.0
         return float(np.mean(cv2.absdiff(previous, current)))
 
-    def expected_box(self, image):
+    @staticmethod
+    def _grid_box(image, row, column):
         h, w = image.shape[:2]
+        return (round((928 + 110 * column) * w / 1920),
+                round((209 + 106 * row) * h / 1080),
+                round(92 * w / 1920), round(94 * h / 1080))
+
+    def expected_box(self, image):
+        if self.manual_cell is not None:
+            return self._grid_box(image, *self.manual_cell)
         column = self.index % self.COLUMNS
         row = min(self.index // self.COLUMNS, self.CURSOR_ROWS - 1)
         if self.total_items and self.total_items > self.CURSOR_ROWS * self.COLUMNS:
             final_row_start = ((self.total_items - 1) // self.COLUMNS) * self.COLUMNS
             if self.index >= final_row_start:
                 row = self.CURSOR_ROWS
-        return (round((928 + 110 * column) * w / 1920),
-                round((209 + 106 * row) * h / 1080),
-                round(92 * w / 1920), round(94 * h / 1080))
+        return self._grid_box(image, row, column)
+
+    def reanchor(self, image, detected):
+        """手动滚动后只锚定可见格子，不从屏幕行号推算绝对库存序号。"""
+        if self.pending_action == "sale" and self.previous_box and self._cursor_at_expected(detected, self.previous_box):
+            return False
+        for row in range(5):
+            for column in range(self.COLUMNS):
+                if self._cursor_at_expected(detected, self._grid_box(image, row, column)):
+                    self.manual_cell = (row, column)
+                    self.pending_action = None
+                    return True
+        return False
 
     @staticmethod
     def _card_gray(image, box):
@@ -102,6 +122,9 @@ class RepositoryNavigation:
         card_change = self._change(
             self.previous_card, self._card_gray(image, box))
         detected, _ = detector.detect_cursor(image, scale_x, scale_y)
+        if self.manual_cell == (3, 0) and self._cursor_at_expected(detected, self._grid_box(image, 4, 0)):
+            self.manual_cell = (4, 0)
+            box = self.expected_box(image)
         if not self._cursor_at_expected(detected, box):
             return NavigationCheck(False, box, "光标未到预计下一格", detail_change,
                                    detail_icon_change, sale_change, card_change, detected, True)
@@ -130,6 +153,14 @@ class RepositoryNavigation:
         self.previous_detail = self._crop_gray(image, self.DETAIL_REGION)
         self.previous_detail_icon = self._crop_gray(image, self.DETAIL_ICON_REGION)
         self.previous_sale = self._crop_gray(image, self.SALE_REGION)
-        self.previous_card = self._card_gray(image, self.expected_box(image))
+        self.previous_box = self.expected_box(image)
+        self.previous_card = self._card_gray(image, self.previous_box)
         self.pending_action = action
         self.index += 1
+        if self.manual_cell is not None:
+            row, column = self.manual_cell
+            if column == self.COLUMNS - 1:
+                # 第四行换行时列表通常滚动，最后一行由下一帧实际光标确认。
+                self.manual_cell = (row if row == 3 else row + 1, 0)
+            else:
+                self.manual_cell = (row, column + 1)

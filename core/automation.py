@@ -379,7 +379,7 @@ class RepositoryFilter:
             log_debug(f"[错误] 解析遗物数量失败: {e}")
             return 0
 
-    def verify_sell_interface(self) -> bool:
+    def verify_sell_interface(self, window_image=None) -> bool:
         """
         验证是否在卖出界面
 
@@ -392,7 +392,11 @@ class RepositoryFilter:
             return False
 
         # 截取卖出区域
-        image = self._capture_region(self.SELL_REGION)
+        if window_image is None:
+            image = self._capture_region(self.SELL_REGION)
+        else:
+            x1, y1, x2, y2 = self._scale_region(self.SELL_REGION)
+            image = window_image[y1:y2, x1:x2]
 
         # 保存调试图片
         self._save_debug_image(image, "sell_region")

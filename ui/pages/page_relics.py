@@ -558,7 +558,10 @@ class RelicPage(QWidget):
             snapshot = read_save_inventory(path)
             slots = snapshot['slots']
             labels = [f"{s['name'] or '未命名'} · {s['slot']} · {len(s['items'])} 件" for s in slots]
-            selected, ok = QInputDialog.getItem(self,'选择库存','存档槽位',labels,0,False)
+            prompt = '存档槽位'
+            if snapshot['slot_errors']:
+                prompt = '以下槽位未能读取：\n' + '\n'.join(snapshot['slot_errors']) + '\n\n请选择要同步的槽位'
+            selected, ok = QInputDialog.getItem(self,'选择库存',prompt,labels,0,False)
             if not ok: return
             slot = slots[labels.index(selected)]
             if slot['errors']:

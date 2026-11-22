@@ -16,7 +16,7 @@ from core.relic_validation import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def make_test_save(relic_id=25000):
+def make_test_save(relic_id=25000, damaged_slots=()):
     """Build a minimal BND4 with ten encrypted profiles and one relic."""
     validator = ReadOnlySaveValidator(RuleData())
     payload_size = (validator.STATE_OFFSET + 80 + (validator.STATE_COUNT - 1) * 8
@@ -33,6 +33,8 @@ def make_test_save(relic_id=25000):
             item_offset = name_offset + 0x5B8 + 4
             struct.pack_into('<III', payload, item_offset, handle, 1, 0)
             payload[item_offset + 12] = 1
+        if slot in damaged_slots:
+            struct.pack_into('<I', payload, validator.STATE_OFFSET, 0xF0000001)
         payload += bytes(-len(payload) % 16)
         iv = bytes([slot]) * 16
         encryptor = Cipher(algorithms.AES(validator.SAVE_KEY), modes.CBC(iv)).encryptor()
@@ -51,6 +53,21 @@ def make_test_save(relic_id=25000):
 
 
 class RelicValidationTests(unittest.TestCase):
+    def test_inventory_isolates_unreadable_profile(self):
+        from core.save_inventory import read_save_inventory
+        from core.relic_validation import SaveReadError
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'inventory.sl2'
+            path.write_bytes(make_test_save(relic_id=1000))
+            normal = read_save_inventory(path)
+            path.write_bytes(make_test_save(relic_id=1000, damaged_slots=(1,)))
+            recovered = read_save_inventory(path)
+            self.assertEqual(recovered['slots'], normal['slots'])
+            self.assertIn('USERDATA_1', recovered['slot_errors'][0])
+            path.write_bytes(make_test_save(relic_id=1000, damaged_slots=(0,)))
+            with self.assertRaisesRegex(SaveReadError, 'USERDATA_0'):
+                read_save_inventory(path)
+
     def test_bundled_rule_tables_and_package_entries_exist(self):
         rules = RuleData.load()
         self.assertGreater(len(rules.relics), 1000)

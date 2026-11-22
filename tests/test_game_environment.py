@@ -117,9 +117,11 @@ class GameEnvironmentTests(unittest.TestCase):
 
     def test_repository_rejects_bad_ratio_before_filtering(self):
         cleaner = object.__new__(RepoCleaner)
+        cleaner.relic_detector = Mock()
         cleaner.settings = {}
         cleaner.repository_filter = SimpleNamespace(
             settings=None, validate_game_resolution=Mock(return_value=False),
+            _get_client_rect_screen_coords=Mock(return_value=(0, 0, 1024, 768)),
             apply_filter=Mock())
         cleaner.qualified_relics = []
         with patch("core.repo_cleaner.create_capture_session", return_value=None), \

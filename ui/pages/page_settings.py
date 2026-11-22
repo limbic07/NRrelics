@@ -472,23 +472,6 @@ class SettingsPage(QWidget):
         threshold_desc.setStyleSheet("color: gray;")
         card_layout.addWidget(threshold_desc)
 
-        # 亮度阈值（遗物状态检测）
-        lum_layout = QHBoxLayout()
-        lum_label = QLabel("亮度阈值:")
-        lum_label.setFixedWidth(150)
-        self.lum_threshold_input = LineEdit()
-        self.lum_threshold_input.setText(str(self.settings.get("brightness_threshold", 45)))
-        self.lum_threshold_input.setFixedWidth(80)
-        self.lum_threshold_input.textChanged.connect(self._auto_save_settings)
-        lum_layout.addWidget(lum_label)
-        lum_layout.addWidget(self.lum_threshold_input)
-        lum_layout.addStretch()
-        card_layout.addLayout(lum_layout)
-
-        lum_desc = QLabel("遗物亮/暗状态判断的亮度阈值（0-255），默认45")
-        lum_desc.setFont(QFont("Segoe UI", 8))
-        lum_desc.setStyleSheet("color: gray;")
-        card_layout.addWidget(lum_desc)
 
         return card
 
@@ -691,7 +674,6 @@ class SettingsPage(QWidget):
             "timing_debug": False,
             "check_relic_id_consistency": False,
             "template_threshold": 0.7,
-            "brightness_threshold": 45,
             "sl_mode_enabled": False,
             "developer_mode": True,
             "scoring": normalize_scoring(None)
@@ -714,7 +696,6 @@ class SettingsPage(QWidget):
             "experimental_relative_brightness": self.relative_brightness_switch.isChecked() if hasattr(self, "relative_brightness_switch") else self.settings.get("experimental_relative_brightness", False),
             "ocr_debug": self.ocr_debug_switch.isChecked() if hasattr(self, 'ocr_debug_switch') else self.settings.get("ocr_debug", False),
             "template_threshold": self._get_threshold_value(),
-            "brightness_threshold": self._get_brightness_threshold_value(),
             "sl_mode_enabled": self.sl_mode_switch.isChecked() if hasattr(self, 'sl_mode_switch') else self.settings.get("sl_mode_enabled", False),
             "developer_mode": True,
             "scoring": self._collect_scoring()
@@ -745,16 +726,6 @@ class SettingsPage(QWidget):
             return max(0.0, min(1.0, val))
         except (ValueError, TypeError):
             return 0.7
-
-    def _get_brightness_threshold_value(self) -> int:
-        """安全获取亮度阈值"""
-        if not hasattr(self, 'lum_threshold_input'):
-            return self.settings.get("brightness_threshold", 45)
-        try:
-            val = int(self.lum_threshold_input.text())
-            return max(0, min(255, val))
-        except (ValueError, TypeError):
-            return 45
 
     def _save_settings(self):
         """保存设置"""

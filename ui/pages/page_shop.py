@@ -221,6 +221,9 @@ class PageShop(QWidget):
 
     def _on_start_shortcut(self):
         """F10 快捷键触发开始"""
+        repo = getattr(self.window(), "repo_page", None)
+        if repo and repo.cleaning_thread and repo.cleaning_thread.isRunning():
+            return
         if self.isVisible() and self.start_btn.isEnabled():
             from PySide6.QtCore import QMetaObject, Qt as QtCore_Qt
             QMetaObject.invokeMethod(self, "_start_shopping", QtCore_Qt.QueuedConnection)

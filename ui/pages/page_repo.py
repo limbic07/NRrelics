@@ -6,13 +6,14 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QComboBox, QTabWidget,
                                QScrollArea, QFrame, QSplitter, QGroupBox, QCheckBox, QLineEdit,
-                               QTreeWidget, QTreeWidgetItem)
+                               QTreeWidget, QTreeWidgetItem, QDialog, QApplication)
 from PySide6.QtCore import Qt, Signal, QThread, QMimeData, QPoint, QTimer
 from PySide6.QtGui import QFont, QIntValidator, QDrag, QPixmap
-import keyboard
+import win32api
+import pywintypes
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton,
                            ComboBox, MessageBox, InfoBar, InfoBarPosition,
-                           isDarkTheme)
+                           isDarkTheme, BodyLabel)
 
 from core.preset_manager import PresetManager, PRESET_TYPE_NORMAL_WHITELIST, PRESET_TYPE_DEEPNIGHT_WHITELIST
 from core.relic_scoring import normalize_scoring
@@ -124,6 +125,7 @@ class CleaningThread(QThread):
     finished_signal = Signal()
     qualified_relic_signal = Signal(dict)  # 合格遗物信息
     result_signal = Signal(dict)
+    pause_signal = Signal(str, str)
 
     def __init__(self, cleaner, mode, cleaning_mode, max_relics, allow_favorited, require_double):
         super().__init__()
@@ -144,7 +146,8 @@ class CleaningThread(QThread):
                 self.allow_favorited,
                 self.require_double,
                 log_callback=self.log_signal.emit,
-                result_callback=self.result_signal.emit
+                result_callback=self.result_signal.emit,
+                pause_callback=self.pause_signal.emit,
             )
 
             # 清理完成后，发送所有合格遗物信息
@@ -481,8 +484,7 @@ class RepoPage(QWidget):
     presets_modified = Signal()
     preset_updated = Signal(str, str)
     preset_list_changed = Signal(str, str, str)
-    clean_requested = Signal()
-    stop_requested = Signal()
+    cleaning_finished = Signal()
 
     def __init__(self, log_manager=None, preset_manager=None):
         super().__init__()
@@ -496,6 +498,12 @@ class RepoPage(QWidget):
 
         # 清理线程
         self.cleaning_thread = None
+        self.pause_dialog = None
+        self.resume_timer = QTimer(self)
+        self.resume_timer.setInterval(1000)
+        self.resume_timer.setTimerType(Qt.PreciseTimer)
+        self.resume_timer.timeout.connect(self._tick_resume)
+        self.resume_seconds = 0
 
         # 当前模式
         self.current_mode = "normal"
@@ -515,8 +523,6 @@ class RepoPage(QWidget):
 
         self._presets_loaded = False
         self._init_ui()
-        self.clean_requested.connect(self._start_cleaning, Qt.QueuedConnection)
-        self.stop_requested.connect(self._stop_cleaning, Qt.QueuedConnection)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -562,8 +568,6 @@ class RepoPage(QWidget):
 
         layout.addWidget(splitter, 1)
 
-        # 设置快捷键
-        self._setup_shortcuts()
 
     def _create_toolbar(self) -> CardWidget:
         """创建顶部工具栏（紧凑版）"""
@@ -625,7 +629,7 @@ class RepoPage(QWidget):
         self.start_btn.setFixedHeight(36)
         self.start_btn.setFixedWidth(120)
         self.start_btn.setEnabled(False)
-        self.start_btn.clicked.connect(self._start_cleaning)
+        self.start_btn.clicked.connect(self._start_or_resume)
         layout.addWidget(self.start_btn)
 
 
@@ -1101,8 +1105,28 @@ class RepoPage(QWidget):
             # 取消勾选，显示输入框
             self.max_input.setVisible(True)
 
+    def _start_or_resume(self):
+        if self.pause_dialog is None:
+            self._start_cleaning()
+        elif self.repo_cleaner.is_paused and not self.resume_timer.isActive():
+            self.pause_dialog.hide()
+            self.resume_seconds = 5
+            self.start_btn.setText("5 秒后检测")
+            self.start_btn.setEnabled(False)
+            self.resume_timer.start()
+
+    def _tick_resume(self):
+        self.resume_seconds -= 1
+        if self.resume_seconds > 0:
+            self.start_btn.setText(f"{self.resume_seconds} 秒后检测")
+            return
+        self.resume_timer.stop()
+        self._resume_from_game()
+
     def _start_cleaning(self):
         """开始清理"""
+        if self.cleaning_thread and self.cleaning_thread.isRunning():
+            return
         mode = "normal" if self.mode_combo.currentIndex() == 0 else "deepnight"
         cleaning_mode = ("sell" if self.clean_mode_combo.currentIndex() == 0 else "favorite")
         self.active_cleaning_mode = cleaning_mode
@@ -1123,10 +1147,6 @@ class RepoPage(QWidget):
         # 更新 repo_cleaner 的设置
         if self.repo_cleaner:
             self.repo_cleaner.settings = self.settings
-
-        # 更新亮度阈值
-        if self.relic_detector:
-            self.relic_detector.brightness_threshold = self.settings.get("brightness_threshold", 45)
 
         # 从设置获取参数
         allow_favorited = self.settings.get("allow_operate_favorited", False)
@@ -1155,6 +1175,7 @@ class RepoPage(QWidget):
             self.repo_cleaner, mode, cleaning_mode, max_relics, allow_favorited, require_double
         )
         self.cleaning_thread.log_signal.connect(self._on_log)
+        self.cleaning_thread.pause_signal.connect(self._show_pause_prompt)
         self.cleaning_thread.finished_signal.connect(self._on_cleaning_finished)
         self.cleaning_thread.qualified_relic_signal.connect(self._add_qualified_relic)
         self.cleaning_thread.result_signal.connect(self._on_result)
@@ -1202,6 +1223,8 @@ class RepoPage(QWidget):
     def _stop_cleaning(self):
         """停止清理"""
         if self.cleaning_thread:
+            self._dismiss_pause_prompt()
+            self.start_btn.setEnabled(False)
             self.is_manual_stop = True
             self.repo_cleaner.stop_cleaning()
             if self.log_manager:
@@ -1211,8 +1234,11 @@ class RepoPage(QWidget):
 
     def _on_cleaning_finished(self):
         """清理完成"""
+        self._dismiss_pause_prompt()
+        self.start_btn.setText("开始清理(F10)")
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.cleaning_finished.emit()
         reason = self.repo_cleaner.stop_reason
         messages = {
             "manual": ("清理已手动停止", "WARNING"),
@@ -1432,18 +1458,85 @@ class RepoPage(QWidget):
         else:
             self.logger.log("OCR 引擎异步加载完成", "SUCCESS")
 
-    def _setup_shortcuts(self):
-        """设置全局快捷键"""
-        keyboard.add_hotkey('F10', self._on_start_shortcut, suppress=False)
-        # F11 停止清理
-        keyboard.add_hotkey('F11', self._on_stop_shortcut, suppress=False)
-
     def _on_start_shortcut(self):
-        """F10 快捷键触发开始"""
-        if self.isVisible() and self.start_btn.isEnabled():
-            self.clean_requested.emit()
+        if self.start_btn.isEnabled():
+            if self.pause_dialog is None:
+                self._start_cleaning()
+            else:
+                self._resume_from_game()
 
-    def _on_stop_shortcut(self):
-        """F11 快捷键触发停止"""
-        if self.isVisible() and self.stop_btn.isEnabled():
-            self.stop_requested.emit()
+    def _dismiss_pause_prompt(self):
+        self.resume_timer.stop()
+        if self.pause_dialog is not None:
+            self.pause_dialog.hide()
+            self.pause_dialog.deleteLater()
+            self.pause_dialog = None
+
+    def _show_pause_prompt(self, reason, stage):
+        if not self.repo_cleaner.is_running or not self.repo_cleaner.is_paused:
+            return
+        self._dismiss_pause_prompt()
+        self.start_btn.setText("继续清理")
+        self.start_btn.setEnabled(True)
+        # 单独列入 Alt+Tab；游戏独占屏幕或主窗口最小化时仍可切换查看。
+        dialog = QDialog(None, Qt.Window | Qt.WindowStaysOnTopHint)
+        self.pause_dialog = dialog
+        title = "仓库清理已暂停" if stage == "item" else "仓库清理尚未开始"
+        dialog.setWindowTitle(title)
+        dialog.setStyleSheet("QDialog { background: " + ("#242424" if isDarkTheme() else "#f7f8fa") + "; }")
+        instructions = {
+            "item": "点击「隐藏提示」，切回游戏，用方向键将高亮框移到下一件尚未勾选、要检查的遗物上。只移动光标，不要按 F。",
+            "window": "点击「隐藏提示」，打开或恢复游戏窗口，进入遗物仪式界面。",
+            "resolution": "点击「隐藏提示」，切回游戏，将画面设为 16∶9（例如 1920 × 1080），返回遗物仪式界面。",
+        }
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
+        for message in (reason, instructions[stage],
+                        "在游戏中按 F10 可立即继续。也可以切回程序，点击仓库清理页的「继续清理」，再切回游戏。程序会在 5 秒后开始检测。",
+                        "按 F11 或点击「结束本次清理」可停止。"):
+            label = BodyLabel(message, dialog)
+            label.setWordWrap(True)
+            layout.addWidget(label)
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        hide = PrimaryPushButton("隐藏提示", dialog)
+        hide.clicked.connect(dialog.hide)
+        stop = PushButton("结束本次清理", dialog)
+        stop.clicked.connect(self._stop_cleaning)
+        buttons.addWidget(stop)
+        buttons.addWidget(hide)
+        layout.addLayout(buttons)
+        dialog.setFixedWidth(440)
+        dialog.adjustSize()
+        window = self.repo_cleaner.game_window
+        screen = self.screen()
+        if window:
+            try:
+                monitor = win32api.MonitorFromWindow(window._hWnd, 2)
+                device = win32api.GetMonitorInfo(monitor)["Device"]
+                screen = next((s for s in QApplication.screens() if s.name() == device), screen)
+            except pywintypes.error:
+                pass  # 游戏可能在暂停时关闭，提示仍在程序所在屏幕显示。
+        if screen:
+            dialog.move(screen.availableGeometry().center() - dialog.rect().center())
+        dialog.show()
+        dialog.raise_()
+        QApplication.alert(dialog)
+        QApplication.beep()
+
+    def _resume_from_game(self):
+        if not self.repo_cleaner.is_paused or self.pause_dialog is None:
+            return
+        if self.pause_dialog.isVisible() or not self.repo_cleaner.game_in_foreground():
+            self.start_btn.setText("继续清理")
+            self.start_btn.setEnabled(True)
+            self.pause_dialog.setWindowTitle("请隐藏提示并切回游戏" if self.pause_dialog.isVisible()
+                                            else "游戏不在前台，清理已暂停")
+            self.pause_dialog.show()
+            self.pause_dialog.raise_()
+            return
+        self._dismiss_pause_prompt()
+        self.start_btn.setText("清理中")
+        self.start_btn.setEnabled(False)
+        self.repo_cleaner.resume_cleaning()

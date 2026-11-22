@@ -12,6 +12,50 @@ from core.relic_detector import (RELIC_STATE_DARK_E, RELIC_STATE_DARK_O,
 
 
 class RepoNavigationTests(unittest.TestCase):
+    def test_interactive_recovery_never_repeats_uncertain_sale(self):
+        # First F leaves the highlight on the original relic. First resume still
+        # sees that relic. On second resume the user has moved two columns.
+        frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        old = (928, 209, 92, 94)
+        moved = (1148, 209, 92, 94)
+        cleaner = RepoCleaner(Mock(), Mock(), Mock())
+        cleaner.repository_filter = Mock(scale_x=1, scale_y=1)
+        cleaner.repository_filter._capture_game_window.return_value = frame
+        cleaner.repository_filter.detect_relic_count.return_value = 20
+        cleaner.relic_detector.detect_cursor.side_effect = [(box, 92) for box in
+                                                           [old, old, old, old, moved, moved]]
+        cleaner.relic_detector.detect_state.return_value = RELIC_STATE_LIGHT
+        cleaner.ocr_engine.recognize_with_classification_from_lines.return_value = {
+            'success': True, 'positive_count': 0, 'negative_count': 0, 'affixes': []}
+        cleaner.preset_manager.get_general_preset.return_value = {}
+        cleaner.preset_manager.get_active_dedicated_presets.return_value = []
+        pauses = []
+        def resume(reason, stage):
+            self.assertTrue(cleaner.is_paused)
+            pauses.append(stage)
+            cleaner.resume_cleaning()
+        with patch.object(cleaner, '_find_game_window', return_value=object()), \
+             patch.object(cleaner, 'game_in_foreground', return_value=True), \
+             patch.object(cleaner, '_match_affixes', return_value=Mock(qualified=False, destructive_action_allowed=True)), \
+             patch('core.repo_cleaner.log_match'), patch('core.repo_cleaner.log_brightness_check'), \
+             patch('core.repo_cleaner.create_capture_session', return_value=None), \
+             patch('core.repo_cleaner.time.sleep'), patch('core.repo_cleaner.pydirectinput.press') as press:
+            cleaner.start_cleaning('normal','sell',2,False,True,pause_callback=resume)
+        self.assertEqual(pauses, ['item', 'item'])
+        self.assertEqual(cleaner.stop_reason, 'completed')
+        self.assertEqual([c.args[0] for c in press.call_args_list], ['f', 'f'])
+        self.assertEqual(cleaner.relic_detector.detect_state.call_args.kwargs['cursor_box'], moved)
+
+    def test_user_can_end_startup_pause_without_applying_filter(self):
+        cleaner = RepoCleaner(Mock(), Mock(), Mock())
+        cleaner.repository_filter = Mock()
+        with patch.object(cleaner, '_find_game_window', return_value=None), \
+             patch('core.repo_cleaner.create_capture_session', return_value=None):
+            cleaner.start_cleaning('normal','sell',2,False,True,
+                                   pause_callback=lambda reason, stage: cleaner.stop_cleaning())
+        self.assertEqual(cleaner.stop_reason, 'manual')
+        cleaner.repository_filter.apply_filter.assert_not_called()
+
     def setUp(self):
         self.cleaner = object.__new__(RepoCleaner)
         self.cleaner.is_running = True
@@ -172,32 +216,29 @@ class RepoNavigationTests(unittest.TestCase):
         detector = RelicDetector()
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
         box = (928, 209, 92, 94)
-        with patch.object(detector, "detect_cursor", side_effect=AssertionError("global cursor used")):
+        with patch.object(detector, "_has_sale_price", return_value=True), patch.object(detector, "detect_cursor", side_effect=AssertionError("global cursor used")):
             with patch.object(detector, "_detect_detailed_state", return_value={
                 "state": "Light", "equipped": False, "favorited": False}):
                 self.assertEqual(detector.detect_state(frame, cursor_box=box), RELIC_STATE_LIGHT)
 
-    def test_official_detail_marker_colors_override_card_brightness(self):
+    def test_sale_price_requires_currency_and_amount(self):
         detector = RelicDetector()
-        box = (1258, 527, 92, 94)
-        colors = {
-            "red": (15, 20, 110),
-            "gold": (20, 90, 115),
-            "green": (30, 102, 45),
-            "blue": (110, 55, 20),
-        }
-        for name, color in colors.items():
-            with self.subTest(color=name):
-                frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-                cv2.rectangle(frame, (1035, 869), (1045, 878), color, -1)
-                with patch.object(detector, "_detect_detailed_state",
-                                  side_effect=AssertionError("brightness used")):
-                    self.assertEqual(detector.detect_state(frame, cursor_box=box),
-                                     RELIC_STATE_DARK_O)
-                smaller = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
-                small_box = tuple(round(v * 2 / 3) for v in box)
-                self.assertEqual(detector.detect_state(smaller, cursor_box=small_box),
-                                 RELIC_STATE_DARK_O)
+        frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        self.assertIsNone(detector._has_sale_price(frame))
+        cv2.putText(frame, "RELIC", (1076, 795), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.9, (200, 200, 200), 2)
+        box = (928, 209, 92, 94)
+        frame[209:303, 928:1020] = 200
+        self.assertEqual(detector.detect_state(frame, cursor_box=box), RELIC_STATE_DARK_O)
+        icon = detector.template_price
+        frame[898:898+icon.shape[0], 934:934+icon.shape[1]] = icon[:, :, None]
+        self.assertIsNone(detector._has_sale_price(frame))
+        cv2.putText(frame, "350", (1014, 919), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.65, (200, 200, 200), 2)
+        frame[209:303, 928:1020] = 10
+        self.assertEqual(detector.detect_state(frame, cursor_box=box), RELIC_STATE_LIGHT)
+        smaller = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+        self.assertTrue(detector._has_sale_price(smaller))
 
     def test_scrolled_relic_uses_fourth_row_state(self):
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
@@ -210,7 +251,7 @@ class RepoNavigationTests(unittest.TestCase):
                 return {"state": "Dark", "equipped": True, "favorited": False}
             return {"state": "Light", "equipped": False, "favorited": False}
 
-        with patch.object(detector, "_detect_detailed_state", side_effect=state_for_box):
+        with patch.object(detector, "_has_sale_price", return_value=True), patch.object(detector, "_detect_detailed_state", side_effect=state_for_box):
             state = detector.detect_state(frame, cursor_box=nav.expected_box(frame))
         self.assertEqual(state, RELIC_STATE_DARK_E)
 
@@ -235,7 +276,6 @@ class RepoNavigationTests(unittest.TestCase):
         repository.extract_line_rois.return_value = lines
         detector = Mock()
         detector.detect_state.return_value = RELIC_STATE_LIGHT
-        detector._has_official_marker.return_value = False
         engine = Mock()
         engine.recognize_with_classification_from_lines.return_value = {
             "success": True, "positive_count": 0, "negative_count": 0, "affixes": []}
@@ -311,7 +351,6 @@ class RepoNavigationTests(unittest.TestCase):
         cleaner.repository_filter = repository
         cleaner.relic_detector = Mock()
         cleaner.relic_detector.detect_state.return_value = RELIC_STATE_LIGHT
-        cleaner.relic_detector._has_official_marker.return_value = False
         cleaner.relic_detector.detect_cursor.return_value = ((1035, 207, 99, 98), 99)
         cleaner.ocr_engine = Mock()
         cleaner.ocr_engine.recognize_with_classification_from_lines.return_value = {
@@ -352,7 +391,6 @@ class RepoNavigationTests(unittest.TestCase):
         cleaner.repository_filter = repository
         cleaner.relic_detector = Mock()
         cleaner.relic_detector.detect_state.return_value = RELIC_STATE_LIGHT
-        cleaner.relic_detector._has_official_marker.return_value = False
         cleaner.relic_detector.detect_cursor.return_value = ((925, 207, 99, 98), 99)
         cleaner.ocr_engine = Mock()
         cleaner.ocr_engine.recognize_with_classification_from_lines.return_value = {

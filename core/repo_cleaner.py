@@ -4,6 +4,7 @@
 """
 
 import time
+from threading import Event
 import cv2
 import numpy as np
 import pyautogui
@@ -86,7 +87,7 @@ class RepoCleaner:
 
     def start_cleaning(self, mode: str, cleaning_mode: str, max_relics: int,
                       allow_operate_favorited: bool, require_double: bool,
-                      log_callback=None, result_callback=None):
+                      log_callback=None, result_callback=None, pause_callback=None):
         """
         开始清理
 
@@ -106,6 +107,7 @@ class RepoCleaner:
         self.relic_detector.experimental_navigation = experimental
         self.is_running = True
         self.is_paused = False
+        self._resume_event = Event()
         self.pending_sell_count = 0
         self.normal_stop = False  # 重置正常停止标志
         self._reset_stats()
@@ -119,8 +121,9 @@ class RepoCleaner:
                 log_debug(f"[{level}] {message}")
 
         try:
-            if self.relic_detector.template_cup is None or self.relic_detector.template_bookmark is None:
-                log("遗物状态模板加载失败，请检查程序资源 data/icon_cup.png 和 data/icon_bookmark.png；已停止清理。", "ERROR")
+            if (self.relic_detector.template_cup is None or self.relic_detector.template_bookmark is None
+                    or self.relic_detector.template_price is None):
+                log("遗物状态模板加载失败，请检查程序资源 货币、圣杯和书签图标；已停止清理。", "ERROR")
                 self.stop_reason = "error"
                 return
             # ===== OCR 自动采集调试代码：每次清理建立独立会话；删除时移除此块及下方标记块 =====
@@ -129,10 +132,10 @@ class RepoCleaner:
             # 0. 检测游戏窗口
             log("正在检测游戏窗口...", "INFO")
             self.game_window = self._find_game_window()
-            if not self.game_window:
-                log("未找到游戏窗口", "ERROR")
-                self.stop_reason = "error"
-                return
+            while not self.game_window:
+                if not self._wait_for_user("未找到游戏窗口", "window", pause_callback, log):
+                    return
+                self.game_window = self._find_game_window()
 
             # 1. 等待3秒，给用户时间切换到游戏界面
             log("等待3秒，请切换到游戏遗物仪式界面...", "INFO")
@@ -141,9 +144,12 @@ class RepoCleaner:
                     return
                 time.sleep(0.1)
 
-            if not self.repository_filter.validate_game_resolution(log):
-                self.stop_reason = "error"
-                return
+            while not self.repository_filter.validate_game_resolution(log):
+                rect = self.repository_filter._get_client_rect_screen_coords()
+                reason = (f"当前游戏画面为 {rect[2]} × {rect[3]}，需要 16∶9 分辨率"
+                          if rect and min(rect[2:]) > 0 else "无法读取游戏窗口尺寸")
+                if not self._wait_for_user(reason, "resolution", pause_callback, log):
+                    return
             log_brightness_check(log)
 
             # 2. 应用筛选
@@ -195,6 +201,9 @@ class RepoCleaner:
             log(f"专用预设: {len(dedicated_presets)}个", "INFO")
 
             navigation = RepositoryNavigation(total_items=navigation_total, experimental=experimental)
+            recovery_reason = None
+            uncertain_sale = False
+            sell_header = None
             log("仓库导航识别：" + ("实验模式" if experimental else "标准模式"), "INFO")
             if navigation_total is not None:
                 log(f"仓库导航末行适配已启用（库存 {navigation_total} 件）", "INFO")
@@ -214,14 +223,36 @@ class RepoCleaner:
                     self.stop_reason = "completed"
                     break
 
+                image = None
+                if recovery_reason:
+                    image = self._recover_navigation(navigation, recovery_reason, pause_callback, log)
+                    if image is None:
+                        break
+                    recovery_reason = None
+
                 # 截图（使用 RepositoryFilter 的截图方法，确保截取客户区）
                 t_start = time.time()
-                image = self.repository_filter._capture_game_window()
+                if pause_callback and not self.game_in_foreground():
+                    uncertain_sale |= navigation.pending_action == "sale"
+                    recovery_reason = "游戏窗口不在前台"
+                    continue
+                if image is None:
+                    image = self.repository_filter._capture_game_window()
                 t_capture = time.time() - t_start
                 if image is None:
-                    log("截图失败，停止清理", "ERROR")
-                    self.stop_reason = "error"
-                    break
+                    uncertain_sale |= navigation.pending_action == "sale"
+                    recovery_reason = "无法获取游戏画面"
+                    continue
+
+                if pause_callback:
+                    header = navigation._crop_gray(image, RepositoryFilter.SELL_REGION)
+                    if (sell_header is None or header.shape != sell_header.shape
+                            or navigation._change(sell_header, header) >= 5):
+                        if not self.repository_filter.verify_sell_interface(image):
+                            uncertain_sale |= navigation.pending_action == "sale"
+                            recovery_reason = "当前画面无法识别为仓库清理的遗物列表"
+                            continue
+                        sell_header = header
 
                 # 光标位置为导航依据；详情文字和大图标仅检查面板是否刷新。
                 check = navigation.check(
@@ -248,7 +279,7 @@ class RepoCleaner:
                 if check is None or not check.confirmed:
                     if check is not None:
                         self._record_navigation_check(image, navigation, check)
-                    log("无法确认已进入下一遗物，停止清理（不重按 F）；"
+                    log("无法确认已进入下一遗物（不重按 F）；"
                         + (f"判据={check.evidence}，"
                            f"详情变化={check.detail_change:.2f}，"
                            f"详情图标变化={check.detail_icon_change:.2f}，"
@@ -257,8 +288,11 @@ class RepoCleaner:
                            f"预计位置={check.box}，"
                            f"检测光标={check.detected_box if check.cursor_checked else '未检测'}"
                            if check is not None else "补拍截图失败"), "WARNING")
-                    self.stop_reason = "error"
-                    break
+                    recovery_reason = check.evidence if check is not None else "补拍游戏画面失败"
+                    if check is not None and check.cursor_checked and check.detected_box is None:
+                        recovery_reason = "没有识别到当前遗物的高亮框"
+                    uncertain_sale |= navigation.pending_action == "sale"
+                    continue
 
                 cursor_box = check.box
 
@@ -275,17 +309,19 @@ class RepoCleaner:
                 has_next = max_relics <= 0 or self.stats["total_detected"] < max_relics
 
                 # 跳过决策
-                official_marker = self.relic_detector._has_official_marker(image)
-                should_skip = official_marker or self._should_skip_relic(
+                should_skip = self._should_skip_relic(
                     relic_state, cleaning_mode, allow_operate_favorited)
 
                 if should_skip:
                     log("跳过该遗物", "INFO")
                     self.stats["skipped"] += 1
                     self._publish_result(mode, None, None, '跳过',
-                                         '特殊遗物' if official_marker else '遗物状态不可操作',
+                                         '无单件售价' if relic_state == RELIC_STATE_DARK_O else '遗物状态不可操作',
                                          log, result_callback)
-                    if has_next:
+                    if has_next and self.is_running:
+                        if pause_callback and not self.game_in_foreground():
+                            recovery_reason = "游戏窗口不在前台"
+                            continue
                         pydirectinput.press('right')
                         navigation.expect_next(image, "right")
                     continue
@@ -318,10 +354,12 @@ class RepoCleaner:
                     # 检查是否是手动停止导致的识别失败
                     if self.is_running:
                         # 正常运行中的识别失败，输出错误信息
-                        log("OCR识别失败（重试3次后仍未识别到任何词条），停止清理", "ERROR")
-                        log("可能原因：不在遗物界面或界面显示异常", "ERROR")
+                        self.stats["skipped"] += 1
+                        if has_next:
+                            recovery_reason = "多次读取仍未识别到遗物词条"
+                            continue
                         self.stop_reason = "error"
-                        self.is_running = False  # 标记为意外停止
+                        log("最后一件遗物未能识别，清理结束，请核对待售选择。", "WARNING")
                     else:
                         # 手动停止导致的识别失败，不输出错误
                         log("检测到停止信号，结束清理", "INFO")
@@ -368,6 +406,12 @@ class RepoCleaner:
                     self._publish_result(mode, ocr_result, match_result,
                                          '跳过', '清理已停止，未执行操作', log, result_callback)
                     break
+                if pause_callback and not self.game_in_foreground():
+                    self.stats["skipped"] += 1
+                    self._publish_result(mode, ocr_result, match_result, '跳过',
+                                         '游戏窗口不在前台，未执行操作', log, result_callback)
+                    recovery_reason = "游戏窗口不在前台"
+                    continue
                 if not match_result.destructive_action_allowed:
                     self.stats["skipped"] += 1
                     self._publish_result(mode, ocr_result, match_result,
@@ -451,11 +495,17 @@ class RepoCleaner:
                 self._print_stats(log, cleaning_mode)
 
             # 自动完成售出操作（仅在正常停止时执行）
-            if self.stop_reason == "completed" and self.is_running and cleaning_mode == "sell" and self.pending_sell_count > 0:
+            if uncertain_sale and self.pending_sell_count:
+                log("有待售勾选未能核实，请在游戏内核对并手动确认售出。", "WARNING")
+            if self.stop_reason == "completed" and self.is_running and cleaning_mode == "sell" and self.pending_sell_count > 0 and not uncertain_sale:
+                if pause_callback and not self.game_in_foreground():
+                    log("游戏窗口不在前台，请手动核对待售选择。", "WARNING")
+                    return
                 log(f"执行售出操作 ({self.pending_sell_count}个遗物)...", "INFO")
                 pydirectinput.press('3')  # 打开售出界面
                 time.sleep(0.5)
-                if not self.is_running or self.stop_reason != "completed":
+                if (not self.is_running or self.stop_reason != "completed"
+                        or (pause_callback and not self.game_in_foreground())):
                     return
                 pydirectinput.press('f')  # 确认售出
                 time.sleep(0.5)
@@ -489,9 +539,10 @@ class RepoCleaner:
             if self.stop_reason is None:
                 self.stop_reason = "manual" if not self.is_running else "error"
             if self.pending_sell_count > 0:
-                log(f"停止原因: {self.stop_reason}；游戏内已选中 {self.pending_sell_count} 个遗物待售出，未自动确认，请检查选择", "WARNING")
+                log(f"停止原因: {self.stop_reason}；程序标记待售 {self.pending_sell_count} 件，请核对游戏中的实际勾选。", "WARNING")
 
             self.is_running = False
+            self.is_paused = False
             self.pending_sell_count = 0
 
     def stop_cleaning(self):
@@ -499,6 +550,51 @@ class RepoCleaner:
         if self.is_running:
             self.stop_reason = "manual"
         self.is_running = False
+        if hasattr(self, '_resume_event'):
+            self._resume_event.set()
+
+    def _wait_for_user(self, reason, stage, notify, log):
+        log(reason, "WARNING")
+        if notify is None:
+            self.stop_reason = "error"
+            return False
+        self._resume_event.clear()
+        self.is_paused = True
+        if self.is_running:
+            notify(reason, stage)
+            self._resume_event.wait()
+        self.is_paused = False
+        return self.is_running
+
+    def game_in_foreground(self):
+        window = self.game_window or self._find_game_window()
+        return window is not None and window == gw.getActiveWindow()
+
+    def _recover_navigation(self, navigation, reason, notify, log):
+        while self._wait_for_user(reason, "item", notify, log):
+            if not self.game_in_foreground():
+                reason = "当前画面无法识别为仓库清理的遗物列表"
+                continue
+            first = self.repository_filter._capture_game_window()
+            if first is None:
+                reason = "无法获取游戏画面"
+                continue
+            if not self.repository_filter.verify_sell_interface(first):
+                reason = "当前画面无法识别为仓库清理的遗物列表"
+                continue
+            box, _ = self.relic_detector.detect_cursor(first)
+            time.sleep(0.15)
+            image = self.repository_filter._capture_game_window()
+            if not self.is_running:
+                break
+            if image is not None and box and self.game_in_foreground():
+                detected, _ = self.relic_detector.detect_cursor(image)
+                if (navigation._cursor_at_expected(detected, box)
+                        and navigation.reanchor(image, detected)):
+                    log("已从当前高亮的遗物继续清理", "INFO")
+                    return image
+            reason = "未能确认当前高亮框的位置"
+        return None
 
     def pause_cleaning(self):
         """暂停清理"""
@@ -506,7 +602,9 @@ class RepoCleaner:
 
     def resume_cleaning(self):
         """恢复清理"""
-        self.is_paused = False
+        if self.is_paused:
+            self.is_paused = False
+            self._resume_event.set()
 
     def _reset_stats(self):
         """重置统计信息"""
@@ -550,6 +648,8 @@ class RepoCleaner:
         if relic_state not in (RELIC_STATE_LIGHT, RELIC_STATE_DARK_F, RELIC_STATE_DARK_FE,
                                RELIC_STATE_DARK_E, RELIC_STATE_DARK_O):
             return True
+        if relic_state == RELIC_STATE_DARK_O:
+            return True
         if cleaning_mode == "sell":
             if relic_state == RELIC_STATE_LIGHT:
                 return False  # 自由状态，可售出
@@ -569,7 +669,7 @@ class RepoCleaner:
                 return not allow_favorited  # 已收藏，根据设置决定是否可取消
             elif relic_state == RELIC_STATE_DARK_FE:
                 return not allow_favorited  # 已装备且收藏，根据设置决定是否可取消
-            else:  # E, O
+            else:  # E
                 return False  # 已装备或官方遗物，可收藏
 
         return True

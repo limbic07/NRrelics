@@ -13,11 +13,11 @@ from core.utils import get_resource_path, log_debug
 
 # 遗物状态常量
 RELIC_STATE_UNKNOWN = "Unknown"
-RELIC_STATE_LIGHT = "Light" #亮度高 自由出售
+RELIC_STATE_LIGHT = "Light" #有单件售价、可自由操作
 RELIC_STATE_DARK_FE = "FE"  #已装备且已收藏
 RELIC_STATE_DARK_F = "F"    #仅已收藏
 RELIC_STATE_DARK_E = "E"    #仅已装备
-RELIC_STATE_DARK_O = "O"    #亮度低但没有被收藏和被装备，官方遗物
+RELIC_STATE_DARK_O = "O"    #详情中没有单件售价
 
 # 光标检测参数
 CURSOR_ROI_START_X_RATIO = 0.46
@@ -64,12 +64,11 @@ class RelicDetector:
         self.canny_threshold1 = canny_threshold1
         self.canny_threshold2 = canny_threshold2
         self.experimental_navigation = False
-        self.brightness_threshold = 45
-        self.brightness_center_ratio = 0.55
         self.template_match_threshold = 0.60
         self.icon_search_ratio = 0.35
 
         # 加载模板
+        self.template_price = self._load_template("data/icon_sale_currency.png")
         self.template_cup = self._load_template(icon_cup_path)
         self.template_bookmark = self._load_template(icon_bookmark_path)
 
@@ -198,9 +197,10 @@ class RelicDetector:
                 cursor_width = cursor_box[2]
             if cursor_box is None or not cursor_width:
                 return RELIC_STATE_UNKNOWN
-            # 特殊官方遗物的详情图标右下角有彩色菱形标记。
-            # 它的图标中心也可能超过普通遗物的亮度阈值，必须先判定。
-            if self._has_official_marker(image):
+            has_price = self._has_sale_price(image)
+            if has_price is None:
+                return RELIC_STATE_UNKNOWN
+            if not has_price:
                 return RELIC_STATE_DARK_O
             if self.template_cup is None or self.template_bookmark is None:
                 return RELIC_STATE_UNKNOWN
@@ -228,19 +228,30 @@ class RelicDetector:
         else:
             return RELIC_STATE_DARK_O
 
-    @staticmethod
-    def _has_official_marker(image: np.ndarray) -> bool:
-        """识别详情大图右下角的彩色菱形，避免将特殊遗物误判为可售出。"""
+    def _has_sale_price(self, image: np.ndarray) -> Optional[bool]:
+        """单件售价包含货币图标和数字。详情未加载或两种信号不一致时返回未知。"""
         h, w = image.shape[:2]
-        x1, x2 = round(1032 * w / 1920), round(1049 * w / 1920)
-        y1, y2 = round(866 * h / 1080), round(882 * h / 1080)
-        patch = image[y1:y2, x1:x2]
-        if patch.size == 0:
+
+        def gray_region(x1, y1, x2, y2):
+            region = image[round(y1*h/1080):round(y2*h/1080),
+                           round(x1*w/1920):round(x2*w/1920)]
+            return cv2.resize(cv2.cvtColor(region, cv2.COLOR_BGR2GRAY), (x2-x1, y2-y1))
+
+        if self.template_price is None:
+            return None
+        currency = gray_region(928, 893, 965, 931)
+        score = cv2.matchTemplate(currency, self.template_price, cv2.TM_CCOEFF_NORMED).max()
+        digits = gray_region(991, 897, 1055, 925)
+        # 金额右对齐。用笔画相对局部背景的对比度，不依赖遗物图案的明暗。
+        has_digits = np.percentile(digits, 96) - np.median(digits) > 26
+        if score > 0.55 and has_digits:
+            return True
+        if score > 0.40 or has_digits:
+            return None
+        title = gray_region(1074, 773, 1280, 799)
+        if np.percentile(title, 96) - np.median(title) > 26:
             return False
-        hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
-        saturation, value = hsv[:, :, 1], hsv[:, :, 2]
-        marker_pixels = (saturation >= 40) & (value >= np.median(value) + 25)
-        return np.count_nonzero(marker_pixels) >= max(6, round(marker_pixels.size * 0.12))
+        return None
 
     def _detect_detailed_state(self, image: np.ndarray, cursor_box: Tuple, scale_factor: float) -> Dict:
         """检测详细状态"""
@@ -270,36 +281,10 @@ class RelicDetector:
             return {'state': RELIC_STATE_UNKNOWN, 'equipped': is_equipped,
                     'favorited': is_favorited, 'brightness': 0}
 
-        # 2. 亮度计算
-        center_ratio = self.brightness_center_ratio
-        offset_ratio = (1.0 - center_ratio) / 2.0
-
-        cx = int(roi_w * offset_ratio)
-        cy = int(roi_h * offset_ratio)
-        cw = int(roi_w * center_ratio)
-        ch = int(roi_h * center_ratio)
-
-        center_roi = roi[cy:cy+ch, cx:cx+cw]
-
-        if center_roi.size > 0:
-            hsv = cv2.cvtColor(center_roi, cv2.COLOR_BGR2HSV)
-            brightness = np.mean(hsv[:, :, 2])
-        else:
-            brightness = 0.0
-
-        # 判断状态
-        if is_equipped or is_favorited:
-            state = 'Dark'
-        elif brightness > self.brightness_threshold:
-            state = 'Light'
-        else:
-            state = 'Dark'
-
         return {
-            'state': state,
+            'state': 'Dark' if is_equipped or is_favorited else 'Light',
             'equipped': is_equipped,
             'favorited': is_favorited,
-            'brightness': brightness
         }
 
     def _match_icon(self, search_img: np.ndarray, template: np.ndarray, scale: float) -> Tuple[Optional[bool], float]:
