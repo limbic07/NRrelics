@@ -11,10 +11,10 @@ from core.utils import get_resource_path
 
 
 SURVIVAL_SCENARIOS = {
-    'survival_physical': ('物理抗伤／未触发蓝泪', {'hp', 'mitigation', 'physical_mitigation'}),
-    'survival_element': ('属性抗伤／未触发蓝泪', {'hp', 'mitigation', 'element_mitigation'}),
-    'survival_physical_blue': ('物理抗伤／触发蓝泪', {'hp', 'mitigation', 'physical_mitigation', 'blue_tear'}),
-    'survival_element_blue': ('属性抗伤／触发蓝泪', {'hp', 'mitigation', 'element_mitigation', 'blue_tear'}),
+    'survival_physical': ('物理抗伤／未触发蓝泪', {'flat_hp', 'hp', 'mitigation', 'physical_mitigation'}),
+    'survival_element': ('属性抗伤／未触发蓝泪', {'flat_hp', 'hp', 'mitigation', 'element_mitigation'}),
+    'survival_physical_blue': ('物理抗伤／触发蓝泪', {'flat_hp', 'hp', 'mitigation', 'physical_mitigation', 'blue_tear'}),
+    'survival_element_blue': ('属性抗伤／触发蓝泪', {'flat_hp', 'hp', 'mitigation', 'element_mitigation', 'blue_tear'}),
 }
 SURVIVAL_TAGS = set().union(*(scopes for _, scopes in SURVIVAL_SCENARIOS.values()))
 
@@ -38,7 +38,7 @@ def effect(name):
         '对陷入冻伤的敌人，能强化攻击': ('frost', [10, 16, 20]),
         '提升物理减伤率': ('physical_mitigation', [10, 10.5, 12]),
         '提升属性减伤率': ('element_mitigation', [6, 10.5, 12]),
-        '生命力': ('hp', [0, 2, 4, 6]),
+        '生命力': ('flat_hp', [0, 2, 4, 6]),
         '周围陷入催眠时，提升攻击力': ('all', [12, 22]),
         '周围陷入发狂时，提升攻击力': ('all', [12, 22]),
         '涂抹油脂类道具时，能额外提升物理攻击力': ('physical', [10, 17, 20]),
@@ -77,7 +77,7 @@ def effect(name):
         if name.endswith('能提升攻击力'):
             return ('all', .10 if '类别为弓的' in name else .20)
         if name.endswith('能提升血量上限'):
-            return ('hp', .20)
+            return ('flat_hp', .20)
     if name.startswith('强化') and name.endswith(('的魔法', '的祷告')):
         return ('school:' + name, .12)
     match = re.fullmatch('提升(.+)的攻击力', name)
@@ -216,6 +216,8 @@ class Metrics:
             official = self.official.get(str(relic.get('official_id')), 0) > 0
             for name in relic['affixes']:
                 tag, value = ('function', 0) if name in self.converted_positive.get(mode, set()) else effect(name)
+                if tag == 'hp' and name == '提升血量上限' and mode == 'normal':
+                    tag = 'flat_hp'  # 普通遗物加固定 100 血；同名深夜词条加 10%。
                 if name in self.negative_names.get(mode,set()):
                     negatives += 1
                     negative_terms[name] += 1
@@ -237,19 +239,19 @@ class Metrics:
                 if '被左侧覆盖' in relic.get('initial_effect_status', {}).get(name, ''):
                     continue
                 key = ('three-weapons' if name.startswith('装备三把以上') and name.endswith('能提升攻击力') else name)
-                if key in seen and not _is_repeatable(mode, name):
-                    continue
-                if key == 'three-weapons' and key in seen:
-                    continue
-                seen.add(key)
+                if key == 'three-weapons' or not _is_repeatable(mode, name):
+                    if key in seen:
+                        continue
+                    seen.add(key)
                 if tag == 'pending': pending.add(name)
                 active.append((name, tag, value))
         if any(name in (VAMP[1], VAMP[2]) for name, _, _ in active):
             active = [a for a in active if a[0] != VAMP[0]]
         damage = [100 * (math.prod(1 + v for _, tag, v in active if tag in scopes) - 1)
                   for _, scopes in self.scenarios]
-        hp = math.prod(1 + v for _, t, v in active if t == 'hp')
-        survival = {key: 100 * (hp / math.prod(1 - v for _, t, v in active if t in scopes and t != 'hp') - 1)
+        base_hp = 1 + sum(v for _, t, v in active if t == 'flat_hp')
+        hp = base_hp * math.prod(1 + v for _, t, v in active if t == 'hp')
+        survival = {key: 100 * (hp / math.prod(1 - v for _, t, v in active if t in scopes and t not in ('flat_hp', 'hp')) - 1)
                     for key, (_, scopes) in self.survival_scenarios.items()}
         return {'damage': damage, 'survival': survival,
                 'functions': sum(t == 'function' for _, t, _ in active),

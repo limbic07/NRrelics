@@ -25,7 +25,8 @@ def solve(normal, deep, required_groups=None):
 
 
 @pytest.mark.parametrize('name', ['提升物理攻击力+4', '提升大剑的攻击力',
-    '强化卡利亚剑的魔法', '减少专注值消耗'])
+    '强化卡利亚剑的魔法', '减少专注值消耗', '提升近战攻击力', '提升战技攻击力',
+    '提升刺剑的攻击力', '生命力+3', '持续恢复专注值', '提升投掷小刀的攻击力'])
 def test_repeat_same_name(name):
     assert solve([[name]]*3, [[name]]*3) == 60
 

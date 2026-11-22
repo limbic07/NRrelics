@@ -138,7 +138,7 @@ def test_survival_uses_actual_effects_and_separates_physical_element_and_blue():
            '提升属性减伤率+2','血量偏低时，能提升减伤率',
            '减伤率降低时，偶尔会让敌人攻击失效']
     value=evaluate(m,names)
-    hp=1.02*1.04*1.06*1.10*1.075
+    hp=(1+.02+.04+.06+.10)*1.075
     assert value['survival']==pytest.approx({
         'survival_physical':100*(hp/.895/.8-1),
         'survival_element':100*(hp/.88/.8-1),
@@ -161,6 +161,64 @@ def test_specific_element_mitigation_is_ignored_even_if_effective():
     value=evaluate(m,names)
     assert not value['active_effects'] and not value['pending']
     assert all(v==0 for v in value['survival'].values())
+
+
+@pytest.mark.parametrize('first', [112, 113])
+def test_balancer_copies_in_actual_default_build(first):
+    import json
+    from pathlib import Path
+    from core.official_relics import load_official_relics
+    from core.loadout_optimizer import optimize
+    from core.loadout_metrics import dominates
+    from core.utils import get_resource_path
+
+    presets = SimpleNamespace(**json.loads(Path(get_resource_path('data/default_presets.json')).read_text(encoding='utf-8')))
+    preset_id = next(k for k, v in presets.normal_dedicated.items() if v['name'] == '追踪者｜属性战技·大剑')
+    m = Metrics(presets, {}, preset_id, 'none', '追踪者')
+    catalog = {o['id']: o for o in load_official_relics()}
+    cup = dict(hero_en='Wylder', name_en='test', normal_en='Blue,*,Red', deep_en='')
+    def solve(ids):
+        relics = [dict(id=i, relic_type='normal', official_id=oid, affixes=catalog[oid]['affixes'],
+                       color=catalog[oid]['color']) for i, oid in enumerate(ids)]
+        for color in (['蓝', '红'] if len(ids) == 1 else ['红']):
+            relics.append(dict(id=len(relics), relic_type='normal', affixes=[], color=color))
+        row = optimize({'hero':'追踪者'}, relics, [cup], presets, {}, normal_preset_id=preset_id,
+                       deepnight_preset_id='none', page_size=1)['solutions'][0]
+        row['metrics'] = m.evaluate(row)
+        return row
+
+    single, double = solve([113]), solve([first, 113])
+    scene = next(i for i, (label, _) in enumerate(m.scenarios) if label == '通用战技／无指定目标状态／基础')
+    assert single['score'] == 19 and double['score'] == (44 if first == 112 else 38)
+    assert single['metrics']['damage'][scene] == pytest.approx(21.9)
+    assert double['metrics']['damage'][scene] == pytest.approx(100 * ((1.06 * 1.15)**2 - 1))
+    assert double['metrics']['functions'] == 0
+    assert dominates(double, single, columns=[scene])
+
+
+def test_flat_hp_adds_before_percent_hp_regardless_of_relic_order():
+    m = metrics([])
+    normal = dict(relic_type='normal', affixes=['生命力+3', '提升血量上限'])
+    deep = dict(relic_type='deepnight', affixes=['提升血量上限'])
+    for items in ([normal, normal, deep], [deep, normal, normal]):
+        result = m.evaluate({'relics': items})
+        assert result['survival']['survival_physical'] == pytest.approx(100 * (1.22 * 1.10 - 1))
+
+
+def test_converted_negative_counts_each_copy_once_even_in_legacy_preset():
+    from core.loadout_optimizer import optimize
+    term = '降低生命力、感应'
+    preset = {'affixes':[term], 'affix_tiers':{term:'core'}, 'negative_tiers':{term:'core'}}
+    presets = SimpleNamespace(normal_general={}, deepnight_general={}, normal_dedicated={},
+                              deepnight_whitelist_dedicated={'d':preset})
+    items = [dict(id=i, relic_type='deepnight', color='蓝', affixes=[term] if i < 2 else [])
+             for i in range(3)]
+    cup = dict(hero_en='Wylder', name_en='test', normal_en='', deep_en='Blue,Blue,Blue')
+    row = optimize({'hero':'追踪者'}, items, [cup], presets, {}, normal_preset_id='none',
+                   deepnight_preset_id='d', page_size=1)['solutions'][0]
+    assert row['score'] == 20
+    result = Metrics(presets, {}, 'none', 'd', '追踪者').evaluate(row)
+    assert result['functional_terms'] == {term:2} and result['negatives'] == 0
 
 
 def test_new_damage_and_function_classification_and_positive_negatives():
